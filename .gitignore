@@ -1,0 +1,46 @@
+*.log
+.DS_Store
+Thumbs.db
+
+# Entorno / secretos
+.env
+.env.backup
+.env.production
+auth.json
+.phpactor.json
+
+# IDEs
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+
+# Dependencias
+/vendor
+/node_modules
+
+# Build / runtime
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*.php
+/bootstrap/cache/*.php
+
+# Testing / cache
+.phpunit.result.cache
+/.phpunit.cache
+
+# Bases/archivos locales o temporales
+/database/*.sqlite
+/database/migrations.rar
+/estructura.txt
+/IDEJSys
+Homestead.json
+Homestead.yaml
