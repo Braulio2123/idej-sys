@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AgendaOperativaController;
 use App\Http\Controllers\AlumnoController;
 use App\Http\Controllers\BecaController;
 use App\Http\Controllers\BitacoraController;
@@ -39,13 +40,26 @@ Route::redirect('/', '/dashboard');
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Agenda operativa unificada para Académica, Sistemas, Recepción y Dirección.
+    Route::get('agenda-operativa', [AgendaOperativaController::class, 'index'])
+        ->middleware('rol:Admin,Sistemas,Academica,CAdmin,Direccion,Recepcion')
+        ->name('agenda-operativa.index');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    // Solicitudes de pago docente: acciones especiales protegidas por rol.
+    // Solicitudes de pago docente: flujo Académica → Administración/Finanzas.
     Route::put('solicitudes_pago/{solicitud_pago}/aprobar', [SolicitudPagoDocenteController::class, 'aprobar'])
-        ->middleware('rol:Admin,Academica')
+        ->middleware('rol:Admin,CAdmin,Finanzas')
         ->name('solicitudes_pago.aprobar');
+
+    Route::get('solicitudes_pago/{solicitud_pago}/observar', [SolicitudPagoDocenteController::class, 'formObservar'])
+        ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->name('solicitudes_pago.observar.form');
+
+    Route::put('solicitudes_pago/{solicitud_pago}/observar', [SolicitudPagoDocenteController::class, 'observar'])
+        ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->name('solicitudes_pago.observar');
 
     Route::get('solicitudes_pago/{solicitud_pago}/pagar', [SolicitudPagoDocenteController::class, 'formPagar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
@@ -54,6 +68,18 @@ Route::middleware(['auth'])->group(function () {
     Route::put('solicitudes_pago/{solicitud_pago}/pagar', [SolicitudPagoDocenteController::class, 'pagar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
         ->name('solicitudes_pago.pagar');
+
+    Route::get('solicitudes_pago/{solicitud_pago}/cancelar', [SolicitudPagoDocenteController::class, 'formCancelar'])
+        ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->name('solicitudes_pago.cancelar.form');
+
+    Route::put('solicitudes_pago/{solicitud_pago}/cancelar', [SolicitudPagoDocenteController::class, 'cancelar'])
+        ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->name('solicitudes_pago.cancelar');
+
+    Route::get('solicitudes_pago/{solicitud_pago}/comprobante', [SolicitudPagoDocenteController::class, 'descargarComprobante'])
+        ->middleware('rol:Admin,CAdmin,Finanzas,Direccion')
+        ->name('solicitudes_pago.comprobante');
 
     // Alumnos y operación de caja/recepción.
     Route::middleware('rol:Admin,Recepcion,CAdmin,Finanzas,RRPP,Academica,Direccion')->group(function () {
@@ -353,22 +379,25 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Solicitudes de pago docente.
-    Route::middleware('rol:Admin,CAdmin,Academica,Recepcion,Finanzas')->group(function () {
+    Route::middleware('rol:Admin,CAdmin,Academica,Finanzas,Direccion')->group(function () {
         Route::get('solicitudes_pago', [SolicitudPagoDocenteController::class, 'index'])->name('solicitudes_pago.index');
     });
 
-    Route::middleware('rol:Admin,CAdmin,Academica,Recepcion')->group(function () {
+    Route::middleware('rol:Admin,Academica')->group(function () {
         Route::get('solicitudes_pago/create', [SolicitudPagoDocenteController::class, 'create'])->name('solicitudes_pago.create');
         Route::post('solicitudes_pago', [SolicitudPagoDocenteController::class, 'store'])->name('solicitudes_pago.store');
     });
 
-    Route::middleware('rol:Admin')->group(function () {
+    Route::middleware('rol:Admin,Academica')->group(function () {
         Route::get('solicitudes_pago/{solicitud_pago}/edit', [SolicitudPagoDocenteController::class, 'edit'])->name('solicitudes_pago.edit');
         Route::put('solicitudes_pago/{solicitud_pago}', [SolicitudPagoDocenteController::class, 'update'])->name('solicitudes_pago.update');
+    });
+
+    Route::middleware('rol:Admin')->group(function () {
         Route::delete('solicitudes_pago/{solicitud_pago}', [SolicitudPagoDocenteController::class, 'destroy'])->name('solicitudes_pago.destroy');
     });
 
-    Route::middleware('rol:Admin,CAdmin,Academica,Recepcion,Finanzas')->group(function () {
+    Route::middleware('rol:Admin,CAdmin,Academica,Finanzas,Direccion')->group(function () {
         Route::get('solicitudes_pago/{solicitud_pago}', [SolicitudPagoDocenteController::class, 'show'])->name('solicitudes_pago.show');
     });
 

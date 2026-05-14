@@ -40,7 +40,7 @@
     $puedeProspectos = in_array($rolClave, [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::RRPP, Rol::DIRECCION], true);
     $puedeAcademica = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::SISTEMAS], true);
     $puedeEducacionContinua = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::SISTEMAS, Rol::DIRECCION], true);
-    $puedeSolicitudes = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::RECEPCION, Rol::FINANZAS], true);
+    $puedeSolicitudes = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::FINANZAS, Rol::DIRECCION], true);
     $puedeFinanzas = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true);
     $puedeCaja = in_array($rolClave, [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS], true);
     $puedeReportes = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION], true);
@@ -48,6 +48,7 @@
     $puedeConfiguracion = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
     $puedeMantenimiento = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
     $puedeBitacora = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS, Rol::DIRECCION], true);
+    $puedeAgendaOperativa = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS, Rol::ACADEMICA, Rol::CADMIN, Rol::DIRECCION, Rol::RECEPCION], true);
 @endphp
 
 <aside class="bg-gradient-to-b from-[#1E3A8A] via-[#162860] to-[#0D133A] text-slate-50 border-r border-blue-900/60 transition-all duration-300 ease-in-out flex flex-col shadow-2xl"
@@ -75,6 +76,14 @@
             </span>
             <span x-show="sidebarOpen" x-transition>Dashboard</span>
         </a>
+
+
+        @if($puedeAgendaOperativa)
+            <a href="{{ route('agenda-operativa.index') }}" class="{{ $linkBase }} {{ request()->routeIs('agenda-operativa.*') ? $active : $inactive }}">
+                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-star text-2xl'></i></span>
+                <span x-show="sidebarOpen">Agenda Operativa</span>
+            </a>
+        @endif
 
         @if($puedeUsuarios)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-amber-200/90">

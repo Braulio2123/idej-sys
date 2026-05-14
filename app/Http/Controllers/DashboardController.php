@@ -45,11 +45,11 @@ class DashboardController extends Controller
         $docentesCount      = Docente::count();
         $docentesNuevosMes  = Docente::whereDate('created_at', '>=', $inicioMes)->count();
 
-        $pagosPendientes    = SolicitudPagoDocente::where('estatus', 'Pendiente')->count();
-        $pagosAprobados     = SolicitudPagoDocente::where('estatus', 'Aprobada')->count();
-        $pagosPagados       = SolicitudPagoDocente::where('estatus', 'Pagada')->count();
+        $pagosPendientes    = SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PENDIENTE)->count();
+        $pagosAprobados     = SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_AUTORIZADA)->count();
+        $pagosPagados       = SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PAGADA)->count();
 
-        $montoPagadoMes     = SolicitudPagoDocente::where('estatus', 'Pagada')
+        $montoPagadoMes     = SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PAGADA)
                                 ->whereDate('fecha_pago', '>=', $inicioMes)
                                 ->sum('monto');
 
@@ -100,7 +100,7 @@ class DashboardController extends Controller
         $pagosWebHoy = Pago::activos()->whereDate('fecha_pago', $hoy)->count();
 
         // ACADÉMICA
-        $solicitudesPendientes = SolicitudPagoDocente::where('estatus', 'Pendiente')->count();
+        $solicitudesPendientes = SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PENDIENTE)->count();
         $docentesActivos       = Docente::where('estatus', 'Activo')->count();
         $gruposActivos         = Grupo::count();
         $materiasActivas       = Materia::activas()->count();
