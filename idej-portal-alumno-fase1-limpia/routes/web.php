@@ -139,6 +139,8 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('rol:Admin,CAdmin,Finanzas')
             ->name('alumnos.becas.cancelar');
 
+
+
         Route::get('alumnos/{alumno}/documentos', [DocumentoAlumnoController::class, 'index'])
             ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,RRPP,Academica,Direccion')
             ->name('alumnos.documentos.index');
@@ -179,6 +181,7 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,RRPP,Academica')
             ->name('alumnos.seguimientos.destroy');
     });
+
 
     // Prospectos y Relaciones Públicas.
     Route::middleware('rol:Admin,Recepcion,CAdmin,RRPP,Direccion')->group(function () {
@@ -316,6 +319,7 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('horarios_academicos', HorarioAcademicoController::class)
             ->parameters(['horarios_academicos' => 'horarioAcademico']);
 
+
         Route::resource('educacion-continua', CursoEducacionContinuaController::class)
             ->names('educacion_continua')
             ->parameters(['educacion-continua' => 'educacionContinua']);
@@ -389,27 +393,11 @@ Route::middleware(['auth'])->group(function () {
 | Portal Alumno PWA - Christian
 |--------------------------------------------------------------------------
 |
-| Carga aislada de rutas del Portal Alumno.
-|
-| IMPORTANTE:
-| - Este bloque NO pertenece al panel administrativo.
-| - Las rutas reales del portal están en routes/portal_alumno.php.
-| - Se mantiene separado para no mezclar el trabajo del área académica
-|   administrativa con el módulo del alumno.
-|
-| URL base del portal:
-| /portal-alumno
+| Se registra en archivo separado para no mezclar rutas del alumno con el
+| panel administrativo academico existente. Todas sus rutas viven en:
+| routes/portal_alumno.php
 |
 */
 require __DIR__.'/portal_alumno.php';
 
-/*
-|--------------------------------------------------------------------------
-| Rutas de autenticación administrativa
-|--------------------------------------------------------------------------
-|
-| Archivo original de autenticación del sistema administrativo.
-| Se mantiene separado del Portal Alumno.
-|
-*/
 require __DIR__.'/auth.php';

@@ -1,0 +1,31 @@
+{
+    "name": "IDEJ Portal Alumno",
+    "short_name": "IDEJ Alumno",
+    "description": "Portal PWA para alumnos del Instituto de Altos Estudios Juridicos de Jalisco.",
+    "start_url": "/portal-alumno",
+    "scope": "/portal-alumno/",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#0f2a5f",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/portal-alumno/icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/portal-alumno/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/portal-alumno/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
