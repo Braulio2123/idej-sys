@@ -64,7 +64,7 @@
                                 <td class="px-4 py-3">{{ $pago->referencia_principal ?? '—' }}</td>
                                 <td class="px-4 py-3">
                                     @if($pago->archivo_comprobante)
-                                        <a href="{{ asset('storage/' . $pago->archivo_comprobante) }}" target="_blank" class="text-indigo-600 hover:underline">
+                                        <a href="{{ route('alumnos.pagos.comprobante', [$alumno, $pago]) }}" class="text-indigo-600 hover:underline">
                                             Ver archivo
                                         </a>
                                     @else
@@ -80,7 +80,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3">
-                                    <a href="{{ route('alumnos.pagos.recibo', [$alumno, $pago]) }}" target="_blank" class="inline-flex items-center px-3 py-1 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900">
+                                    <a href="{{ route('alumnos.pagos.recibo', [$alumno, $pago]) }}" class="inline-flex items-center px-3 py-1 rounded bg-slate-800 text-white text-xs font-semibold hover:bg-slate-900">
                                         PDF
                                     </a>
                                 </td>

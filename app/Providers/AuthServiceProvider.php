@@ -17,46 +17,24 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        Gate::define('es-admin', fn (Usuario $user) => $user->tieneRol(Rol::ADMIN));
-        Gate::define('es-sistemas', fn (Usuario $user) => $user->tieneRol(Rol::SISTEMAS));
-        Gate::define('es-direccion', fn (Usuario $user) => $user->tieneRol(Rol::DIRECCION));
-        Gate::define('es-cadmin', fn (Usuario $user) => $user->tieneRol(Rol::CADMIN));
-        Gate::define('es-recepcion', fn (Usuario $user) => $user->tieneRol(Rol::RECEPCION));
-        Gate::define('es-academica', fn (Usuario $user) => $user->tieneRol(Rol::ACADEMICA));
-        Gate::define('es-finanzas', fn (Usuario $user) => $user->tieneRol(Rol::FINANZAS));
+        foreach (config('idej_permisos.gates', []) as $gate => $definicion) {
+            Gate::define($gate, function (Usuario $user) use ($definicion) {
+                if (is_string($definicion)) {
+                    return $user->tienePermiso($definicion);
+                }
 
-        Gate::define('puede-ver-alumnos', function (Usuario $user) {
-            return $user->tieneRol(Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION, Rol::RRPP, Rol::ACADEMICA);
-        });
+                if (is_array($definicion)) {
+                    return $user->tieneRol(...$definicion);
+                }
 
+                return false;
+            });
+        }
 
+        foreach (array_keys(config('idej_permisos.permisos', [])) as $permiso) {
+            Gate::define($permiso, fn (Usuario $user) => $user->tienePermiso($permiso));
+        }
 
-        Gate::define('puede-ver-academica', function (Usuario $user) {
-            return $user->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::DIRECCION, Rol::SISTEMAS);
-        });
-
-        Gate::define('puede-ver-prospectos', function (Usuario $user) {
-            return $user->tieneRol(Rol::RECEPCION, Rol::CADMIN, Rol::RRPP, Rol::DIRECCION);
-        });
-
-        Gate::define('puede-ver-finanzas', function (Usuario $user) {
-            return $user->tieneRol(Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION);
-        });
-
-        Gate::define('puede-operar-caja', function (Usuario $user) {
-            return $user->tieneRol(Rol::CADMIN, Rol::FINANZAS, Rol::RECEPCION);
-        });
-
-        Gate::define('puede-administrar-usuarios', function (Usuario $user) {
-            return $user->tieneRol(Rol::SISTEMAS);
-        });
-
-        Gate::define('puede-mantenimiento-sistema', function (Usuario $user) {
-            return $user->tieneRol(Rol::ADMIN, Rol::SISTEMAS);
-        });
-
-        Gate::define('puede-ver-bitacora', function (Usuario $user) {
-            return $user->tieneRol(Rol::SISTEMAS, Rol::DIRECCION);
-        });
+        Gate::define('es-rrpp', fn (Usuario $user) => $user->tieneRol(Rol::RRPP));
     }
 }

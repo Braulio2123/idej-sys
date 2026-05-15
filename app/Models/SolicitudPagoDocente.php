@@ -67,6 +67,7 @@ class SolicitudPagoDocente extends Model
         'banco_pago',
         'comprobante_pago_path',
         'comprobante_pago_original',
+        'pago_operacion_uuid',
         'observaciones_academica',
         'observaciones_administracion',
         'motivo_observacion',

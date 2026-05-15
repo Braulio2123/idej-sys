@@ -54,6 +54,17 @@ class CursoSesion extends Model
         return $this->belongsTo(Docente::class, 'docente_id');
     }
 
+    public function solicitudesPagoDocente()
+    {
+        return $this->hasMany(SolicitudPagoDocente::class, 'curso_sesion_id');
+    }
+
+    public function solicitudesPagoDocenteOperativas()
+    {
+        return $this->solicitudesPagoDocente()
+            ->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA]);
+    }
+
     public function asistencias()
     {
         return $this->hasMany(CursoAsistencia::class, 'curso_sesion_id');

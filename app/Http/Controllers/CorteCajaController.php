@@ -6,6 +6,7 @@ use App\Models\CorteCaja;
 use App\Models\Pago;
 use App\Models\Usuario;
 use App\Traits\RegistraBitacora;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +65,8 @@ class CorteCajaController extends Controller
             'observaciones_apertura' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $corte = DB::transaction(function () use ($validated) {
+        try {
+            $corte = DB::transaction(function () use ($validated) {
             $existente = CorteCaja::abierta()
                 ->deUsuario(Auth::id())
                 ->lockForUpdate()
@@ -78,6 +80,7 @@ class CorteCajaController extends Controller
 
             $corte = CorteCaja::create([
                 'usuario_id' => Auth::id(),
+                'usuario_caja_abierta_id' => Auth::id(),
                 'fecha_apertura' => now(),
                 'saldo_inicial' => $validated['saldo_inicial'],
                 'estatus' => CorteCaja::ESTATUS_ABIERTA,
@@ -90,7 +93,16 @@ class CorteCajaController extends Controller
             );
 
             return $corte;
-        });
+            }, 3);
+        } catch (QueryException $e) {
+            if ((string) $e->getCode() === '23000') {
+                throw ValidationException::withMessages([
+                    'saldo_inicial' => 'Ya existe una caja abierta para tu usuario. Se evitó abrir una caja duplicada.',
+                ]);
+            }
+
+            throw $e;
+        }
 
         return redirect()
             ->route('cortes-caja.show', $corte)
@@ -187,6 +199,7 @@ class CorteCajaController extends Controller
                 'diferencia_efectivo' => round($efectivoReportado - $efectivoEsperado, 2),
                 'diferencia_total' => round($totalReportado - ((float) $corte->saldo_inicial + (float) $totales['total_sistema']), 2),
                 'estatus' => CorteCaja::ESTATUS_CERRADA,
+                'usuario_caja_abierta_id' => null,
                 'observaciones_cierre' => $validated['observaciones_cierre'] ?? null,
             ]);
 

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Bitacora extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'bitacoras';
 
@@ -31,6 +32,7 @@ class Bitacora extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'fecha_evento' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function usuario()

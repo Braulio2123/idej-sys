@@ -215,7 +215,7 @@ class DocumentoAlumnoController extends Controller
 
         if ($request->hasFile('archivo')) {
             if ($documento->archivo_path) {
-                Storage::disk('public')->delete($documento->archivo_path);
+                $this->eliminarArchivoFisico($documento->archivo_path);
             }
 
             $this->asignarArchivo($documento, $request->file('archivo'), $alumno);
@@ -253,13 +253,23 @@ class DocumentoAlumnoController extends Controller
     {
         $this->validarDocumentoDelAlumno($alumno, $documento);
 
-        if (! $documento->archivo_path || ! Storage::disk('public')->exists($documento->archivo_path)) {
+        $disk = $this->resolverDiscoArchivo($documento->archivo_path);
+
+        if (! $documento->archivo_path || ! $disk) {
             return back()->with('error', 'El archivo no existe o todavía no ha sido cargado.');
         }
 
         $nombreDescarga = $documento->nombre_original ?: Str::slug($documento->tipo_documento, '_').'.'.($documento->extension ?: 'pdf');
 
-        return Storage::disk('public')->download($documento->archivo_path, $nombreDescarga);
+        $this->bitacora(
+            'Descargar Documento Alumno',
+            "Se descargó el documento {$documento->tipo_documento} del alumno {$alumno->nombre_completo}.",
+            'Documentos de Alumnos',
+            $documento,
+            $alumno->id
+        );
+
+        return Storage::disk($disk)->download($documento->archivo_path, $nombreDescarga);
     }
 
     public function destroy(Alumno $alumno, DocumentoAlumno $documento)
@@ -269,7 +279,7 @@ class DocumentoAlumnoController extends Controller
         $tipo = $documento->tipo_documento;
 
         if ($documento->archivo_path) {
-            Storage::disk('public')->delete($documento->archivo_path);
+            $this->eliminarArchivoFisico($documento->archivo_path);
         }
 
         $documento->delete();
@@ -289,7 +299,9 @@ class DocumentoAlumnoController extends Controller
 
     private function asignarArchivo(DocumentoAlumno $documento, $archivo, Alumno $alumno): void
     {
-        $path = $archivo->store("documentos/alumnos/{$alumno->id}", 'public');
+        // Los documentos de alumnos contienen información sensible.
+        // Se guardan en disco privado y se entregan únicamente por ruta autenticada.
+        $path = $archivo->store("documentos/alumnos/{$alumno->id}", 'local');
 
         $documento->nombre_original = $archivo->getClientOriginalName();
         $documento->archivo_path = $path;
@@ -298,6 +310,39 @@ class DocumentoAlumnoController extends Controller
         $documento->tamano_bytes = $archivo->getSize();
         $documento->fecha_entrega = now();
         $documento->usuario_subio_id = Auth::id();
+    }
+
+    private function resolverDiscoArchivo(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (Storage::disk('local')->exists($path)) {
+            return 'local';
+        }
+
+        // Compatibilidad con archivos cargados antes de la Fase 24.
+        if (Storage::disk('public')->exists($path)) {
+            return 'public';
+        }
+
+        return null;
+    }
+
+    private function eliminarArchivoFisico(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        if (Storage::disk('local')->exists($path)) {
+            Storage::disk('local')->delete($path);
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     private function validarDocumentoDelAlumno(Alumno $alumno, DocumentoAlumno $documento): void

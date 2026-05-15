@@ -6,6 +6,7 @@ use App\Http\Controllers\BecaController;
 use App\Http\Controllers\BitacoraController;
 use App\Http\Controllers\CargoController;
 use App\Http\Controllers\CargoMasivoController;
+use App\Http\Controllers\CentroControlOperativoController;
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\ConceptoPagoController;
 use App\Http\Controllers\ConfiguracionInstitucionalController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\DocenteController;
 use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\MantenimientoController;
 use App\Http\Controllers\MateriaController;
+use App\Http\Controllers\NotificacionInternaController;
 use App\Http\Controllers\HorarioAcademicoController;
 use App\Http\Controllers\CalendarioAcademicoController;
 use App\Http\Controllers\CalendarioMateriaController;
@@ -29,9 +31,11 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProspectoController;
 use App\Http\Controllers\ProgramaController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\ReporteEjecutivoController;
 use App\Http\Controllers\RequisitoDocumentalController;
 use App\Http\Controllers\SolicitudPagoDocenteController;
 use App\Http\Controllers\SeguimientoController;
+use App\Http\Controllers\SeguridadPermisoController;
 use App\Http\Controllers\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,36 +49,60 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('rol:Admin,Sistemas,Academica,CAdmin,Direccion,Recepcion')
         ->name('agenda-operativa.index');
 
+    Route::get('centro-control-operativo', [CentroControlOperativoController::class, 'index'])
+        ->middleware('rol:Admin,Sistemas,Academica,CAdmin,Direccion,Recepcion')
+        ->name('centro-control.index');
+
+
+    // Notificaciones internas del panel administrativo.
+    Route::get('notificaciones', [NotificacionInternaController::class, 'index'])
+        ->name('notificaciones.index');
+    Route::patch('notificaciones/leer-todas', [NotificacionInternaController::class, 'marcarTodasLeidas'])
+        ->name('notificaciones.leer-todas');
+    Route::patch('notificaciones/{notificacion}/leer', [NotificacionInternaController::class, 'marcarLeida'])
+        ->name('notificaciones.leer');
+    Route::patch('notificaciones/{notificacion}/no-leida', [NotificacionInternaController::class, 'marcarNoLeida'])
+        ->name('notificaciones.no-leida');
+    Route::delete('notificaciones/{notificacion}', [NotificacionInternaController::class, 'archivar'])
+        ->name('notificaciones.archivar');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     // Solicitudes de pago docente: flujo Académica → Administración/Finanzas.
     Route::put('solicitudes_pago/{solicitud_pago}/aprobar', [SolicitudPagoDocenteController::class, 'aprobar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.aprobar');
 
     Route::get('solicitudes_pago/{solicitud_pago}/observar', [SolicitudPagoDocenteController::class, 'formObservar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.observar.form');
 
     Route::put('solicitudes_pago/{solicitud_pago}/observar', [SolicitudPagoDocenteController::class, 'observar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.observar');
 
     Route::get('solicitudes_pago/{solicitud_pago}/pagar', [SolicitudPagoDocenteController::class, 'formPagar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.form_pagar');
 
     Route::put('solicitudes_pago/{solicitud_pago}/pagar', [SolicitudPagoDocenteController::class, 'pagar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.pagar');
 
     Route::get('solicitudes_pago/{solicitud_pago}/cancelar', [SolicitudPagoDocenteController::class, 'formCancelar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.cancelar.form');
 
     Route::put('solicitudes_pago/{solicitud_pago}/cancelar', [SolicitudPagoDocenteController::class, 'cancelar'])
         ->middleware('rol:Admin,CAdmin,Finanzas')
+        ->middleware('password.fresh:900')
         ->name('solicitudes_pago.cancelar');
 
     Route::get('solicitudes_pago/{solicitud_pago}/comprobante', [SolicitudPagoDocenteController::class, 'descargarComprobante'])
@@ -113,20 +141,28 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,Direccion')
             ->name('alumnos.pagos.recibo');
 
+        Route::get('alumnos/{alumno}/pagos/{pago}/comprobante', [PagoController::class, 'descargarComprobante'])
+            ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,Direccion')
+            ->name('alumnos.pagos.comprobante');
+
         Route::get('alumnos/{alumno}/pagos/{pago}/cancelar', [PagoController::class, 'confirmarCancelacion'])
             ->middleware('rol:Admin,CAdmin,Finanzas')
+            ->middleware('password.fresh:900')
             ->name('alumnos.pagos.cancelar.confirmar');
 
         Route::put('alumnos/{alumno}/pagos/{pago}/cancelar', [PagoController::class, 'cancelar'])
             ->middleware('rol:Admin,CAdmin,Finanzas')
+            ->middleware('password.fresh:900')
             ->name('alumnos.pagos.cancelar');
 
         Route::get('alumnos/{alumno}/pagos/{pago}/ajuste-cancelacion', [PagoController::class, 'confirmarAjusteCancelacion'])
             ->middleware('rol:Admin,CAdmin,Finanzas')
+            ->middleware('password.fresh:900')
             ->name('alumnos.pagos.ajuste-cancelacion.confirmar');
 
         Route::put('alumnos/{alumno}/pagos/{pago}/ajuste-cancelacion', [PagoController::class, 'ajusteCancelacion'])
             ->middleware('rol:Admin,CAdmin,Finanzas')
+            ->middleware('password.fresh:900')
             ->name('alumnos.pagos.ajuste-cancelacion');
 
         Route::resource('alumnos.convenios', ConvenioController::class)
@@ -159,10 +195,12 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/alumnos/{alumno}/becas/{beca}/cancelar', [BecaController::class, 'confirmarCancelacion'])
             ->middleware('rol:Admin,CAdmin,Finanzas')
+            ->middleware('password.fresh:900')
             ->name('alumnos.becas.cancelar.confirmar');
 
         Route::put('/alumnos/{alumno}/becas/{beca}/cancelar', [BecaController::class, 'cancelar'])
             ->middleware('rol:Admin,CAdmin,Finanzas')
+            ->middleware('password.fresh:900')
             ->name('alumnos.becas.cancelar');
 
         Route::get('alumnos/{alumno}/documentos', [DocumentoAlumnoController::class, 'index'])
@@ -187,6 +225,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('alumnos/{alumno}/documentos/{documento}', [DocumentoAlumnoController::class, 'destroy'])
             ->middleware('rol:Admin,CAdmin')
+            ->middleware('password.fresh:900')
             ->name('alumnos.documentos.destroy');
 
         Route::get('alumnos/{alumno}/seguimientos', [SeguimientoController::class, 'index'])
@@ -251,11 +290,28 @@ Route::middleware(['auth'])->group(function () {
 
     // Usuarios y configuración técnica.
     Route::middleware('rol:Admin,Sistemas')->group(function () {
-        Route::resource('usuarios', UsuarioController::class);
+        Route::patch('usuarios/{usuario}/reactivar', [UsuarioController::class, 'reactivar'])
+            ->middleware('password.fresh:900')
+            ->name('usuarios.reactivar');
+
+        Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])
+            ->middleware('password.fresh:900')
+            ->name('usuarios.update');
+
+        Route::delete('usuarios/{usuario}', [UsuarioController::class, 'destroy'])
+            ->middleware('password.fresh:900')
+            ->name('usuarios.destroy');
+
+        Route::resource('usuarios', UsuarioController::class)
+            ->except(['update', 'destroy']);
+
+        Route::get('seguridad/permisos', [SeguridadPermisoController::class, 'index'])
+            ->name('seguridad.permisos.index');
 
         Route::get('configuracion/institucional', [ConfiguracionInstitucionalController::class, 'edit'])
             ->name('configuracion.institucional.edit');
         Route::put('configuracion/institucional', [ConfiguracionInstitucionalController::class, 'update'])
+            ->middleware('password.fresh:900')
             ->name('configuracion.institucional.update');
 
         Route::get('sistema/mantenimiento', [MantenimientoController::class, 'index'])
@@ -265,10 +321,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('sistema/mantenimiento/storage-link', [MantenimientoController::class, 'crearStorageLink'])
             ->name('sistema.mantenimiento.storage-link');
         Route::post('sistema/mantenimiento/limpiar-logs', [MantenimientoController::class, 'limpiarLogs'])
+            ->middleware('password.fresh:900')
             ->name('sistema.mantenimiento.limpiar-logs');
         Route::get('sistema/mantenimiento/backup-base-datos', [MantenimientoController::class, 'descargarBackupBaseDatos'])
+            ->middleware('password.fresh:900')
             ->name('sistema.mantenimiento.backup-db');
         Route::get('sistema/mantenimiento/backup-archivos', [MantenimientoController::class, 'descargarBackupArchivos'])
+            ->middleware('password.fresh:900')
             ->name('sistema.mantenimiento.backup-archivos');
     });
 
@@ -288,14 +347,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('cortes-caja/create', [CorteCajaController::class, 'create'])->name('cortes-caja.create');
         Route::post('cortes-caja', [CorteCajaController::class, 'store'])->name('cortes-caja.store');
         Route::get('cortes-caja/{corteCaja}', [CorteCajaController::class, 'show'])->name('cortes-caja.show');
-        Route::get('cortes-caja/{corteCaja}/cierre', [CorteCajaController::class, 'cierre'])->name('cortes-caja.cierre');
-        Route::put('cortes-caja/{corteCaja}/cerrar', [CorteCajaController::class, 'cerrar'])->name('cortes-caja.cerrar');
+        Route::get('cortes-caja/{corteCaja}/cierre', [CorteCajaController::class, 'cierre'])->middleware('password.fresh:900')->name('cortes-caja.cierre');
+        Route::put('cortes-caja/{corteCaja}/cerrar', [CorteCajaController::class, 'cerrar'])->middleware('password.fresh:900')->name('cortes-caja.cerrar');
     });
 
     Route::middleware('rol:Admin,CAdmin,Finanzas,Direccion')->group(function () {
         Route::get('reportes', [ReporteController::class, 'index'])->name('reportes.index');
         Route::get('reportes/export-excel', [ReporteController::class, 'exportExcel'])->name('reportes.export-excel');
         Route::get('reportes/export-pdf', [ReporteController::class, 'exportPdf'])->name('reportes.export-pdf');
+
+        Route::get('reportes-ejecutivos', [ReporteEjecutivoController::class, 'index'])->name('reportes.ejecutivo');
+        Route::get('reportes-ejecutivos/export-csv', [ReporteEjecutivoController::class, 'exportCsv'])->name('reportes.ejecutivo.export-csv');
     });
 
     // Académica / administración escolar.
@@ -390,17 +452,22 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('rol:Admin')->group(function () {
-        Route::delete('solicitudes_pago/{solicitud_pago}', [SolicitudPagoDocenteController::class, 'destroy'])->name('solicitudes_pago.destroy');
+        Route::delete('solicitudes_pago/{solicitud_pago}', [SolicitudPagoDocenteController::class, 'destroy'])->middleware('password.fresh:900')->name('solicitudes_pago.destroy');
     });
 
     Route::middleware('rol:Admin,CAdmin,Academica,Finanzas,Direccion')->group(function () {
         Route::get('solicitudes_pago/{solicitud_pago}', [SolicitudPagoDocenteController::class, 'show'])->name('solicitudes_pago.show');
     });
 
-    // Bitácora: lectura para Dirección/Sistemas, eliminación solo Admin por controlador.
+    // Bitácora: lectura para Dirección/Sistemas; ocultar registros solo Admin con contraseña fresca.
     Route::middleware('rol:Admin,Sistemas,Direccion')->group(function () {
         Route::resource('bitacoras', BitacoraController::class)
-            ->only(['index', 'show', 'destroy']);
+            ->only(['index', 'show']);
+
+        Route::delete('bitacoras/{bitacora}', [BitacoraController::class, 'destroy'])
+            ->middleware('rol:Admin')
+            ->middleware('password.fresh:900')
+            ->name('bitacoras.destroy');
 
         Route::get('bitacoras/export/pdf', [BitacoraController::class, 'exportPdf'])
             ->name('bitacoras.export.pdf');

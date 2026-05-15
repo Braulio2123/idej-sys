@@ -1,5 +1,13 @@
 <!DOCTYPE html>
-<html lang="es" x-data="{ sidebarOpen: true, userMenu: false }" class="bg-slate-100">
+<html lang="es" x-data="{
+    sidebarOpen: JSON.parse(localStorage.getItem('idej_sidebar_open') ?? 'true'),
+    userMenu: false,
+    notificacionesMenu: false,
+    toggleSidebar() {
+        this.sidebarOpen = ! this.sidebarOpen;
+        localStorage.setItem('idej_sidebar_open', JSON.stringify(this.sidebarOpen));
+    }
+}" class="bg-slate-100">
 <head>
     <link rel="icon" type="image/png" href="{{ logoInstitucionalUrl() }}">
     <meta charset="UTF-8">
@@ -44,11 +52,16 @@
     $puedeFinanzas = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true);
     $puedeCaja = in_array($rolClave, [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS], true);
     $puedeReportes = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION], true);
+    $puedeReporteEjecutivo = usuarioTienePermiso('reportes.ejecutivos');
     $puedeUsuarios = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
     $puedeConfiguracion = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
+    $puedePanelPermisos = usuarioTienePermiso('seguridad.permisos.ver');
     $puedeMantenimiento = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
     $puedeBitacora = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS, Rol::DIRECCION], true);
     $puedeAgendaOperativa = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS, Rol::ACADEMICA, Rol::CADMIN, Rol::DIRECCION, Rol::RECEPCION], true);
+    $puedeCentroControlOperativo = usuarioTienePermiso('centro_control.ver');
+    $resumenNotificacionesInternas = resumenNotificacionesInternas($usuarioActual);
+    $notificacionesInternasRecientes = notificacionesInternasRecientes($usuarioActual, 5);
 @endphp
 
 <aside class="bg-gradient-to-b from-[#1E3A8A] via-[#162860] to-[#0D133A] text-slate-50 border-r border-blue-900/60 transition-all duration-300 ease-in-out flex flex-col shadow-2xl"
@@ -63,7 +76,7 @@
             </div>
         </div>
 
-        <button @click="sidebarOpen = !sidebarOpen"
+        <button @click="toggleSidebar()"
                 class="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white transition">
             <i class='bx text-2xl' :class="sidebarOpen ? 'bx-chevron-left' : 'bx-chevron-right'"></i>
         </button>
@@ -85,6 +98,13 @@
             </a>
         @endif
 
+        @if($puedeCentroControlOperativo)
+            <a href="{{ route('centro-control.index') }}" class="{{ $linkBase }} {{ request()->routeIs('centro-control.*') ? $active : $inactive }}">
+                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-radar text-2xl'></i></span>
+                <span x-show="sidebarOpen">Centro de Control</span>
+            </a>
+        @endif
+
         @if($puedeUsuarios)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-amber-200/90">
                 Administración
@@ -99,6 +119,13 @@
                 <a href="{{ route('configuracion.institucional.edit') }}" class="{{ $linkBase }} {{ request()->routeIs('configuracion.*') ? $active : $inactive }}">
                     <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-cog text-2xl'></i></span>
                     <span x-show="sidebarOpen">Configuración</span>
+                </a>
+            @endif
+
+            @if($puedePanelPermisos)
+                <a href="{{ route('seguridad.permisos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('seguridad.permisos.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-shield-quarter text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Permisos</span>
                 </a>
             @endif
 
@@ -188,7 +215,7 @@
             </a>
         @endif
 
-        @if($puedeFinanzas || $puedeReportes || $puedeCaja)
+        @if($puedeFinanzas || $puedeReportes || $puedeReporteEjecutivo || $puedeCaja)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-yellow-200/90">
                 Finanzas
             </p>
@@ -219,9 +246,16 @@
             @endif
 
             @if($puedeReportes)
-                <a href="{{ route('reportes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('reportes.*') ? $active : $inactive }}">
+                <a href="{{ route('reportes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('reportes.index') || request()->routeIs('reportes.export-*') ? $active : $inactive }}">
                     <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-line-chart text-2xl'></i></span>
                     <span x-show="sidebarOpen">Reportes</span>
+                </a>
+            @endif
+
+            @if($puedeReporteEjecutivo)
+                <a href="{{ route('reportes.ejecutivo') }}" class="{{ $linkBase }} {{ request()->routeIs('reportes.ejecutivo*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-bar-chart-alt-2 text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Reporte Ejecutivo</span>
                 </a>
             @endif
         @endif
@@ -244,10 +278,10 @@
                 {{ strtoupper(mb_substr($nombreUsuario, 0, 1)) }}
             </div>
 
-            <div x-show="sidebarOpen" x-transition class="flex-1 min-w-0">
+            <a href="{{ route('profile.edit') }}" x-show="sidebarOpen" x-transition class="flex-1 min-w-0 rounded-lg px-2 py-1 hover:bg-white/10 transition" title="Mi perfil">
                 <p class="text-xs font-semibold truncate">{{ $nombreUsuario }}</p>
                 <p class="text-[11px] text-slate-100/70 truncate">{{ $usuarioActual?->rol?->nombre ?? 'Sin rol' }}</p>
-            </div>
+            </a>
 
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
@@ -262,7 +296,7 @@
 <div class="flex-1 flex flex-col">
     <header class="h-16 bg-white/80 backdrop-blur border-b border-slate-200 flex items-center justify-between px-6 shadow-sm">
         <div class="flex items-center gap-3">
-            <button @click="sidebarOpen = !sidebarOpen" class="md:hidden flex items-center justify-center h-9 w-9 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">
+            <button @click="toggleSidebar()" class="md:hidden flex items-center justify-center h-9 w-9 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">
                 <i class='bx bx-menu text-2xl'></i>
             </button>
 
@@ -272,38 +306,143 @@
             </div>
         </div>
 
-        <div class="relative hidden sm:block" @click.away="userMenu = false">
-            <button @click="userMenu = !userMenu" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm text-slate-700">
-                <span class="hidden md:inline-block max-w-[180px] truncate">{{ $nombreUsuario }}</span>
-                <i class='bx bx-chevron-down text-lg'></i>
-            </button>
+        <div class="flex items-center gap-2">
+            <div class="relative" @click.away="notificacionesMenu = false">
+                <button @click="notificacionesMenu = !notificacionesMenu" class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" title="Notificaciones internas">
+                    <i class='bx bx-bell text-xl'></i>
+                    @if(($resumenNotificacionesInternas['pendientes'] ?? 0) > 0)
+                        <span class="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                            {{ ($resumenNotificacionesInternas['pendientes'] ?? 0) > 99 ? '99+' : $resumenNotificacionesInternas['pendientes'] }}
+                        </span>
+                    @endif
+                </button>
 
-            <div x-show="userMenu" x-transition class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden text-sm">
-                <div class="px-3 py-2 border-b border-slate-100">
-                    <p class="font-medium truncate">{{ $nombreUsuario }}</p>
-                    <p class="text-xs text-slate-500 truncate">{{ $usuarioActual?->rol?->nombre ?? 'Sin rol' }}</p>
+                <div x-show="notificacionesMenu" x-transition class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-xl">
+                    <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                        <div>
+                            <p class="font-semibold text-slate-800">Notificaciones</p>
+                            <p class="text-xs text-slate-500">{{ $resumenNotificacionesInternas['pendientes'] ?? 0 }} pendientes</p>
+                        </div>
+                        <a href="{{ route('notificaciones.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">Ver todas</a>
+                    </div>
+
+                    <div class="max-h-80 overflow-y-auto">
+                        @forelse($notificacionesInternasRecientes as $notificacionInterna)
+                            <a href="{{ $notificacionInterna->url ?: route('notificaciones.index') }}" class="block border-b border-slate-100 px-4 py-3 hover:bg-slate-50">
+                                <div class="flex items-start gap-3">
+                                    <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full {{ in_array($notificacionInterna->severidad, ['critica', 'alta'], true) ? 'bg-red-500' : 'bg-amber-400' }}"></span>
+                                    <div class="min-w-0">
+                                        <p class="truncate font-semibold text-slate-800">{{ $notificacionInterna->titulo }}</p>
+                                        <p class="line-clamp-2 text-xs text-slate-500">{{ $notificacionInterna->mensaje }}</p>
+                                        <p class="mt-1 text-[11px] text-slate-400">{{ $notificacionInterna->created_at?->diffForHumans() }}</p>
+                                    </div>
+                                </div>
+                            </a>
+                        @empty
+                            <div class="px-4 py-6 text-center text-sm text-slate-500">
+                                <i class='bx bx-bell-off mb-2 block text-3xl text-slate-300'></i>
+                                Sin notificaciones pendientes.
+                            </div>
+                        @endforelse
+                    </div>
+
+                    @if(($resumenNotificacionesInternas['pendientes'] ?? 0) > 0)
+                        <form action="{{ route('notificaciones.leer-todas') }}" method="POST" class="border-t border-slate-100 px-4 py-3">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="w-full rounded-xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900">
+                                Marcar todas como leídas
+                            </button>
+                        </form>
+                    @endif
                 </div>
-                <a href="{{ route('profile.edit') }}" class="w-full px-4 py-2.5 hover:bg-slate-100 flex items-center gap-2 text-[13px]">
-                    <i class='bx bx-user text-lg'></i>
-                    <span>Mi perfil</span>
-                </a>
-                <form action="{{ route('logout') }}" method="POST">
-                    @csrf
-                    <button class="w-full text-left px-4 py-2.5 hover:bg-red-500 hover:text-white flex items-center gap-2 text-[13px]">
-                        <i class='bx bx-log-out text-lg'></i>
-                        <span>Cerrar sesión</span>
-                    </button>
-                </form>
+            </div>
+
+            <div class="relative hidden sm:block" @click.away="userMenu = false">
+                <button @click="userMenu = !userMenu" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm text-slate-700">
+                    <span class="hidden md:inline-block max-w-[180px] truncate">{{ $nombreUsuario }}</span>
+                    <i class='bx bx-chevron-down text-lg'></i>
+                </button>
+
+                <div x-show="userMenu" x-transition class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden text-sm">
+                    <div class="px-3 py-2 border-b border-slate-100">
+                        <p class="font-medium truncate">{{ $nombreUsuario }}</p>
+                        <p class="text-xs text-slate-500 truncate">{{ $usuarioActual?->rol?->nombre ?? 'Sin rol' }}</p>
+                    </div>
+                    <a href="{{ route('profile.edit') }}" class="w-full px-4 py-2.5 hover:bg-slate-100 flex items-center gap-2 text-[13px]">
+                        <i class='bx bx-user text-lg'></i>
+                        <span>Mi perfil</span>
+                    </a>
+                    <form action="{{ route('logout') }}" method="POST">
+                        @csrf
+                        <button class="w-full text-left px-4 py-2.5 hover:bg-red-500 hover:text-white flex items-center gap-2 text-[13px]">
+                            <i class='bx bx-log-out text-lg'></i>
+                            <span>Cerrar sesión</span>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </header>
 
     <main class="p-4 md:p-6">
+        @if(session('success') || session('error') || session('info') || session('status'))
+            <div class="mb-4 space-y-2">
+                @if(session('success'))
+                    <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                @if(session('error'))
+                    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+                        {{ session('error') }}
+                    </div>
+                @endif
+
+                @if(session('info') || session('status'))
+                    <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+                        {{ session('info') ?? session('status') }}
+                    </div>
+                @endif
+            </div>
+        @endif
+
         <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-4 md:p-6">
             @yield('content')
         </div>
     </main>
 </div>
+
+<script>
+    document.addEventListener('submit', function (event) {
+        const form = event.target;
+
+        if (! form.matches('form') || form.dataset.allowResubmit === 'true') {
+            return;
+        }
+
+        if (form.dataset.submitted === 'true') {
+            event.preventDefault();
+            return;
+        }
+
+        form.dataset.submitted = 'true';
+
+        form.querySelectorAll('button[type="submit"], button:not([type])').forEach((button) => {
+            button.disabled = true;
+            button.classList.add('opacity-60', 'cursor-not-allowed');
+
+            if (! button.dataset.originalText) {
+                button.dataset.originalText = button.innerHTML;
+            }
+
+            if (! button.dataset.keepText) {
+                button.innerHTML = 'Procesando...';
+            }
+        });
+    }, true);
+</script>
 
 @stack('scripts')
 </body>

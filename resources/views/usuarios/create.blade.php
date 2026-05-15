@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Crear usuario')
+
 @section('content')
 <div class="max-w-xl mx-auto bg-white shadow-md rounded-xl p-6 mt-6">
     <h2 class="text-2xl font-bold text-gray-800 mb-4">➕ Crear nuevo usuario</h2>

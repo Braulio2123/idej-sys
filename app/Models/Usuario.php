@@ -17,6 +17,11 @@ class Usuario extends Authenticatable
         'email',
         'password',
         'rol_id',
+        'activo',
+        'ultimo_acceso_at',
+        'ultimo_login_ip',
+        'ultimo_user_agent',
+        'password_changed_at',
     ];
 
     protected $hidden = [
@@ -26,9 +31,19 @@ class Usuario extends Authenticatable
 
     protected $casts = [
         'password' => 'hashed',
+        'activo' => 'boolean',
+        'ultimo_acceso_at' => 'datetime',
+        'password_changed_at' => 'datetime',
     ];
 
     protected $with = ['rol'];
+
+
+    public function estaActivo(): bool
+    {
+        // Compatibilidad durante despliegue: si la migración aún no ha corrido, no bloquear el login.
+        return ! array_key_exists('activo', $this->attributes) || (bool) $this->activo;
+    }
 
     public function rol()
     {
@@ -119,6 +134,42 @@ class Usuario extends Authenticatable
         }
 
         return in_array($rol, $claves, true);
+    }
+
+    public function tienePermiso(string $permiso): bool
+    {
+        $rol = $this->rolClave();
+
+        if (! $rol) {
+            return false;
+        }
+
+        if ($rol === Rol::ADMIN) {
+            return true;
+        }
+
+        $configuracion = config("idej_permisos.permisos.{$permiso}");
+
+        if (! is_array($configuracion)) {
+            return false;
+        }
+
+        $roles = $configuracion['roles'] ?? [];
+
+        return in_array($rol, $roles, true);
+    }
+
+    public function esRolCritico(): bool
+    {
+        $rol = $this->rolClave();
+
+        return $rol !== null && in_array($rol, config('idej_permisos.roles_criticos', []), true);
+    }
+
+
+    public function notificacionesInternas()
+    {
+        return $this->hasMany(NotificacionInterna::class, 'usuario_id');
     }
 
     public function esAdmin(): bool

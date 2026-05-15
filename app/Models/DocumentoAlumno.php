@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
 class DocumentoAlumno extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'documentos_alumnos';
 
@@ -44,6 +45,7 @@ class DocumentoAlumno extends Model
         'tamano_bytes' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public static function tiposDisponibles(): array
@@ -97,7 +99,8 @@ class DocumentoAlumno extends Model
 
     public function getUrlAttribute(): ?string
     {
-        return $this->archivo_path ? Storage::disk('public')->url($this->archivo_path) : null;
+        // Los documentos de alumnos son sensibles. No se expone URL pública directa.
+        return null;
     }
 
     public function getTamanoLegibleAttribute(): string

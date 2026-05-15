@@ -550,7 +550,7 @@
                                     <td class="px-4 py-3">{{ $pago->referencia_principal ?? '—' }}</td>
                                     <td class="px-4 py-3">
                                         @if($pago->archivo_comprobante)
-                                            <a href="{{ asset('storage/' . $pago->archivo_comprobante) }}" target="_blank" class="text-indigo-600 hover:underline">Ver</a>
+                                            <a href="{{ route('alumnos.pagos.comprobante', [$alumno, $pago]) }}" class="text-indigo-600 hover:underline">Ver</a>
                                         @else
                                             —
                                         @endif
@@ -563,7 +563,7 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">
-                                        <a href="{{ route('alumnos.pagos.recibo', [$alumno, $pago]) }}" target="_blank" class="text-slate-700 hover:underline font-semibold">PDF</a>
+                                        <a href="{{ route('alumnos.pagos.recibo', [$alumno, $pago]) }}" class="text-slate-700 hover:underline font-semibold">PDF</a>
                                     </td>
                                     <td class="px-4 py-3">
                                         @if($puedeCancelarPagos && ! $pago->estaCancelado() && $pago->corteCaja?->estaAbierta())

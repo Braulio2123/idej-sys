@@ -16,6 +16,7 @@ class CorteCaja extends Model
 
     protected $fillable = [
         'usuario_id',
+        'usuario_caja_abierta_id',
         'fecha_apertura',
         'fecha_cierre',
         'saldo_inicial',

@@ -51,6 +51,17 @@ class CalendarioMateria extends Model
         return $this->hasMany(CalendarioSesion::class, 'calendario_materia_id')->orderBy('fecha')->orderBy('hora_inicio');
     }
 
+    public function solicitudesPagoDocente()
+    {
+        return $this->hasMany(SolicitudPagoDocente::class, 'calendario_materia_id');
+    }
+
+    public function solicitudesPagoDocenteOperativas()
+    {
+        return $this->solicitudesPagoDocente()
+            ->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA]);
+    }
+
     public function getNombreMateriaAttribute(): string
     {
         return $this->nombre_materia_snapshot ?: ($this->materia->nombre ?? 'Materia no disponible');

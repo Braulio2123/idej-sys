@@ -11,9 +11,11 @@ use App\Models\Pago;
 use App\Models\ParcialidadConvenio;
 use App\Traits\RegistraBitacora;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -59,6 +61,7 @@ class PagoController extends Controller
             'metodo_pago' => ['required', Rule::in(['Efectivo', 'Transferencia', 'Tarjeta'])],
             'monto_total_pagado' => ['required', 'numeric', 'min:0.01'],
             'fecha_pago' => ['nullable', 'date'],
+            'operacion_uuid' => ['required', 'uuid'],
 
             'cargos' => ['nullable', 'array'],
             'cargos.*' => ['integer', 'distinct'],
@@ -98,7 +101,16 @@ class PagoController extends Controller
             ]);
         }
 
-        $pago = DB::transaction(function () use ($request, $validated, $alumno, $cargoIds, $parcialidadIds) {
+        $pagoExistente = Pago::where('operacion_uuid', $validated['operacion_uuid'])->first();
+
+        if ($pagoExistente && (int) $pagoExistente->alumno_id === (int) $alumno->id) {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('info', "El pago #{$pagoExistente->id} ya había sido registrado. Se evitó duplicar la operación.");
+        }
+
+        try {
+            $pago = DB::transaction(function () use ($request, $validated, $alumno, $cargoIds, $parcialidadIds) {
             $corteCaja = CorteCaja::abierta()
                 ->deUsuario(Auth::id())
                 ->lockForUpdate()
@@ -155,6 +167,7 @@ class PagoController extends Controller
                 'recibo_uuid' => (string) Str::uuid(),
                 'recibo_emitido_at' => now(),
                 'recibo_version' => 1,
+                'operacion_uuid' => $validated['operacion_uuid'],
                 'referencia_bancaria' => $this->obtenerReferenciaBancaria($validated),
                 'archivo_comprobante' => $archivoComprobante,
                 'banco_emisor' => $this->obtenerBancoEmisor($validated),
@@ -220,7 +233,8 @@ class PagoController extends Controller
             $saldoAFavorGenerado = max(0, round($montoDisponible, 2));
 
             if ($saldoAFavorGenerado > 0) {
-                $alumno->increment('saldo_a_favor', $saldoAFavorGenerado);
+                $alumnoActual = Alumno::whereKey($alumno->id)->lockForUpdate()->firstOrFail();
+                $alumnoActual->increment('saldo_a_favor', $saldoAFavorGenerado);
 
                 $pago->forceFill([
                     'saldo_a_favor_generado' => $saldoAFavorGenerado,
@@ -240,7 +254,24 @@ class PagoController extends Controller
             );
 
             return $pago;
-        }, 3);
+            }, 3);
+        } catch (QueryException $e) {
+            if ((string) $e->getCode() === '23000') {
+                $pagoExistente = Pago::where('operacion_uuid', $validated['operacion_uuid'])->first();
+
+                if ($pagoExistente && (int) $pagoExistente->alumno_id === (int) $alumno->id) {
+                    return redirect()
+                        ->route('alumnos.show', $alumno)
+                        ->with('info', "El pago #{$pagoExistente->id} ya había sido registrado. Se evitó duplicar la operación.");
+                }
+
+                throw ValidationException::withMessages([
+                    'operacion_uuid' => 'La operación ya fue procesada o existe un folio duplicado. Revisa la ficha del alumno antes de intentar nuevamente.',
+                ]);
+            }
+
+            throw $e;
+        }
 
         return redirect()
             ->route('alumnos.show', $alumno)
@@ -458,6 +489,39 @@ class PagoController extends Controller
     }
 
     /**
+     * Descargar comprobante bancario/tarjeta desde disco privado.
+     */
+    public function descargarComprobante(Alumno $alumno, Pago $pago)
+    {
+        $this->validarPagoPerteneceAlumno($alumno, $pago);
+
+        if (! $pago->archivo_comprobante) {
+            abort(404);
+        }
+
+        $disk = Storage::disk('local')->exists($pago->archivo_comprobante)
+            ? 'local'
+            : (Storage::disk('public')->exists($pago->archivo_comprobante) ? 'public' : null);
+
+        if (! $disk) {
+            abort(404);
+        }
+
+        $this->bitacora(
+            'Descargar Comprobante de Pago',
+            "Se descargó el comprobante del pago #{$pago->id} del alumno {$alumno->nombre_completo}.",
+            'Pagos',
+            $pago,
+            $alumno->id
+        );
+
+        $extension = pathinfo($pago->archivo_comprobante, PATHINFO_EXTENSION) ?: 'pdf';
+        $nombre = 'comprobante-pago-'.$pago->id.'.'.$extension;
+
+        return Storage::disk($disk)->download($pago->archivo_comprobante, $nombre);
+    }
+
+    /**
      * Generar y descargar el recibo formal del pago en PDF.
      */
     public function recibo(Alumno $alumno, Pago $pago)
@@ -533,11 +597,11 @@ class PagoController extends Controller
     private function guardarComprobante(Request $request, string $metodoPago): ?string
     {
         if ($metodoPago === 'Transferencia' && $request->hasFile('archivo_comprobante')) {
-            return $request->file('archivo_comprobante')->store('comprobantes/pagos', 'public');
+            return $request->file('archivo_comprobante')->store('comprobantes/pagos', 'local');
         }
 
         if ($metodoPago === 'Tarjeta' && $request->hasFile('comprobante_tarjeta')) {
-            return $request->file('comprobante_tarjeta')->store('comprobantes/pagos', 'public');
+            return $request->file('comprobante_tarjeta')->store('comprobantes/pagos', 'local');
         }
 
         return null;

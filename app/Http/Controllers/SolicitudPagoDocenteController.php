@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class SolicitudPagoDocenteController extends Controller
 {
@@ -87,12 +88,16 @@ class SolicitudPagoDocenteController extends Controller
 
         DB::transaction(function () use ($validated) {
             $solicitud = SolicitudPagoDocente::create(array_merge($validated, [
-                'folio' => $this->generarFolio(),
+                'folio' => null,
                 'fecha_solicitud' => $validated['fecha_solicitud'] ?? now()->toDateString(),
                 'estatus' => SolicitudPagoDocente::ESTATUS_PENDIENTE,
                 'creado_por_id' => Auth::id(),
                 'observaciones' => $validated['observaciones_academica'] ?? null,
             ]));
+
+            $solicitud->forceFill([
+                'folio' => $this->generarFolio($solicitud),
+            ])->save();
 
             $this->bitacora(
                 'Crear Solicitud de Pago Docente',
@@ -100,7 +105,7 @@ class SolicitudPagoDocenteController extends Controller
                 'Solicitudes de Pago Docente',
                 $solicitud
             );
-        });
+        }, 3);
 
         return redirect()->route('solicitudes_pago.index')
             ->with('success', 'Solicitud creada correctamente y enviada a Coordinación Administrativa/Finanzas para revisión.');
@@ -165,29 +170,33 @@ class SolicitudPagoDocenteController extends Controller
             abort(403);
         }
 
-        if (!in_array($solicitud_pago->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE], true)) {
-            return back()->with('error', 'Solo se pueden autorizar solicitudes pendientes.');
-        }
-
         $validated = $request->validate([
             'observaciones_administracion' => 'nullable|string|max:1000',
         ]);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
-            $solicitud_pago->update([
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+            if ($solicitud->estatus !== SolicitudPagoDocente::ESTATUS_PENDIENTE) {
+                throw ValidationException::withMessages([
+                    'observaciones_administracion' => 'Solo se pueden autorizar solicitudes pendientes. La solicitud pudo haber cambiado en otra pestaña.',
+                ]);
+            }
+
+            $solicitud->update([
                 'estatus' => SolicitudPagoDocente::ESTATUS_AUTORIZADA,
                 'autorizado_por_id' => Auth::id(),
                 'fecha_autorizacion' => now(),
-                'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud_pago->observaciones_administracion,
+                'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud->observaciones_administracion,
             ]);
 
             $this->bitacora(
                 'Autorizar Solicitud de Pago Docente',
-                "Solicitud {$solicitud_pago->folio} autorizada para pago.",
+                "Solicitud {$solicitud->folio} autorizada para pago.",
                 'Solicitudes de Pago Docente',
-                $solicitud_pago
+                $solicitud
             );
-        });
+        }, 3);
 
         return back()->with('success', 'Solicitud autorizada correctamente. Ahora puede registrarse el pago.');
     }
@@ -208,16 +217,20 @@ class SolicitudPagoDocenteController extends Controller
     {
         $this->autorizarRevisionAdministrativa();
 
-        if (!in_array($solicitud_pago->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true)) {
-            return back()->with('error', 'Esta solicitud ya no puede marcarse como observada.');
-        }
-
         $validated = $request->validate([
             'motivo_observacion' => 'required|string|min:8|max:1500',
         ]);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
-            $solicitud_pago->update([
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+            if (!in_array($solicitud->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true)) {
+                throw ValidationException::withMessages([
+                    'motivo_observacion' => 'Esta solicitud ya no puede marcarse como observada. La solicitud pudo haber cambiado en otra pestaña.',
+                ]);
+            }
+
+            $solicitud->update([
                 'estatus' => SolicitudPagoDocente::ESTATUS_OBSERVADA,
                 'motivo_observacion' => $validated['motivo_observacion'],
                 'autorizado_por_id' => null,
@@ -226,11 +239,11 @@ class SolicitudPagoDocenteController extends Controller
 
             $this->bitacora(
                 'Observar Solicitud de Pago Docente',
-                "Solicitud {$solicitud_pago->folio} devuelta a Académica con observaciones.",
+                "Solicitud {$solicitud->folio} devuelta a Académica con observaciones.",
                 'Solicitudes de Pago Docente',
-                $solicitud_pago
+                $solicitud
             );
-        });
+        }, 3);
 
         return redirect()->route('solicitudes_pago.show', $solicitud_pago)
             ->with('success', 'Solicitud marcada como observada. Académica podrá corregirla y reenviarla.');
@@ -259,10 +272,6 @@ class SolicitudPagoDocenteController extends Controller
             abort(403);
         }
 
-        if ($solicitud_pago->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA) {
-            return back()->with('error', 'Solo se pueden pagar solicitudes autorizadas.');
-        }
-
         $validated = $request->validate([
             'fecha_pago' => 'required|date',
             'metodo_pago' => ['required', Rule::in(SolicitudPagoDocente::metodosPago())],
@@ -270,36 +279,46 @@ class SolicitudPagoDocenteController extends Controller
             'banco_pago' => 'nullable|string|max:120',
             'comprobante_pago' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'observaciones_administracion' => 'nullable|string|max:1000',
+            'pago_operacion_uuid' => ['required', 'uuid'],
         ]);
 
         DB::transaction(function () use ($solicitud_pago, $validated, $request) {
-            $path = $solicitud_pago->comprobante_pago_path;
-            $original = $solicitud_pago->comprobante_pago_original;
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+            if ($solicitud->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA) {
+                throw ValidationException::withMessages([
+                    'fecha_pago' => 'Solo se pueden pagar solicitudes autorizadas. La solicitud pudo haber cambiado en otra pestaña.',
+                ]);
+            }
+
+            $path = $solicitud->comprobante_pago_path;
+            $original = $solicitud->comprobante_pago_original;
 
             if ($request->hasFile('comprobante_pago')) {
-                $path = $request->file('comprobante_pago')->store('comprobantes/docentes', 'public');
+                $path = $request->file('comprobante_pago')->store('comprobantes/docentes', 'local');
                 $original = $request->file('comprobante_pago')->getClientOriginalName();
             }
 
-            $solicitud_pago->update([
+            $solicitud->update([
                 'fecha_pago' => $validated['fecha_pago'],
                 'metodo_pago' => $validated['metodo_pago'],
                 'referencia_pago' => $validated['referencia_pago'] ?? null,
                 'banco_pago' => $validated['banco_pago'] ?? null,
                 'comprobante_pago_path' => $path,
                 'comprobante_pago_original' => $original,
-                'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud_pago->observaciones_administracion,
+                'pago_operacion_uuid' => $validated['pago_operacion_uuid'],
+                'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud->observaciones_administracion,
                 'procesado_por_id' => Auth::id(),
                 'estatus' => SolicitudPagoDocente::ESTATUS_PAGADA,
             ]);
 
             $this->bitacora(
                 'Pagar Solicitud de Pago Docente',
-                "Solicitud {$solicitud_pago->folio} pagada por $".number_format((float) $solicitud_pago->monto, 2).'.',
+                "Solicitud {$solicitud->folio} pagada por $".number_format((float) $solicitud->monto, 2).'.',
                 'Solicitudes de Pago Docente',
-                $solicitud_pago
+                $solicitud
             );
-        });
+        }, 3);
 
         return redirect()->route('solicitudes_pago.show', $solicitud_pago)
             ->with('success', 'Pago registrado correctamente.');
@@ -321,16 +340,26 @@ class SolicitudPagoDocenteController extends Controller
     {
         $this->autorizarRevisionAdministrativa();
 
-        if ($solicitud_pago->estatus === SolicitudPagoDocente::ESTATUS_PAGADA) {
-            return back()->with('error', 'Una solicitud pagada no debe cancelarse desde este flujo.');
-        }
-
         $validated = $request->validate([
             'motivo_cancelacion' => 'required|string|min:8|max:1500',
         ]);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
-            $solicitud_pago->update([
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+            if ($solicitud->estatus === SolicitudPagoDocente::ESTATUS_PAGADA) {
+                throw ValidationException::withMessages([
+                    'motivo_cancelacion' => 'Una solicitud pagada no debe cancelarse desde este flujo.',
+                ]);
+            }
+
+            if ($solicitud->estatus === SolicitudPagoDocente::ESTATUS_CANCELADA) {
+                throw ValidationException::withMessages([
+                    'motivo_cancelacion' => 'Esta solicitud ya fue cancelada anteriormente.',
+                ]);
+            }
+
+            $solicitud->update([
                 'estatus' => SolicitudPagoDocente::ESTATUS_CANCELADA,
                 'cancelado_por_id' => Auth::id(),
                 'fecha_cancelacion' => now(),
@@ -339,11 +368,11 @@ class SolicitudPagoDocenteController extends Controller
 
             $this->bitacora(
                 'Cancelar Solicitud de Pago Docente',
-                "Solicitud {$solicitud_pago->folio} cancelada.",
+                "Solicitud {$solicitud->folio} cancelada.",
                 'Solicitudes de Pago Docente',
-                $solicitud_pago
+                $solicitud
             );
-        });
+        }, 3);
 
         return redirect()->route('solicitudes_pago.show', $solicitud_pago)
             ->with('success', 'Solicitud cancelada correctamente.');
@@ -351,11 +380,26 @@ class SolicitudPagoDocenteController extends Controller
 
     public function descargarComprobante(SolicitudPagoDocente $solicitud_pago)
     {
-        if (!$solicitud_pago->comprobante_pago_path || !Storage::disk('public')->exists($solicitud_pago->comprobante_pago_path)) {
+        if (! $solicitud_pago->comprobante_pago_path) {
             abort(404);
         }
 
-        return Storage::disk('public')->download(
+        $disk = Storage::disk('local')->exists($solicitud_pago->comprobante_pago_path)
+            ? 'local'
+            : (Storage::disk('public')->exists($solicitud_pago->comprobante_pago_path) ? 'public' : null);
+
+        if (! $disk) {
+            abort(404);
+        }
+
+        $this->bitacora(
+            'Descargar Comprobante Pago Docente',
+            "Se descargó el comprobante de la solicitud {$solicitud_pago->folio}.",
+            'Solicitudes de Pago Docente',
+            $solicitud_pago
+        );
+
+        return Storage::disk($disk)->download(
             $solicitud_pago->comprobante_pago_path,
             $solicitud_pago->comprobante_pago_original ?: 'comprobante-pago-docente-'.$solicitud_pago->id
         );
@@ -480,11 +524,10 @@ class SolicitudPagoDocenteController extends Controller
         }
     }
 
-    private function generarFolio(): string
+    private function generarFolio(SolicitudPagoDocente $solicitud): string
     {
-        $prefijo = 'SPD-'.now()->format('Ym');
-        $ultimoId = (int) (SolicitudPagoDocente::max('id') ?? 0) + 1;
+        $fecha = optional($solicitud->fecha_solicitud)->format('Ym') ?: now()->format('Ym');
 
-        return $prefijo.'-'.str_pad((string) $ultimoId, 6, '0', STR_PAD_LEFT);
+        return 'SPD-'.$fecha.'-'.str_pad((string) $solicitud->id, 6, '0', STR_PAD_LEFT);
     }
 }

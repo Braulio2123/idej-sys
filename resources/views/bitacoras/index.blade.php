@@ -137,11 +137,11 @@
                                 </a>
 
                                 @if(auth()->user()?->rolClave() === Rol::ADMIN)
-                                    <form action="{{ route('bitacoras.destroy', $b) }}" method="POST" class="inline ml-3" onsubmit="return confirm('¿Seguro de eliminar este registro de bitácora?');">
+                                    <form action="{{ route('bitacoras.destroy', $b) }}" method="POST" class="inline ml-3" onsubmit="return confirm('¿Seguro de ocultar este registro de bitácora? Se conserva en base de datos para trazabilidad.');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-red-600 hover:text-red-800 font-medium">
-                                            Eliminar
+                                            Ocultar
                                         </button>
                                     </form>
                                 @endif

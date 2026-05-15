@@ -42,6 +42,7 @@
 
     <form action="{{ route('alumnos.pagos.store', $alumno) }}" method="POST" enctype="multipart/form-data" id="form-pago">
         @csrf
+        <input type="hidden" name="operacion_uuid" value="{{ old('operacion_uuid', (string) \Illuminate\Support\Str::uuid()) }}">
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">

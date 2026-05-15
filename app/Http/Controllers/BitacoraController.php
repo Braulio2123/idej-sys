@@ -137,13 +137,13 @@ class BitacoraController extends Controller
             return back()->with('error', 'Solo el administrador puede eliminar bitácoras.');
         }
 
-        $descripcion = "Registro de bitácora eliminado. Acción: '{$bitacora->accion}', ID {$bitacora->id}.";
+        $descripcion = "Registro de bitácora ocultado. Acción: '{$bitacora->accion}', ID {$bitacora->id}.";
 
         $bitacora->delete();
 
-        $this->bitacora('Eliminar Bitácora', $descripcion, 'Bitácoras');
+        $this->bitacora('Ocultar registro de bitácora', $descripcion, 'Bitácoras');
 
         return redirect()->route('bitacoras.index')
-            ->with('success', 'Registro de bitácora eliminado correctamente.');
+            ->with('success', 'Registro de bitácora ocultado correctamente. Se conserva en base de datos con soft delete.');
     }
 }

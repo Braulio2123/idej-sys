@@ -26,6 +26,7 @@ class Pago extends Model
         'recibo_uuid',
         'recibo_emitido_at',
         'recibo_version',
+        'operacion_uuid',
         'referencia_bancaria',
         'archivo_comprobante',
         'banco_emisor',

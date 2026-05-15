@@ -33,6 +33,7 @@
         <form method="POST" action="{{ route('solicitudes_pago.pagar', $solicitud) }}" enctype="multipart/form-data" class="space-y-5">
             @csrf
             @method('PUT')
+            <input type="hidden" name="pago_operacion_uuid" value="{{ old('pago_operacion_uuid', (string) \Illuminate\Support\Str::uuid()) }}">
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
