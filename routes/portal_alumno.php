@@ -4,6 +4,7 @@ use App\Http\Controllers\PortalAlumno\AuthController;
 use App\Http\Controllers\PortalAlumno\AvisoController;
 use App\Http\Controllers\PortalAlumno\CalificacionController;
 use App\Http\Controllers\PortalAlumno\DashboardController;
+use App\Http\Controllers\PortalAlumno\FinanzaController;
 use App\Http\Controllers\PortalAlumno\HorarioController;
 use App\Http\Controllers\PortalAlumno\MateriaController;
 use App\Http\Controllers\PortalAlumno\PerfilController;
@@ -38,6 +39,7 @@ Route::prefix('portal-alumno')
             Route::get('/horario', [HorarioController::class, 'index'])->name('horario');
             Route::get('/materias', [MateriaController::class, 'index'])->name('materias');
             Route::get('/calificaciones', [CalificacionController::class, 'index'])->name('calificaciones');
+            Route::get('/finanzas', [FinanzaController::class, 'index'])->name('finanzas');
             Route::get('/avisos', [AvisoController::class, 'index'])->name('avisos');
             Route::get('/ubicacion', [UbicacionController::class, 'index'])->name('ubicacion');
             Route::get('/perfil', [PerfilController::class, 'index'])->name('perfil');

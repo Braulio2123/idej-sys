@@ -10,100 +10,83 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 /**
- * Portal Alumno PWA - Christian
+ * Calificaciones del Portal Alumno.
  *
- * Sección de calificaciones del alumno.
+ * Esta sección queda preparada para conectar un módulo formal de calificaciones
+ * cuando exista en el sistema interno.
  *
- * IMPORTANTE:
- * Este controlador pertenece exclusivamente al Portal Alumno.
- * No modifica ni reemplaza controladores administrativos del área académica.
- *
- * Estado actual:
- * El sistema base aún no contiene una tabla formal de calificaciones del alumno.
- * Por eso esta primera versión muestra las materias reales asociadas al grupo
- * del alumno y deja preparado el espacio visual para conectar calificaciones
- * cuando el módulo académico las tenga disponibles.
+ * Por ahora:
+ * - Muestra materias reales del alumno.
+ * - No inventa calificaciones.
+ * - No modifica información académica.
  */
 class CalificacionController extends Controller
 {
-    /**
-     * Muestra la vista de calificaciones del alumno autenticado.
-     */
     public function index(): View
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Alumno autenticado del Portal Alumno
-        |--------------------------------------------------------------------------
-        |
-        | Se obtiene el ID desde el guard separado "portal_alumno" y después
-        | se consulta con el modelo AlumnoPortal. Esto evita mezclar el portal
-        | con el modelo administrativo App\Models\Alumno.
-        |
-        */
-        $alumno = AlumnoPortal::query()
-            ->with(['grupo.programa'])
-            ->findOrFail(Auth::guard('portal_alumno')->id());
+        /** @var AlumnoPortal|null $alumno */
+        $alumno = Auth::guard('portal_alumno')->user();
+
+        abort_unless($alumno instanceof AlumnoPortal, 401);
+
+        $alumno->load(['grupo.programa', 'grupo.cicloEscolar']);
 
         $materias = collect();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Materias asociadas al grupo del alumno
-        |--------------------------------------------------------------------------
-        |
-        | Se consultan dos fuentes existentes del sistema:
-        |
-        | 1. Calendario académico.
-        | 2. Horarios académicos.
-        |
-        | Después se normalizan como arreglos simples para evitar conflictos
-        | entre colecciones Eloquent y colecciones base.
-        |
-        */
         if ($alumno->grupo_id) {
-            $desdeCalendario = collect(
-                CalendarioMateria::query()
-                    ->with(['materia', 'docente', 'calendario'])
-                    ->whereHas('calendario', function ($query) use ($alumno) {
-                        $query->where('grupo_id', $alumno->grupo_id);
-                    })
-                    ->where('estatus', '!=', CalendarioMateria::ESTATUS_CANCELADA)
-                    ->orderBy('orden')
-                    ->get()
-                    ->map(function (CalendarioMateria $calendarioMateria) {
-                        return [
-                            'nombre' => $calendarioMateria->nombre_materia ?? 'Materia sin nombre',
-                            'docente' => $calendarioMateria->nombre_docente ?? 'Docente pendiente',
-                            'origen' => 'calendario',
-                        ];
-                    })
-                    ->all()
-            );
+            $desdeCalendario = CalendarioMateria::query()
+                ->with(['materia', 'docente', 'calendario'])
+                ->whereHas('calendario', function ($query) use ($alumno) {
+                    $query->where('grupo_id', $alumno->grupo_id);
+                })
+                ->where('estatus', '!=', CalendarioMateria::ESTATUS_CANCELADA)
+                ->orderBy('orden')
+                ->orderBy('id')
+                ->get()
+                ->map(function (CalendarioMateria $calendarioMateria) {
+                    return [
+                        'clave' => $calendarioMateria->materia_id
+                            ? 'materia_' . $calendarioMateria->materia_id
+                            : 'calendario_' . $calendarioMateria->id,
+                        'nombre' => $calendarioMateria->nombre_materia ?? 'Materia sin nombre',
+                        'docente' => $calendarioMateria->nombre_docente ?? 'Docente pendiente',
+                        'origen' => 'Calendario académico',
+                        'calendario' => $calendarioMateria->calendario->nombre ?? 'Calendario no definido',
+                    ];
+                });
 
-            $desdeHorario = collect(
-                HorarioAcademico::query()
-                    ->with(['materia', 'docente'])
-                    ->activos()
-                    ->where('grupo_id', $alumno->grupo_id)
-                    ->get()
-                    ->unique('materia_id')
-                    ->map(function (HorarioAcademico $horario) {
-                        return [
-                            'nombre' => $horario->materia->nombre ?? 'Materia sin nombre',
-                            'docente' => $horario->docente->nombre_completo ?? 'Docente pendiente',
-                            'origen' => 'horario',
-                        ];
-                    })
-                    ->all()
-            );
+            $desdeHorario = HorarioAcademico::query()
+                ->with(['materia', 'docente'])
+                ->activos()
+                ->where('grupo_id', $alumno->grupo_id)
+                ->orderByRaw("FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo')")
+                ->orderBy('hora_inicio')
+                ->get()
+                ->unique('materia_id')
+                ->map(function (HorarioAcademico $horario) {
+                    return [
+                        'clave' => $horario->materia_id
+                            ? 'materia_' . $horario->materia_id
+                            : 'horario_' . $horario->id,
+                        'nombre' => $horario->materia->nombre ?? 'Materia sin nombre',
+                        'docente' => $horario->docente->nombre_completo ?? 'Docente pendiente',
+                        'origen' => 'Horario académico',
+                        'calendario' => 'Detectada desde horario',
+                    ];
+                });
 
             $materias = $desdeCalendario
                 ->concat($desdeHorario)
-                ->unique('nombre')
+                ->unique('clave')
                 ->values();
         }
 
-        return view('portal_alumno.calificaciones.index', compact('alumno', 'materias'));
+        $totalMaterias = $materias->count();
+
+        return view('portal_alumno.calificaciones.index', compact(
+            'alumno',
+            'materias',
+            'totalMaterias'
+        ));
     }
 }

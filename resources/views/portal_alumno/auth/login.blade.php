@@ -152,13 +152,15 @@
         | la ruta Laravel /portal-alumno.
         |
         */
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker
-                    .register('{{ asset('portal-alumno-assets/sw.js') }}')
-                    .catch(() => {});
-            });
-        }
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker
+            .register('{{ asset('portal-alumno-sw.js') }}', {
+                scope: '/portal-alumno/'
+            })
+            .catch(() => {});
+    });
+}
     </script>
 </body>
 </html>
