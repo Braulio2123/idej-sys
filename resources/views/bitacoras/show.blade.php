@@ -6,7 +6,7 @@
 <div class="max-w-4xl mx-auto mt-6">
     <div class="bg-white shadow-lg rounded-2xl p-6 border border-slate-200">
         <h1 class="text-2xl font-semibold text-slate-800 mb-1">Detalle de Bitácora</h1>
-        <p class="text-xs text-slate-500 mb-6">Información técnica y funcional del evento registrado.</p>
+        <p class="text-xs text-slate-500 mb-6">Información del evento registrado.</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
@@ -38,7 +38,7 @@
             </div>
 
             <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <span class="block text-xs text-slate-500">Método / URL</span>
+                <span class="block text-xs text-slate-500">Acceso registrado</span>
                 <p class="text-slate-800 font-medium">{{ $bitacora->metodo_http ?? '—' }}</p>
                 <p class="text-xs text-slate-500 break-all">{{ $bitacora->url ?? '—' }}</p>
             </div>
@@ -52,7 +52,7 @@
         </div>
 
         <div class="mt-5">
-            <span class="block text-xs text-slate-500 mb-1">User Agent</span>
+            <span class="block text-xs text-slate-500 mb-1">Navegador o dispositivo</span>
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-600 text-xs break-all">
                 {{ $bitacora->user_agent ?? '—' }}
             </div>

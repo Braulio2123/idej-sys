@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es" x-data="{
-    sidebarOpen: JSON.parse(localStorage.getItem('idej_sidebar_open') ?? 'true'),
+    sidebarOpen: JSON.parse(localStorage.getItem('idej_sidebar_open') ?? (window.innerWidth >= 768 ? 'true' : 'false')),
     userMenu: false,
     notificacionesMenu: false,
     toggleSidebar() {
@@ -24,10 +24,12 @@
         body { font-family: 'Poppins', sans-serif; }
         .sidebar-scroll::-webkit-scrollbar { width: 6px; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 999px; }
+        .idej-table-responsive { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .idej-table-responsive > table { min-width: 760px; }
     </style>
 </head>
 
-<body class="min-h-screen flex bg-slate-100">
+<body class="min-h-screen flex bg-slate-100 overflow-x-hidden">
 @php
     use App\Models\Rol;
 
@@ -64,8 +66,8 @@
     $notificacionesInternasRecientes = notificacionesInternasRecientes($usuarioActual, 5);
 @endphp
 
-<aside class="bg-gradient-to-b from-[#1E3A8A] via-[#162860] to-[#0D133A] text-slate-50 border-r border-blue-900/60 transition-all duration-300 ease-in-out flex flex-col shadow-2xl"
-       :class="sidebarOpen ? 'w-72' : 'w-24'">
+<aside class="fixed inset-y-0 left-0 z-40 h-screen bg-gradient-to-b from-[#1E3A8A] via-[#162860] to-[#0D133A] text-slate-50 border-r border-blue-900/60 transition-all duration-300 ease-in-out flex flex-col shadow-2xl md:sticky md:top-0 md:translate-x-0"
+       :class="sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 md:translate-x-0 md:w-24'">
 
     <div class="h-24 flex items-center justify-between px-5 border-b border-white/10">
         <div class="flex items-center gap-3 overflow-hidden">
@@ -293,20 +295,22 @@
     </div>
 </aside>
 
-<div class="flex-1 flex flex-col">
-    <header class="h-16 bg-white/80 backdrop-blur border-b border-slate-200 flex items-center justify-between px-6 shadow-sm">
-        <div class="flex items-center gap-3">
+<div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-30 bg-slate-900/50 md:hidden" @click="toggleSidebar()"></div>
+
+<div class="flex-1 flex flex-col min-w-0">
+    <header class="h-16 bg-white/80 backdrop-blur border-b border-slate-200 flex items-center justify-between gap-3 px-3 sm:px-6 shadow-sm min-w-0">
+        <div class="flex items-center gap-3 min-w-0">
             <button @click="toggleSidebar()" class="md:hidden flex items-center justify-center h-9 w-9 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">
                 <i class='bx bx-menu text-2xl'></i>
             </button>
 
-            <div>
-                <h1 class="text-xl md:text-2xl font-semibold text-slate-800">@yield('title', 'Panel de Control')</h1>
+            <div class="min-w-0">
+                <h1 class="truncate text-lg md:text-2xl font-semibold text-slate-800">@yield('title', 'Panel de Control')</h1>
                 <p class="text-xs text-slate-500 hidden sm:block">{{ $nombreCortoSistema }}-SYS · {{ $lemaSistema }}</p>
             </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-shrink-0">
             <div class="relative" @click.away="notificacionesMenu = false">
                 <button @click="notificacionesMenu = !notificacionesMenu" class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" title="Notificaciones internas">
                     <i class='bx bx-bell text-xl'></i>
@@ -317,7 +321,7 @@
                     @endif
                 </button>
 
-                <div x-show="notificacionesMenu" x-transition class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-xl">
+                <div x-show="notificacionesMenu" x-transition class="absolute right-0 z-30 mt-2 w-[calc(100vw-2rem)] sm:w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-xl">
                     <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                         <div>
                             <p class="font-semibold text-slate-800">Notificaciones</p>
@@ -385,7 +389,7 @@
         </div>
     </header>
 
-    <main class="p-4 md:p-6">
+    <main class="min-w-0 overflow-x-hidden p-3 md:p-6">
         @if(session('success') || session('error') || session('info') || session('status'))
             <div class="mb-4 space-y-2">
                 @if(session('success'))
@@ -408,7 +412,7 @@
             </div>
         @endif
 
-        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-4 md:p-6">
+        <div class="w-full max-w-full overflow-hidden bg-white rounded-2xl shadow-md border border-slate-100 p-3 md:p-6">
             @yield('content')
         </div>
     </main>
@@ -442,6 +446,20 @@
             }
         });
     }, true);
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('main table').forEach(function (table) {
+            if (table.closest('.idej-table-responsive') || table.closest('.overflow-x-auto') || table.closest('[data-no-responsive-table]')) {
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'idej-table-responsive rounded-xl border border-slate-200';
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+            table.classList.add('min-w-full');
+        });
+    });
 </script>
 
 @stack('scripts')

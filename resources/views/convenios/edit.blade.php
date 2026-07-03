@@ -61,7 +61,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="px-3 py-3 text-center text-gray-500">Este convenio no tiene cargos relacionados en la tabla pivote.</td>
+                                <td colspan="3" class="px-3 py-3 text-center text-gray-500">Este convenio no tiene cargos relacionados.</td>
                             </tr>
                         @endforelse
                     </tbody>

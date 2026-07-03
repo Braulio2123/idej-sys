@@ -7,7 +7,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold text-slate-800">Mi perfil</h2>
-            <p class="text-sm text-slate-500">Administra tu información de acceso al sistema interno IDEJ-SYS.</p>
+            <p class="text-sm text-slate-500">Administra tus datos de acceso y seguridad.</p>
         </div>
 
         <div class="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">

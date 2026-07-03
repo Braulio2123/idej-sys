@@ -87,6 +87,12 @@ class UsuarioController extends Controller
 
         $rolAnterior = $usuario->rol?->clave ?? 'Sin rol';
         $emailAnterior = $usuario->email;
+        $nuevoRol = Rol::find($validated['rol_id']);
+
+        if ($usuario->rolClave() === Rol::ADMIN && $nuevoRol?->clave !== Rol::ADMIN && $this->esUltimoAdminActivo($usuario)) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'No se puede cambiar el rol del último administrador activo. Primero asigna otro administrador.');
+        }
 
         $usuario->nombre = $validated['nombre'];
         $usuario->email = $validated['email'];
@@ -125,6 +131,11 @@ class UsuarioController extends Controller
                 ->with('error', 'El usuario ya estaba desactivado.');
         }
 
+        if ($this->esUltimoAdminActivo($usuario)) {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'No se puede desactivar el último administrador activo. Primero asigna otro administrador.');
+        }
+
         $usuario->forceFill([
             'activo' => false,
             'remember_token' => null,
@@ -159,5 +170,18 @@ class UsuarioController extends Controller
 
         return redirect()->route('usuarios.index')
             ->with('success', 'Usuario reactivado correctamente.');
+    }
+
+
+    private function esUltimoAdminActivo(Usuario $usuario): bool
+    {
+        if (! $usuario->activo || $usuario->rolClave() !== Rol::ADMIN) {
+            return false;
+        }
+
+        return ! Usuario::where('activo', true)
+            ->where('id', '!=', $usuario->id)
+            ->whereHas('rol', fn ($query) => $query->where('clave', Rol::ADMIN))
+            ->exists();
     }
 }

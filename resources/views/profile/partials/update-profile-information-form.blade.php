@@ -5,7 +5,7 @@
         </h2>
 
         <p class="mt-1 text-sm text-gray-600">
-            Actualiza tu nombre y correo institucional dentro de IDEJ-SYS.
+            Actualiza tu nombre y correo institucional.
         </p>
     </header>
 

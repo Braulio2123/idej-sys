@@ -35,6 +35,7 @@ class MantenimientoController extends Controller
             'archivos' => [
                 'Storage link' => $this->storageLinkActivo() ? 'Activo' : 'No detectado',
                 'storage/app/public' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/public'))),
+                'storage/app/private' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/private'))),
                 'storage/logs' => $this->formatearBytes($this->tamanoDirectorio(storage_path('logs'))),
                 'bootstrap/cache' => is_writable(base_path('bootstrap/cache')) ? 'Escribible' : 'No escribible',
                 'storage' => is_writable(storage_path()) ? 'Escribible' : 'No escribible',
@@ -151,38 +152,50 @@ class MantenimientoController extends Controller
                 return back()->with('error', 'No se pudo crear el archivo ZIP de respaldo.');
             }
 
-            $source = storage_path('app/public');
-            if (! File::exists($source)) {
-                File::ensureDirectoryExists($source);
-            }
-
             $agregados = 0;
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
-                RecursiveIteratorIterator::SELF_FIRST
-            );
+            $origenes = [
+                'public' => storage_path('app/public'),
+                'private' => storage_path('app/private'),
+            ];
 
-            foreach ($iterator as $file) {
-                $filePath = $file->getRealPath();
-                $relativePath = str_replace('\\', '/', Str::after($filePath, $source.DIRECTORY_SEPARATOR));
+            foreach ($origenes as $prefijo => $source) {
+                if (! File::exists($source)) {
+                    File::ensureDirectoryExists($source);
+                    continue;
+                }
 
-                if ($file->isDir()) {
-                    $zip->addEmptyDir($relativePath);
-                } else {
-                    $zip->addFile($filePath, $relativePath);
-                    $agregados++;
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
+                    RecursiveIteratorIterator::SELF_FIRST
+                );
+
+                foreach ($iterator as $file) {
+                    $filePath = $file->getRealPath();
+                    $relativePath = str_replace('\\', '/', Str::after($filePath, $source.DIRECTORY_SEPARATOR));
+                    $zipPath = trim($prefijo.'/'.$relativePath, '/');
+
+                    if (str_starts_with($zipPath, 'private/backups/') || str_starts_with($zipPath, 'public/backups/')) {
+                        continue;
+                    }
+
+                    if ($file->isDir()) {
+                        $zip->addEmptyDir($zipPath);
+                    } else {
+                        $zip->addFile($filePath, $zipPath);
+                        $agregados++;
+                    }
                 }
             }
 
             if ($agregados === 0) {
-                $zip->addFromString('LEEME.txt', 'No había archivos cargados en storage/app/public al momento de generar este respaldo.');
+                $zip->addFromString('LEEME.txt', 'No había archivos cargados al momento de generar este respaldo.');
             }
 
             $zip->close();
 
             $this->bitacora(
                 'Descargar Backup de Archivos',
-                'Se generó y descargó un ZIP con archivos públicos cargados al sistema.',
+                'Se generó y descargó un ZIP con archivos públicos y privados cargados al sistema.',
                 'Mantenimiento'
             );
 
