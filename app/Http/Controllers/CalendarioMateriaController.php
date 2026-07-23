@@ -191,15 +191,10 @@ class CalendarioMateriaController extends Controller
             'tiposSesion' => [
                 CalendarioSesion::TIPO_CLASE,
                 CalendarioSesion::TIPO_COLOQUIO,
-                CalendarioSesion::TIPO_CONFERENCIA,
-                CalendarioSesion::TIPO_EXAMEN,
-                CalendarioSesion::TIPO_OTRO,
             ],
             'estatusesMateria' => [
-                CalendarioMateria::ESTATUS_PROGRAMADA,
                 CalendarioMateria::ESTATUS_CONFIRMADA,
                 CalendarioMateria::ESTATUS_IMPARTIDA,
-                CalendarioMateria::ESTATUS_CANCELADA,
             ],
             'aula' => $aula,
             'modalidadSeleccionada' => $modalidad,
@@ -207,7 +202,7 @@ class CalendarioMateriaController extends Controller
             'sesionesSeleccionadas' => $sesionesSeleccionadas,
             'mesesPlaneador' => $this->mesesPlaneador($calendarioAcademico, $sesionesSeleccionadas),
             'rangoPlaneacionTexto' => $this->textoRangoPlaneacion($calendarioAcademico, $sesionesSeleccionadas),
-            'horariosPredefinidos' => $this->horariosPredefinidos(),
+            'horariosPredefinidos' => $this->horariosPredefinidos($calendarioAcademico),
             'conteosPorFecha' => $conteosPorFecha,
             'previewSesionesPorFecha' => $previewSesionesPorFecha,
             'fechasBloqueadasMismoCalendario' => $fechasBloqueadasMismoCalendario,
@@ -225,11 +220,10 @@ class CalendarioMateriaController extends Controller
             'materia_id' => 'required|exists:materias,id',
             'docente_id' => 'required|exists:docentes,id',
             'orden' => 'required|integer|min:1|max:100',
-            'estatus' => 'required|in:Programada,Confirmada,Impartida,Cancelada',
+            'estatus' => 'required|in:Confirmada,Impartida',
             'observaciones' => 'nullable|string|max:3000',
-            'aula' => 'nullable|string|max:100',
             'modalidad' => 'required|in:Presencial,Virtual,Mixta',
-            'tipo_sesion' => 'required|in:Clase,Coloquio,Conferencia,Examen,Otro',
+            'tipo_sesion' => 'required|in:Clase,Coloquio',
             'permitir_no_laboral' => 'nullable|boolean',
             'usar_horario_idej' => 'nullable|boolean',
             'sesiones' => 'nullable|array',
@@ -317,7 +311,7 @@ class CalendarioMateriaController extends Controller
                 'fecha' => $sesion['fecha'],
                 'hora_inicio' => $sesion['hora_inicio'],
                 'hora_fin' => $sesion['hora_fin'],
-                'aula' => $validated['aula'] ?? null,
+                'aula' => null,
                 'modalidad' => $validated['modalidad'],
                 'tipo_sesion' => $validated['tipo_sesion'],
                 'estatus' => CalendarioSesion::ESTATUS_PROGRAMADA,
@@ -369,17 +363,10 @@ class CalendarioMateriaController extends Controller
                 6 => ['inicio' => '08:00', 'fin' => '13:00', 'nota' => 'Horario IDEJ posgrado sábado.'],
                 default => throw ValidationException::withMessages([$campoError => "{$fechaVista} no corresponde a viernes o sábado para posgrado."]),
             },
-            CalendarioAcademico::TIPO_LICENCIATURA_SABATINA => match ($dia) {
-                6 => ['inicio' => '08:00', 'fin' => '13:00', 'nota' => 'Horario IDEJ licenciatura sabatina.'],
-                default => throw ValidationException::withMessages([$campoError => "{$fechaVista} no corresponde a sábado para licenciatura sabatina."]),
-            },
-            CalendarioAcademico::TIPO_LICENCIATURA_MATUTINA => match ($dia) {
-                1, 2, 3, 4, 5 => ['inicio' => '09:00', 'fin' => '12:00', 'nota' => 'Horario IDEJ licenciatura matutina.'],
-                default => throw ValidationException::withMessages([$campoError => "{$fechaVista} no corresponde a lunes a viernes para licenciatura matutina."]),
-            },
-            CalendarioAcademico::TIPO_LICENCIATURA_VESPERTINA => match ($dia) {
-                1, 2, 3, 4, 5 => ['inicio' => '18:00', 'fin' => '21:00', 'nota' => 'Horario IDEJ licenciatura vespertina.'],
-                default => throw ValidationException::withMessages([$campoError => "{$fechaVista} no corresponde a lunes a viernes para licenciatura vespertina."]),
+            CalendarioAcademico::TIPO_LICENCIATURA_SABATINA, CalendarioAcademico::TIPO_LICENCIATURA_MATUTINA, CalendarioAcademico::TIPO_LICENCIATURA_VESPERTINA => match ($dia) {
+                5 => ['inicio' => '17:00', 'fin' => '21:00', 'nota' => 'Horario institucional IDEJ viernes.'],
+                6 => ['inicio' => '08:00', 'fin' => '13:00', 'nota' => 'Horario institucional IDEJ sábado.'],
+                default => throw ValidationException::withMessages([$campoError => "{$fechaVista} no corresponde a viernes o sábado para Educación Programática."]),
             },
             default => throw ValidationException::withMessages([
                 $campoError => 'Este calendario es personalizado. Captura manualmente hora inicio y hora fin para cada fecha seleccionada.',
@@ -581,7 +568,7 @@ class CalendarioMateriaController extends Controller
                 throw ValidationException::withMessages(['docente_id' => "El docente ya tiene una sesión programada el {$fechaVista} en ese horario."]);
             }
 
-            if (!empty($data['aula'])) {
+            if (false && !empty($data['aula'])) {
                 $aulaTieneConflicto = CalendarioSesion::activos()
                     ->whereDate('fecha', $fecha)
                     ->where('aula', $data['aula'])
@@ -708,15 +695,29 @@ class CalendarioMateriaController extends Controller
         }
     }
 
-    private function horariosPredefinidos(): array
+    private function horariosPredefinidos(?CalendarioAcademico $calendario = null): array
     {
-        return [
-            ['label' => '05:00 pm - 09:00 pm', 'inicio' => '17:00', 'fin' => '21:00'],
-            ['label' => '08:00 am - 01:00 pm', 'inicio' => '08:00', 'fin' => '13:00'],
-            ['label' => '05:00 pm - 08:00 pm', 'inicio' => '17:00', 'fin' => '20:00'],
-            ['label' => '09:00 am - 11:00 am', 'inicio' => '09:00', 'fin' => '11:00'],
-            ['label' => '09:00 am - 01:00 pm', 'inicio' => '09:00', 'fin' => '13:00'],
-        ];
+        return match ($calendario?->tipo_calendario) {
+            CalendarioAcademico::TIPO_POSGRADO_VIERNES_SABADO => [
+                ['label' => 'Viernes 05:00 pm - 09:00 pm', 'inicio' => '17:00', 'fin' => '21:00'],
+                ['label' => 'Sábado 08:00 am - 01:00 pm', 'inicio' => '08:00', 'fin' => '13:00'],
+            ],
+            CalendarioAcademico::TIPO_LICENCIATURA_SABATINA => [
+                ['label' => 'Sábado 08:00 am - 01:00 pm', 'inicio' => '08:00', 'fin' => '13:00'],
+            ],
+            CalendarioAcademico::TIPO_LICENCIATURA_MATUTINA => [
+                ['label' => '09:00 am - 11:00 am', 'inicio' => '09:00', 'fin' => '11:00'],
+                ['label' => '09:00 am - 01:00 pm', 'inicio' => '09:00', 'fin' => '13:00'],
+            ],
+            CalendarioAcademico::TIPO_LICENCIATURA_VESPERTINA => [
+                ['label' => '05:00 pm - 08:00 pm', 'inicio' => '17:00', 'fin' => '20:00'],
+                ['label' => '05:00 pm - 09:00 pm', 'inicio' => '17:00', 'fin' => '21:00'],
+            ],
+            default => [
+                ['label' => 'Captura manual 09:00 am - 01:00 pm', 'inicio' => '09:00', 'fin' => '13:00'],
+                ['label' => 'Captura manual 05:00 pm - 09:00 pm', 'inicio' => '17:00', 'fin' => '21:00'],
+            ],
+        };
     }
 
     private function estructuraMes(Carbon $fecha): array

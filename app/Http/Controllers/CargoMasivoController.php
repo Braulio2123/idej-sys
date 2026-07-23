@@ -113,8 +113,12 @@ class CargoMasivoController extends Controller
         ]);
 
         $concepto = ConceptoPago::findOrFail($request->concepto_id);
-        $monto = $request->monto ?? $concepto->monto_base;
+        $montoCapturado = round((float) ($request->monto ?? $concepto->monto_base), 2);
+        $monto = $concepto->montoConIvaEducacionContinua($montoCapturado);
         $descripcion = $request->descripcion ?: ('Cargo masivo: ' . $concepto->nombre);
+        if ($concepto->aplicaIvaEducacionContinua()) {
+            $descripcion .= ' (incluye IVA 16% por Educación Continua)';
+        }
         $fechaVencimiento = $request->fecha_vencimiento;
 
         $cargosInsert = [];
@@ -196,8 +200,9 @@ class CargoMasivoController extends Controller
         $this->bitacora(
             'Cargos Masivos',
             "Se generaron cargos masivos para {$registro->total_alumnos} alumnos. "
-            . "Concepto: {$concepto->nombre}, Monto base: {$monto}, "
-            . "Fecha vencimiento: {$fechaVencimiento}."
+            . "Concepto: {$concepto->nombre}, Monto base: {$monto}"
+            . ($concepto->aplicaIvaEducacionContinua() ? " (incluye IVA 16% sobre {$montoCapturado})" : "")
+            . ", Fecha vencimiento: {$fechaVencimiento}."
         );
 
         return redirect()

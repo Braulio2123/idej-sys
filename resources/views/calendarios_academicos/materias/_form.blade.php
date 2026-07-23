@@ -37,17 +37,15 @@
         <label class="block text-sm font-semibold text-slate-700 mb-1">Estatus de materia *</label>
         <select name="estatus" class="w-full rounded-xl border-slate-300">
             @foreach($estatusesMateria as $estatus)
-                <option value="{{ $estatus }}" @selected(old('estatus', $calendarioMateria->estatus ?: 'Programada') === $estatus)>{{ $estatus }}</option>
+                <option value="{{ $estatus }}" @selected(old('estatus', $calendarioMateria->estatus ?: 'Confirmada') === $estatus)>{{ $estatus }}</option>
             @endforeach
         </select>
         @error('estatus') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
     </div>
 
-    <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Aula / liga general</label>
-        <input type="text" name="aula" value="{{ old('aula', $aula) }}" class="w-full rounded-xl border-slate-300" placeholder="Aula, Zoom, Meet...">
-        <p class="text-xs text-slate-500 mt-1">Se aplica a todas las sesiones de esta materia. Si una reposición cambia de aula/liga, se modifica desde la sesión reprogramada.</p>
-        @error('aula') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
+    <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
+        <p class="text-sm font-semibold text-blue-950">Aula y equipo</p>
+        <p class="text-sm text-blue-800 mt-1">Coordinación Académica no asigna aula en este flujo. Sistemas definirá posteriormente el aula, liga o equipo requerido desde la agenda operativa.</p>
     </div>
 
     <div>
@@ -84,7 +82,7 @@
             <span>
                 Sugerir horarios IDEJ automáticamente
                 <span class="block font-normal text-indigo-800 mt-1">
-                    Viernes de posgrado 17:00-21:00; sábado 08:00-13:00; licenciatura matutina/vespertina de lunes a viernes. Puedes ajustar cada sesión.
+                    Educación Programática usa horario institucional: viernes 17:00-21:00 y sábado 08:00-13:00. Puedes ajustar cada sesión si existe autorización.
                 </span>
             </span>
         </label>
@@ -321,16 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (jsDay === 6) return { inicio: '08:00', fin: '13:00' };
         }
 
-        if (tipoCalendario === 'Licenciatura sabatina' && jsDay === 6) {
-            return { inicio: '08:00', fin: '13:00' };
-        }
-
-        if (tipoCalendario === 'Licenciatura matutina' && [1,2,3,4,5].includes(jsDay)) {
-            return { inicio: '09:00', fin: '12:00' };
-        }
-
-        if (tipoCalendario === 'Licenciatura vespertina' && [1,2,3,4,5].includes(jsDay)) {
-            return { inicio: '18:00', fin: '21:00' };
+        if (['Licenciatura sabatina', 'Licenciatura matutina', 'Licenciatura vespertina'].includes(tipoCalendario)) {
+            if (jsDay === 5) return { inicio: '17:00', fin: '21:00' };
+            if (jsDay === 6) return { inicio: '08:00', fin: '13:00' };
         }
 
         return { inicio: '', fin: '' };
@@ -394,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${badge}
                         </div>
                         <p class="mt-1 text-slate-600">${escapeHtml(item.docente)}</p>
-                        <p class="mt-1 text-slate-500">${escapeHtml(item.horario)} · ${escapeHtml(item.aula)} · ${escapeHtml(item.modalidad)}</p>
+                        <p class="mt-1 text-slate-500">${escapeHtml(item.horario)} · ${escapeHtml(item.modalidad)}</p>
                         <p class="mt-1 text-slate-500">${escapeHtml(item.calendario)}</p>
                         <p class="text-slate-500">${escapeHtml(item.grupo)}</p>
                     </div>

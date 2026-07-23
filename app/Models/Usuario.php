@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Hash;
 
 class Usuario extends Authenticatable
 {
@@ -15,6 +16,11 @@ class Usuario extends Authenticatable
     protected $fillable = [
         'nombre',
         'email',
+        'telefono_notificaciones',
+        'whatsapp_notificaciones',
+        'notificar_email',
+        'notificar_sms',
+        'notificar_whatsapp',
         'password',
         'rol_id',
         'activo',
@@ -22,6 +28,9 @@ class Usuario extends Authenticatable
         'ultimo_login_ip',
         'ultimo_user_agent',
         'password_changed_at',
+        'must_change_password',
+        'temporary_password_generated_at',
+        'temporary_password_expires_at',
     ];
 
     protected $hidden = [
@@ -34,6 +43,12 @@ class Usuario extends Authenticatable
         'activo' => 'boolean',
         'ultimo_acceso_at' => 'datetime',
         'password_changed_at' => 'datetime',
+        'must_change_password' => 'boolean',
+        'notificar_email' => 'boolean',
+        'notificar_sms' => 'boolean',
+        'notificar_whatsapp' => 'boolean',
+        'temporary_password_generated_at' => 'datetime',
+        'temporary_password_expires_at' => 'datetime',
     ];
 
     protected $with = ['rol'];
@@ -48,6 +63,49 @@ class Usuario extends Authenticatable
     public function rol()
     {
         return $this->belongsTo(Rol::class, 'rol_id');
+    }
+
+
+
+    public function passwordHistories()
+    {
+        return $this->hasMany(UsuarioPasswordHistory::class, 'usuario_id');
+    }
+
+    public function registrarPasswordEnHistorial(?string $hash = null): void
+    {
+        $hash = $hash ?: $this->password;
+
+        if (! $hash) {
+            return;
+        }
+
+        $this->passwordHistories()->create([
+            'password_hash' => $hash,
+            'changed_at' => now(),
+        ]);
+    }
+
+    public function passwordUsadaRecientemente(string $passwordPlano, int $meses = 6): bool
+    {
+        if (Hash::check($passwordPlano, $this->password)) {
+            return true;
+        }
+
+        $desde = now()->subMonths($meses);
+
+        return $this->passwordHistories()
+            ->where(function ($query) use ($desde) {
+                $query->whereNull('changed_at')
+                    ->orWhere('changed_at', '>=', $desde);
+            })
+            ->get()
+            ->contains(fn (UsuarioPasswordHistory $history) => Hash::check($passwordPlano, $history->password_hash));
+    }
+
+    public function requiereCambioPassword(): bool
+    {
+        return (bool) $this->must_change_password;
     }
 
     public function seguimientos()

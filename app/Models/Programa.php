@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class Programa extends Model
 {
     //
-    protected $fillable = ['nombre', 'nivel'];
+    protected $fillable = ['clave', 'nombre', 'nivel', 'modalidad', 'duracion_periodos', 'descripcion', 'activo'];
+
+    protected $casts = [
+        'activo' => 'boolean',
+        'duracion_periodos' => 'integer',
+    ];
 
 
     public function requisitosDocumentales()

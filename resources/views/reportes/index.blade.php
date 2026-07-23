@@ -190,7 +190,7 @@
                         <thead class="bg-slate-50 text-slate-600">
                             <tr>
                                 <th class="px-3 py-2 text-left">Alumno</th>
-                                <th class="px-3 py-2 text-left">Programa</th>
+                                <th class="px-3 py-2 text-left">Educación Programática</th>
                                 <th class="px-3 py-2 text-right">Monto</th>
                                 <th class="px-3 py-2 text-right">Adeudo</th>
                                 <th class="px-3 py-2 text-left">Estatus</th>
@@ -241,7 +241,7 @@
                         <thead class="bg-slate-50 text-slate-600">
                             <tr>
                                 <th class="px-3 py-2 text-left">Alumno</th>
-                                <th class="px-3 py-2 text-left">Programa</th>
+                                <th class="px-3 py-2 text-left">Educación Programática</th>
                                 <th class="px-3 py-2 text-right">Monto</th>
                                 <th class="px-3 py-2 text-left">Fecha pago</th>
                             </tr>

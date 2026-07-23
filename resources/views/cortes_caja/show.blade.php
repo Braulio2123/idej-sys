@@ -5,6 +5,7 @@
 @section('content')
 @php
     use App\Models\Rol;
+    use App\Models\MovimientoCaja;
     $usuarioActual = Auth::user();
     $puedeCancelarPagos = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS) ?? false;
 
@@ -17,7 +18,18 @@
         'total_ajustes' => 0,
         'cantidad_ajustes' => 0,
     ];
-    $totalNetoAjustado = (float) $totalesActuales['total_sistema'] + (float) $resumenAjustes['total_ajustes'];
+    $resumenMovimientos = $resumenMovimientos ?? [
+        'entradas_efectivo' => 0,
+        'salidas_efectivo' => 0,
+        'neto_efectivo' => 0,
+        'entradas_total' => 0,
+        'salidas_total' => 0,
+        'neto_total' => 0,
+        'cantidad' => 0,
+    ];
+    $efectivoEsperado = $efectivoEsperado + (float) $resumenMovimientos['neto_efectivo'];
+    $totalEsperado = $totalEsperado + (float) $resumenMovimientos['neto_total'];
+    $totalNetoAjustado = (float) $totalesActuales['total_sistema'] + (float) $resumenAjustes['total_ajustes'] + (float) $resumenMovimientos['neto_total'];
 @endphp
 
 <div class="space-y-6">
@@ -31,7 +43,9 @@
 
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('cortes-caja.index') }}" class="px-4 py-2 rounded-lg border text-slate-700 font-semibold hover:bg-slate-50">← Volver</a>
-            <button onclick="window.print()" class="px-4 py-2 rounded-lg bg-slate-700 text-white font-semibold hover:bg-slate-800">Imprimir</button>
+            @if($corteCaja->estaCerrada())
+                <a href="{{ route('cortes-caja.pdf', $corteCaja) }}" target="_blank" class="px-4 py-2 rounded-lg bg-slate-700 text-white font-semibold hover:bg-slate-800">PDF oficial</a>
+            @endif
             @if($corteCaja->estaAbierta())
                 <a href="{{ route('cortes-caja.cierre', $corteCaja) }}" class="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700">Cerrar caja</a>
             @endif
@@ -88,6 +102,145 @@
             @endif
         </div>
     </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-5 rounded-xl border bg-white">
+            <p class="text-sm text-slate-500">Entradas operativas</p>
+            <p class="text-2xl font-bold text-green-700">${{ number_format($resumenMovimientos['entradas_total'], 2) }}</p>
+            <p class="text-xs text-slate-500 mt-1">Cambio adicional u otros ingresos no vinculados a colegiaturas.</p>
+        </div>
+        <div class="p-5 rounded-xl border bg-white">
+            <p class="text-sm text-slate-500">Salidas operativas</p>
+            <p class="text-2xl font-bold text-red-700">${{ number_format($resumenMovimientos['salidas_total'], 2) }}</p>
+            <p class="text-xs text-slate-500 mt-1">Compras menores, agua, papelería o egresos autorizados.</p>
+        </div>
+        <div class="p-5 rounded-xl border bg-white">
+            <p class="text-sm text-slate-500">Neto de movimientos</p>
+            <p class="text-2xl font-bold {{ $resumenMovimientos['neto_total'] < 0 ? 'text-red-700' : 'text-green-700' }}">${{ number_format($resumenMovimientos['neto_total'], 2) }}</p>
+            <p class="text-xs text-slate-500 mt-1">Impacta el efectivo esperado al cerrar caja.</p>
+        </div>
+    </div>
+
+    @if($corteCaja->estaAbierta())
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 mb-1">Registrar entrada o salida de caja</h3>
+            <p class="text-sm text-slate-500 mb-4">Usa este apartado para cambio, compras menores autorizadas o salidas operativas. Los pagos de alumnos siguen registrándose desde el expediente del alumno. Cada registro conserva el usuario que realizó la operación; evita usar cuentas compartidas.</p>
+
+            <form method="POST" action="{{ route('cortes-caja.movimientos.store', $corteCaja) }}" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Tipo *</label>
+                    <select name="tipo" required class="w-full rounded-lg border-slate-300">
+                        @foreach(MovimientoCaja::tipos() as $tipoMovimiento)
+                            <option value="{{ $tipoMovimiento }}" @selected(old('tipo') === $tipoMovimiento)>{{ $tipoMovimiento }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Concepto *</label>
+                    <select name="concepto" required class="w-full rounded-lg border-slate-300">
+                        @foreach(MovimientoCaja::conceptosSugeridos() as $conceptoMovimiento)
+                            <option value="{{ $conceptoMovimiento }}" @selected(old('concepto') === $conceptoMovimiento)>{{ $conceptoMovimiento }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Monto *</label>
+                    <input type="number" step="0.01" min="0.01" name="monto" value="{{ old('monto') }}" required class="w-full rounded-lg border-slate-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Método *</label>
+                    <select name="metodo_pago" required class="w-full rounded-lg border-slate-300">
+                        @foreach(MovimientoCaja::metodosPago() as $metodoMovimiento)
+                            <option value="{{ $metodoMovimiento }}" @selected(old('metodo_pago', 'Efectivo') === $metodoMovimiento)>{{ $metodoMovimiento }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Referencia</label>
+                    <input type="text" name="referencia" value="{{ old('referencia') }}" class="w-full rounded-lg border-slate-300" placeholder="Ticket, autorización, referencia bancaria o nota interna">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Comprobante</label>
+                    <input type="file" name="comprobante" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded-lg border-slate-300 bg-slate-50">
+                    <p class="text-xs text-slate-500 mt-1">Opcional. PDF o imagen, máximo 4 MB.</p>
+                </div>
+                <div class="md:col-span-2 xl:col-span-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">Observaciones</label>
+                    <textarea name="observaciones" rows="3" class="w-full rounded-lg border-slate-300" placeholder="Ej. Compra de agua para recepción, salida autorizada por coordinación, cambio adicional recibido.">{{ old('observaciones') }}</textarea>
+                </div>
+                <div class="md:col-span-2 xl:col-span-4 flex justify-end">
+                    <button class="px-5 py-2 rounded-lg bg-cyan-600 text-white font-semibold hover:bg-cyan-700">Guardar movimiento</button>
+                </div>
+            </form>
+        </div>
+    @endif
+
+    @if($corteCaja->movimientos->isNotEmpty())
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="px-5 py-4 border-b bg-slate-50 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800">Entradas y salidas de caja</h3>
+                    <p class="text-xs text-slate-500">Los folios internos de movimientos pueden no ser consecutivos si existen cancelaciones o registros históricos.</p>
+                </div>
+                <span class="text-xs text-slate-500">{{ $corteCaja->movimientos->count() }} movimiento(s), incluyendo cancelados</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-white text-slate-500 uppercase text-xs">
+                        <tr>
+                            <th class="p-3 text-left">Movimiento</th>
+                            <th class="p-3 text-center">Fecha</th>
+                            <th class="p-3 text-center">Método</th>
+                            <th class="p-3 text-left">Referencia</th>
+                            <th class="p-3 text-left">Usuario</th>
+                            <th class="p-3 text-center">Estatus</th>
+                            <th class="p-3 text-right">Monto</th>
+                            <th class="p-3 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($corteCaja->movimientos->sortByDesc('fecha_movimiento') as $movimiento)
+                            <tr class="border-t hover:bg-slate-50 {{ $movimiento->estaCancelado() ? 'bg-red-50 text-slate-500' : '' }}">
+                                <td class="p-3">
+                                    <p class="font-semibold">{{ $movimiento->tipo }} · {{ $movimiento->concepto }}</p>
+                                    <p class="text-[11px] text-slate-400">Folio interno de movimiento: #{{ $movimiento->id }}</p>
+                                    @if($movimiento->observaciones)
+                                        <p class="text-xs text-slate-500 mt-1">{{ $movimiento->observaciones }}</p>
+                                    @endif
+                                    @if($movimiento->motivo_cancelacion)
+                                        <p class="text-xs text-red-600 mt-1">Cancelado: {{ $movimiento->motivo_cancelacion }}</p>
+                                    @endif
+                                </td>
+                                <td class="p-3 text-center">{{ optional($movimiento->fecha_movimiento)->format('d/m/Y H:i') }}</td>
+                                <td class="p-3 text-center">{{ $movimiento->metodo_pago }}</td>
+                                <td class="p-3">{{ $movimiento->referencia ?? '—' }}</td>
+                                <td class="p-3">{{ $movimiento->usuario->nombre ?? '—' }}</td>
+                                <td class="p-3 text-center">
+                                    <span class="px-2 py-1 rounded-full text-xs font-bold {{ $movimiento->estaCancelado() ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700' }}">{{ $movimiento->estatus }}</span>
+                                </td>
+                                <td class="p-3 text-right font-bold {{ $movimiento->tipo === MovimientoCaja::TIPO_SALIDA ? 'text-red-700' : 'text-green-700' }}">
+                                    {{ $movimiento->tipo === MovimientoCaja::TIPO_SALIDA ? '-' : '+' }}${{ number_format($movimiento->monto, 2) }}
+                                </td>
+                                <td class="p-3 text-center">
+                                    @if($corteCaja->estaAbierta() && ! $movimiento->estaCancelado())
+                                        <form method="POST" action="{{ route('cortes-caja.movimientos.cancelar', [$corteCaja, $movimiento]) }}" onsubmit="return confirm('¿Cancelar este movimiento de caja?');" class="inline-block">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="hidden" name="motivo_cancelacion" value="Cancelado por corrección operativa antes del cierre de caja.">
+                                            <button class="text-red-700 hover:underline font-semibold">Cancelar</button>
+                                        </form>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 
     @if($corteCaja->estaCerrada())
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">

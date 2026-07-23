@@ -62,12 +62,24 @@
                             @else
                                 <span class="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Desactivado</span>
                             @endif
+                            @if($u->must_change_password ?? false)
+                                <div class="mt-2"><span class="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Debe cambiar contraseña</span></div>
+                            @endif
                         </td>
                         <td class="p-3 text-gray-500 whitespace-nowrap">
                             {{ $u->ultimo_acceso_at?->format('d/m/Y H:i') ?? '—' }}
                         </td>
                         <td class="p-3 text-center space-x-2 whitespace-nowrap">
                             <a href="{{ route('usuarios.edit', $u) }}" class="text-indigo-600 font-semibold">Editar</a>
+
+                            @if($u->activo)
+                                <form action="{{ route('usuarios.password-temporal', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Generar contraseña temporal? Se mostrará una sola vez y el usuario deberá cambiarla al iniciar sesión.');">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button class="text-amber-700 font-semibold">Contraseña temporal</button>
+                                </form>
+
+                            @endif
 
                             @if($u->activo)
                                 <form action="{{ route('usuarios.destroy', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Desactivar este usuario? No se eliminará su historial.');">

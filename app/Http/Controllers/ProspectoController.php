@@ -29,7 +29,16 @@ class ProspectoController extends Controller
                     $q->where('nombre_completo', 'like', "%{$search}%")
                         ->orWhere('correo', 'like', "%{$search}%")
                         ->orWhere('telefono', 'like', "%{$search}%")
-                        ->orWhere('whatsapp', 'like', "%{$search}%");
+                        ->orWhere('whatsapp', 'like', "%{$search}%")
+                        ->orWhere('medio_contacto', 'like', "%{$search}%")
+                        ->orWhereHas('programa', function ($programaQuery) use ($search) {
+                            $programaQuery->where('nombre', 'like', "%{$search}%")
+                                ->orWhere('nivel', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('asesor', function ($asesorQuery) use ($search) {
+                            $asesorQuery->where('nombre', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($request->estatus, fn ($query, $estatus) => $query->where('estatus', $estatus))
@@ -220,7 +229,30 @@ class ProspectoController extends Controller
             'grupo_id' => ['nullable', 'exists:grupos,id'],
             'correo' => ['nullable', 'email', 'max:255', 'unique:alumnos,correo'],
             'telefono' => ['nullable', 'string', 'max:30'],
+        ], [
+            'matricula.required' => 'Captura la matrícula del nuevo alumno.',
+            'matricula.unique' => 'La matrícula capturada ya pertenece a otro alumno.',
+            'correo.unique' => 'El correo capturado ya pertenece a otro alumno. Revisa si el alumno ya fue creado previamente.',
+            'grupo_id.exists' => 'El grupo seleccionado ya no está disponible. Actualiza la página e intenta nuevamente.',
         ]);
+
+        if (! empty($validated['grupo_id'])) {
+            $grupoInscripcion = Grupo::with(['programa', 'cicloEscolar'])->find($validated['grupo_id']);
+            $nivel = $grupoInscripcion?->programa?->nivel;
+            $ciclo = $grupoInscripcion?->cicloEscolar;
+
+            if (in_array($nivel, ['Licenciatura', 'Maestría', 'Maestria', 'Doctorado'], true) && $ciclo) {
+                $hoy = now()->toDateString();
+                $inicio = optional($ciclo->fecha_inicio_inscripcion)->toDateString();
+                $fin = optional($ciclo->fecha_fin_inscripcion)->toDateString();
+
+                if ($inicio && $fin && ($hoy < $inicio || $hoy > $fin)) {
+                    return back()
+                        ->withInput()
+                        ->with('error', 'El periodo de inscripción para este ciclo escolar no está abierto. No es posible convertir este prospecto en alumno de Educación Programática fuera del periodo autorizado.');
+                }
+            }
+        }
 
         $alumno = DB::transaction(function () use ($validated, $prospecto) {
             $grupo = ! empty($validated['grupo_id'])

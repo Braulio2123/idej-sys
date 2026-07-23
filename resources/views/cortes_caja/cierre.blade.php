@@ -4,8 +4,17 @@
 
 @section('content')
 @php
-    $efectivoEsperado = (float) $corteCaja->saldo_inicial + (float) $totalesActuales['efectivo_sistema'];
-    $totalEsperado = (float) $corteCaja->saldo_inicial + (float) $totalesActuales['total_sistema'];
+    $resumenMovimientos = $resumenMovimientos ?? [
+        'entradas_efectivo' => 0,
+        'salidas_efectivo' => 0,
+        'neto_efectivo' => 0,
+        'entradas_total' => 0,
+        'salidas_total' => 0,
+        'neto_total' => 0,
+        'cantidad' => 0,
+    ];
+    $efectivoEsperado = (float) $corteCaja->saldo_inicial + (float) $totalesActuales['efectivo_sistema'] + (float) $resumenMovimientos['neto_efectivo'];
+    $totalEsperado = (float) $corteCaja->saldo_inicial + (float) $totalesActuales['total_sistema'] + (float) $resumenMovimientos['neto_total'];
 @endphp
 
 <div class="max-w-4xl mx-auto space-y-6">
@@ -27,7 +36,7 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div class="p-5 rounded-xl border bg-white">
             <p class="text-sm text-slate-500">Saldo inicial</p>
             <p class="text-2xl font-bold">${{ number_format($corteCaja->saldo_inicial, 2) }}</p>
@@ -39,6 +48,10 @@
         <div class="p-5 rounded-xl border bg-white">
             <p class="text-sm text-slate-500">Total ingresos sistema</p>
             <p class="text-2xl font-bold text-indigo-700">${{ number_format($totalesActuales['total_sistema'], 2) }}</p>
+        </div>
+        <div class="p-5 rounded-xl border bg-white">
+            <p class="text-sm text-slate-500">Movimientos netos</p>
+            <p class="text-2xl font-bold {{ $resumenMovimientos['neto_total'] < 0 ? 'text-red-700' : 'text-green-700' }}">${{ number_format($resumenMovimientos['neto_total'], 2) }}</p>
         </div>
         <div class="p-5 rounded-xl border bg-amber-50 border-amber-200">
             <p class="text-sm text-slate-500">Efectivo esperado</p>
@@ -54,7 +67,7 @@
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Efectivo físico reportado</label>
                 <input type="number" step="0.01" min="0" name="efectivo_reportado" value="{{ old('efectivo_reportado', number_format($efectivoEsperado, 2, '.', '')) }}" class="w-full rounded-lg border-slate-300" required>
-                <p class="text-xs text-slate-500 mt-1">Incluye saldo inicial + efectivo cobrado.</p>
+                <p class="text-xs text-slate-500 mt-1">Incluye saldo inicial + efectivo cobrado + entradas/salidas operativas.</p>
             </div>
 
             <div>
@@ -69,7 +82,8 @@
         </div>
 
         <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-600">
-            <p><strong>Total esperado incluyendo saldo inicial:</strong> ${{ number_format($totalEsperado, 2) }}</p>
+            <p><strong>Total esperado incluyendo saldo inicial y movimientos de caja:</strong> ${{ number_format($totalEsperado, 2) }}</p>
+            <p class="mt-1">Entradas registradas: ${{ number_format($resumenMovimientos['entradas_total'], 2) }} · Salidas registradas: ${{ number_format($resumenMovimientos['salidas_total'], 2) }}.</p>
             <p class="mt-1">Si el importe reportado no coincide, el sistema guardará la diferencia para revisión administrativa.</p>
         </div>
 

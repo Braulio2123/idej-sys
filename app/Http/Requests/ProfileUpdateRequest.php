@@ -10,16 +10,31 @@ class ProfileUpdateRequest extends FormRequest
 {
     public function rules(): array
     {
-        return [
+        $rules = [
             'nombre' => ['required', 'string', 'max:255'],
-            'email' => [
+        ];
+
+        if ($this->puedeModificarCorreo()) {
+            $rules['email'] = [
                 'required',
                 'string',
                 'lowercase',
                 'email',
                 'max:255',
                 Rule::unique(Usuario::class, 'email')->ignore($this->user()->id),
-            ],
-        ];
+            ];
+        }
+
+        return $rules;
+    }
+
+    public function puedeModificarCorreo(): bool
+    {
+        $usuario = $this->user();
+
+        return $usuario
+            && method_exists($usuario, 'esAdmin')
+            && method_exists($usuario, 'esSistemas')
+            && ($usuario->esAdmin() || $usuario->esSistemas());
     }
 }

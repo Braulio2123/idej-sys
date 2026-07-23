@@ -11,6 +11,7 @@ class CalendarioAcademico extends Model
 
     protected $table = 'calendarios_academicos';
 
+    public const ESTATUS_AGENDADO = 'Agendado';
     public const ESTATUS_BORRADOR = 'Borrador';
     public const ESTATUS_PLANEADO = 'Planeado';
     public const ESTATUS_APROBADO = 'Aprobado';
@@ -118,9 +119,9 @@ class CalendarioAcademico extends Model
     {
         return match ($tipo) {
             self::TIPO_POSGRADO_VIERNES_SABADO => [5, 6],
-            self::TIPO_LICENCIATURA_SABATINA => [6],
-            self::TIPO_LICENCIATURA_MATUTINA => [1, 2, 3, 4, 5],
-            self::TIPO_LICENCIATURA_VESPERTINA => [1, 2, 3, 4, 5],
+            self::TIPO_LICENCIATURA_SABATINA => [5, 6],
+            self::TIPO_LICENCIATURA_MATUTINA => [5, 6],
+            self::TIPO_LICENCIATURA_VESPERTINA => [5, 6],
             default => [1, 2, 3, 4, 5, 6, 7],
         };
     }
@@ -129,9 +130,9 @@ class CalendarioAcademico extends Model
     {
         return match ($tipo) {
             self::TIPO_POSGRADO_VIERNES_SABADO => 'viernes y sábado',
-            self::TIPO_LICENCIATURA_SABATINA => 'sábado',
-            self::TIPO_LICENCIATURA_MATUTINA => 'lunes a viernes',
-            self::TIPO_LICENCIATURA_VESPERTINA => 'lunes a viernes',
+            self::TIPO_LICENCIATURA_SABATINA => 'viernes y sábado',
+            self::TIPO_LICENCIATURA_MATUTINA => 'viernes y sábado',
+            self::TIPO_LICENCIATURA_VESPERTINA => 'viernes y sábado',
             default => 'cualquier día',
         };
     }
@@ -145,6 +146,29 @@ class CalendarioAcademico extends Model
             self::TIPO_LICENCIATURA_VESPERTINA => [self::TIPO_LICENCIATURA_VESPERTINA],
             default => self::tiposCalendario(),
         };
+    }
+
+
+    public function getEstatusOperativoAttribute(): string
+    {
+        if ($this->estatus === self::ESTATUS_CANCELADO) {
+            return self::ESTATUS_CANCELADO;
+        }
+
+        $hoy = now()->toDateString();
+        if ($this->fecha_inicio && $hoy < $this->fecha_inicio->toDateString()) {
+            return self::ESTATUS_AGENDADO;
+        }
+
+        if ($this->fecha_fin && $hoy > $this->fecha_fin->toDateString()) {
+            return self::ESTATUS_FINALIZADO;
+        }
+
+        if ($this->fecha_inicio && $this->fecha_fin && $hoy >= $this->fecha_inicio->toDateString() && $hoy <= $this->fecha_fin->toDateString()) {
+            return self::ESTATUS_EN_CURSO;
+        }
+
+        return $this->estatus ?: self::ESTATUS_AGENDADO;
     }
 
     public function scopeOperativos($query)

@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Ciclos Escolares')
+
 @section('content')
 <div class="container mx-auto px-4 py-6">
 
@@ -21,7 +23,8 @@
     @if($ciclos->isEmpty())
         <p class="text-gray-600">No hay ciclos registrados.</p>
     @else
-        <table class="min-w-full text-sm border">
+        <div class="overflow-x-auto rounded-lg border border-gray-200">
+        <table class="min-w-full text-sm">
             <thead class="bg-indigo-600 text-white text-xs uppercase">
                 <tr>
                     <th class="px-4 py-3">Nombre</th>
@@ -66,6 +69,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
 
         <div class="mt-4">
             {{ $ciclos->links() }}

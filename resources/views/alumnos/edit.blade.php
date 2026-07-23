@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    use App\Models\Rol;
+    $puedeEliminarAlumno = auth()->user()?->tieneRol(Rol::ADMIN, Rol::CADMIN) ?? false;
+@endphp
 <div class="max-w-3xl mx-auto bg-white shadow-md rounded-lg p-6 mt-6">
     <h1 class="text-2xl font-bold text-gray-800 mb-6">Editar Alumno</h1>
 
@@ -85,12 +89,24 @@
                 <option value="Baja Temporal" @selected($alumno->estatus_academico == 'Baja Temporal')>Baja Temporal</option>
                 <option value="Suspendido"    @selected($alumno->estatus_academico == 'Suspendido')>Suspendido</option>
             </select>
+            <p class="text-xs text-gray-500 mt-1">Baja temporal o suspendido conserva el expediente y bloquea cargos/convenios nuevos; los pagos de adeudos existentes siguen disponibles.</p>
         </div>
 
         <div class="flex justify-end">
             <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">Actualizar</button>
         </div>
     </form>
+    @if($puedeEliminarAlumno)
+        <div class="mt-8 border-t border-red-200 pt-6">
+            <h2 class="text-lg font-bold text-red-700">Zona administrativa</h2>
+            <p class="text-sm text-gray-600 mt-1">La eliminación física solo aplica a alumnos capturados por error y sin historial. Si ya tiene pagos, documentos, convenios, becas o seguimientos, el sistema bloqueará la eliminación y se debe usar el estatus académico.</p>
+            <form action="{{ route('alumnos.destroy', $alumno) }}" method="POST" class="mt-4" onsubmit="return confirm('¿Intentar eliminar físicamente este alumno? Si tiene historial, el sistema bloqueará la operación.');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700">Eliminar solo si no tiene historial</button>
+            </form>
+        </div>
+    @endif
 </div>
 
 @endsection

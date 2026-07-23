@@ -27,18 +27,18 @@ class MantenimientoController extends Controller
                 'Laravel' => app()->version(),
                 'PHP' => PHP_VERSION,
                 'Ambiente' => config('app.env'),
-                'Debug' => config('app.debug') ? 'Activo' : 'Desactivado',
+                'Errores detallados' => config('app.debug') ? 'Activo' : 'Desactivado',
                 'URL' => config('app.url'),
                 'Zona horaria' => config('app.timezone'),
             ],
             'base_datos' => $this->estadoBaseDatos(),
             'archivos' => [
-                'Storage link' => $this->storageLinkActivo() ? 'Activo' : 'No detectado',
-                'storage/app/public' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/public'))),
-                'storage/app/private' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/private'))),
-                'storage/logs' => $this->formatearBytes($this->tamanoDirectorio(storage_path('logs'))),
-                'bootstrap/cache' => is_writable(base_path('bootstrap/cache')) ? 'Escribible' : 'No escribible',
-                'storage' => is_writable(storage_path()) ? 'Escribible' : 'No escribible',
+                'Acceso a archivos públicos' => $this->storageLinkActivo() ? 'Disponible' : 'No detectado',
+                'Archivos públicos' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/public'))),
+                'Documentos privados' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/private'))),
+                'Registros técnicos' => $this->formatearBytes($this->tamanoDirectorio(storage_path('logs'))),
+                'Carpeta de configuración' => is_writable(base_path('bootstrap/cache')) ? 'Disponible' : 'Sin permisos',
+                'Carpeta de archivos' => is_writable(storage_path()) ? 'Disponible' : 'Sin permisos',
             ],
             'logs' => $this->estadoLogs(),
             'migraciones' => $this->estadoMigraciones(),
@@ -58,11 +58,11 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return back()->with('success', 'Caché de configuración, rutas, vistas y aplicación limpiada correctamente.');
+            return back()->with('success', 'La configuración del sistema se actualizó correctamente.');
         } catch (Throwable $e) {
             Log::error('Error al limpiar caché desde mantenimiento: '.$e->getMessage());
 
-            return back()->with('error', 'No se pudo limpiar la caché: '.$e->getMessage());
+            return back()->with('error', 'No se pudo actualizar la configuración. Revisa permisos del servidor o solicita apoyo técnico.');
         }
     }
 
@@ -77,11 +77,11 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return back()->with('success', 'Enlace público de storage verificado o creado correctamente.');
+            return back()->with('success', 'Se verificó el acceso a archivos públicos del sistema.');
         } catch (Throwable $e) {
             Log::error('Error al crear storage link desde mantenimiento: '.$e->getMessage());
 
-            return back()->with('error', 'No se pudo crear el enlace de storage: '.$e->getMessage());
+            return back()->with('error', 'No se pudo verificar el acceso a archivos públicos. Revisa permisos del servidor o solicita apoyo técnico.');
         }
     }
 
@@ -100,11 +100,11 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return back()->with('success', 'Log principal de Laravel limpiado correctamente.');
+            return back()->with('success', 'El registro técnico principal se vació correctamente.');
         } catch (Throwable $e) {
             Log::error('Error al limpiar logs desde mantenimiento: '.$e->getMessage());
 
-            return back()->with('error', 'No se pudieron limpiar los logs: '.$e->getMessage());
+            return back()->with('error', 'No se pudo vaciar el registro técnico principal. Revisa permisos del servidor.');
         }
     }
 
@@ -288,14 +288,14 @@ class MantenimientoController extends Controller
     {
         return [
             [
-                'titulo' => 'APP_DEBUG desactivado en producción',
+                'titulo' => 'Errores detallados desactivados en producción',
                 'estado' => ! config('app.debug'),
-                'detalle' => config('app.debug') ? 'Actualmente está activo. Correcto solo en local.' : 'Correcto para producción.',
+                'detalle' => config('app.debug') ? 'Actualmente muestra detalles de errores. Correcto solo en desarrollo local.' : 'Correcto para producción.',
             ],
             [
-                'titulo' => 'APP_KEY configurada',
+                'titulo' => 'Llave de seguridad configurada',
                 'estado' => filled(config('app.key')),
-                'detalle' => filled(config('app.key')) ? 'Llave de aplicación detectada.' : 'Ejecuta php artisan key:generate.',
+                'detalle' => filled(config('app.key')) ? 'Llave de seguridad detectada.' : 'Genera la llave de seguridad antes de usar el sistema.',
             ],
             [
                 'titulo' => 'Conexión a base de datos',
@@ -303,19 +303,19 @@ class MantenimientoController extends Controller
                 'detalle' => $this->baseDatosDisponible() ? 'La conexión responde correctamente.' : 'No se pudo conectar a la base de datos.',
             ],
             [
-                'titulo' => 'Storage link activo',
+                'titulo' => 'Acceso a archivos públicos disponible',
                 'estado' => $this->storageLinkActivo(),
-                'detalle' => $this->storageLinkActivo() ? 'public/storage apunta a storage/app/public.' : 'Ejecuta storage:link desde este módulo.',
+                'detalle' => $this->storageLinkActivo() ? 'Los archivos públicos necesarios se pueden mostrar.' : 'Usa la acción Reparar acceso a archivos públicos.',
             ],
             [
-                'titulo' => 'Carpeta storage escribible',
+                'titulo' => 'Carpeta de archivos disponible',
                 'estado' => is_writable(storage_path()),
                 'detalle' => is_writable(storage_path()) ? 'Laravel puede escribir cachés, sesiones y archivos.' : 'Revisa permisos de storage/.',
             ],
             [
-                'titulo' => 'Carpeta bootstrap/cache escribible',
+                'titulo' => 'Carpeta de configuración disponible',
                 'estado' => is_writable(base_path('bootstrap/cache')),
-                'detalle' => is_writable(base_path('bootstrap/cache')) ? 'Laravel puede cachear configuración y rutas.' : 'Revisa permisos de bootstrap/cache.',
+                'detalle' => is_writable(base_path('bootstrap/cache')) ? 'El sistema puede guardar configuración optimizada.' : 'Revisa permisos de la carpeta de configuración.',
             ],
         ];
     }

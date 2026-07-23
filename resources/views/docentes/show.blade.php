@@ -68,24 +68,18 @@
                 <p class="text-lg text-slate-700">{{ $docente->telefono ?? '—' }}</p>
             </div>
 
-            {{-- Domicilio --}}
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm md:col-span-2">
-                <p class="text-xs text-slate-500">Domicilio</p>
-                <p class="text-lg text-slate-700">
-                    {{ $docente->domicilio ?? '—' }}
-                </p>
-            </div>
-
             {{-- RFC --}}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
                 <p class="text-xs text-slate-500">RFC</p>
                 <p class="text-lg text-slate-700">{{ $docente->rfc ?? '—' }}</p>
             </div>
 
-            {{-- Número de cuenta --}}
+            {{-- Datos bancarios --}}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
                 <p class="text-xs text-slate-500">Número de cuenta</p>
                 <p class="text-lg text-slate-700">{{ $docente->numero_cuenta ?? '—' }}</p>
+                <p class="text-xs text-slate-500 mt-2">Banco</p>
+                <p class="text-lg text-slate-700">{{ $docente->banco ?? '—' }}</p>
             </div>
 
             {{-- Estatus --}}

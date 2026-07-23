@@ -7,6 +7,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use App\Http\Middleware\RolMiddleware;
 use App\Http\Middleware\RequireFreshPassword;
 use App\Http\Middleware\PermisoMiddleware;
+use App\Http\Middleware\EnsureUsuarioInternoActivo;
 use App\Models\Bitacora;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -18,22 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
 
-    // ✅ Tareas programadas
+    // Tareas programadas del sistema interno.
     ->withSchedule(function (Schedule $schedule) {
-        // 09:00 - Recordatorios
-        $schedule->command('app:enviar-recordatorios')
-            ->dailyAt('09:00')
-            ->timezone('America/Mexico_City');
-
-        // 10:00 - Moratorios (después de recordatorios)
-        $schedule->command('app:aplicar-moratorios')
-            ->dailyAt('10:00')
-            ->timezone('America/Mexico_City');
-
-        // Cada 30 minutos - Sincronización de notificaciones internas operativas.
         $schedule->command('idej:notificaciones-operativas')
             ->everyThirtyMinutes()
-            ->timezone('America/Mexico_City');
+            ->timezone(config('app.timezone', 'America/Mexico_City'))
+            ->withoutOverlapping();
     })
 
     // ✅ Registrar grupos y alias de middleware
@@ -47,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            EnsureUsuarioInternoActivo::class,
             \App\Http\Middleware\SecurityHeaders::class,
         ]);
 

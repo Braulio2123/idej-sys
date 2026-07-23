@@ -30,12 +30,20 @@ class AlumnoController extends Controller
         $grupoId = $request->grupo_id;
 
         $alumnos = Alumno::query()
+            ->with(['grupo.programa'])
 
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('nombre_completo', 'like', "%{$search}%")
                       ->orWhere('correo', 'like', "%{$search}%")
-                      ->orWhere('matricula', 'like', "%{$search}%");
+                      ->orWhere('matricula', 'like', "%{$search}%")
+                      ->orWhereHas('grupo', function ($grupoQuery) use ($search) {
+                          $grupoQuery->where('nombre', 'like', "%{$search}%")
+                              ->orWhereHas('programa', function ($programaQuery) use ($search) {
+                                  $programaQuery->where('nombre', 'like', "%{$search}%")
+                                      ->orWhere('nivel', 'like', "%{$search}%");
+                              });
+                      });
                 });
             })
 
@@ -242,7 +250,20 @@ class AlumnoController extends Controller
             ->where('estatus', DocumentoAlumno::ESTATUS_ACEPTADO)
             ->count();
 
+        $documentosEntregados = $alumno->documentos()
+            ->whereIn('estatus', [
+                DocumentoAlumno::ESTATUS_ENTREGADO,
+                DocumentoAlumno::ESTATUS_EN_REVISION,
+                DocumentoAlumno::ESTATUS_ACEPTADO,
+            ])
+            ->count();
+
+        $documentosRechazados = $alumno->documentos()
+            ->where('estatus', DocumentoAlumno::ESTATUS_RECHAZADO)
+            ->count();
+
         $requisitosDocumentales = RequisitoDocumental::paraAlumno($alumno)->count();
+        $documentosEsperados = max($requisitosDocumentales, $documentosTotal);
 
 
         return view('alumnos.show', compact(
@@ -257,6 +278,9 @@ class AlumnoController extends Controller
             'documentosTotal',
             'documentosPendientes',
             'documentosAceptados',
+            'documentosEntregados',
+            'documentosRechazados',
+            'documentosEsperados',
             'requisitosDocumentales'
         ));
     }
@@ -267,8 +291,19 @@ class AlumnoController extends Controller
      */
     public function destroy(Alumno $alumno)
     {
-        if ($alumno->cargos()->exists() || $alumno->pagos()->exists()) {
-            return back()->with('error', 'No se puede eliminar un alumno con movimientos financieros.');
+        $tieneHistorialOperativo = $alumno->cargos()->exists()
+            || $alumno->pagos()->exists()
+            || $alumno->convenios()->exists()
+            || $alumno->becas()->exists()
+            || $alumno->seguimientos()->exists()
+            || $alumno->documentos()->withTrashed()->exists()
+            || $alumno->bitacoras()->exists()
+            || $alumno->ajustesCaja()->exists()
+            || $alumno->cursosEducacionContinua()->exists()
+            || $alumno->prospectoOrigen()->exists();
+
+        if ($tieneHistorialOperativo) {
+            return back()->with('error', 'No se puede eliminar físicamente un alumno con historial operativo, financiero, documental o de seguimiento. Para baja institucional, cambia su estatus académico.');
         }
 
         $nombre = $alumno->nombre_completo;
@@ -279,7 +314,7 @@ class AlumnoController extends Controller
         // 🔥 BITÁCORA → Eliminar alumno
         $this->bitacora(
             'Eliminar Alumno',
-            "Se eliminó al alumno {$nombre} (ID: {$id})."
+            "Se eliminó al alumno {$nombre} (ID: {$id}) sin historial operativo asociado."
         );
 
         return redirect()->route('alumnos.index')

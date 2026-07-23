@@ -52,6 +52,13 @@
     </div>
 @endif
 
+@if($alumno->estatus_academico !== 'Activo')
+    <div class="mb-4 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg shadow-sm">
+        <p class="font-bold">Alumno no activo: {{ $alumno->estatus_academico }}</p>
+        <p class="text-sm mt-1">El expediente permanece consultable y pueden registrarse pagos sobre adeudos existentes, pero no se deben generar cargos ni convenios nuevos hasta reactivar al alumno.</p>
+    </div>
+@endif
+
 <div class="container mx-auto px-2 md:px-4 py-4"
      x-data="{ openResumen: true, openDocumentos: true, openSeguimientos: true, openNuevoSeguimiento: false, openCargos: false, openPagos: false, openConvenios: false }">
 
@@ -79,13 +86,15 @@
                 @endif
 
                 @if($puedeOperarFinanzas)
-                    <a href="{{ route('alumnos.cargos.create', $alumno) }}" class="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
-                        + Cargo
-                    </a>
+                    @if($alumno->estatus_academico === 'Activo')
+                        <a href="{{ route('alumnos.cargos.create', $alumno) }}" class="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
+                            + Cargo
+                        </a>
+                    @endif
                     <a href="{{ route('alumnos.pagos.create', $alumno) }}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
                         + Pago
                     </a>
-                    @if(in_array($alumno->estatus_financiero, ['Con Adeudo', 'En Convenio'], true))
+                    @if($alumno->estatus_academico === 'Activo' && in_array($alumno->estatus_financiero, ['Con Adeudo', 'En Convenio'], true))
                         <a href="{{ route('alumnos.convenios.create', $alumno) }}" class="bg-amber-400 hover:bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
                             + Convenio
                         </a>
@@ -176,9 +185,9 @@
         </div>
 
         <div class="bg-white rounded-2xl border border-slate-100 shadow p-5">
-            <p class="text-xs uppercase tracking-wide text-slate-500">Documentos</p>
+            <p class="text-xs uppercase tracking-wide text-slate-500">Documentos entregados</p>
             <p class="mt-2 text-2xl font-bold {{ $documentosPendientes > 0 ? 'text-red-700' : 'text-cyan-700' }}">
-                {{ $documentosAceptados }}/{{ $documentosTotal }}
+                {{ $documentosEntregados }}/{{ $documentosEsperados }}
                 @if($documentosPendientes > 0)
                     <span class="text-sm font-semibold">({{ $documentosPendientes }} pend.)</span>
                 @endif
@@ -301,8 +310,8 @@
         <div x-show="openDocumentos" x-transition class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
                 <div class="bg-cyan-50 border border-cyan-100 rounded-xl p-4">
-                    <p class="text-xs uppercase text-cyan-700 font-semibold">Requisitos / registrados</p>
-                    <p class="text-2xl font-bold text-cyan-900">{{ $requisitosDocumentales }}/{{ $documentosTotal }}</p>
+                    <p class="text-xs uppercase text-cyan-700 font-semibold">Entregados / esperados</p>
+                    <p class="text-2xl font-bold text-cyan-900">{{ $documentosEntregados }}/{{ $documentosEsperados }}</p>
                 </div>
                 <div class="bg-green-50 border border-green-100 rounded-xl p-4">
                     <p class="text-xs uppercase text-green-700 font-semibold">Aceptados</p>
@@ -311,7 +320,14 @@
                 <div class="bg-red-50 border border-red-100 rounded-xl p-4">
                     <p class="text-xs uppercase text-red-700 font-semibold">Pendientes / rechazados</p>
                     <p class="text-2xl font-bold text-red-800">{{ $documentosPendientes }}</p>
+                    @if($documentosRechazados > 0)
+                        <p class="text-xs text-red-700 mt-1">{{ $documentosRechazados }} rechazado(s) conservan evidencia.</p>
+                    @endif
                 </div>
+            </div>
+
+            <div class="mb-5 rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+                El avance documental cuenta documentos entregados, en revisión y aceptados. Los aceptados se muestran aparte porque ya fueron validados por el área correspondiente.
             </div>
 
             @if($documentos->isEmpty())

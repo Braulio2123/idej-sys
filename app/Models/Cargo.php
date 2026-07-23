@@ -16,6 +16,9 @@ class Cargo extends Model
     protected $fillable = [
         'alumno_id',
         'concepto_id',
+        'cargo_recurrente_plan_id',
+        'periodo_recurrente',
+        'generado_automaticamente',
         'beca_id',
         'descripcion_cargo',
         'monto_original',
@@ -35,6 +38,7 @@ class Cargo extends Model
         'fecha_vencimiento' => 'date',
         'estatus' => 'string',
         'moratorio_aplicado' => 'boolean',
+        'generado_automaticamente' => 'boolean',
     ];
 
     public function alumno()
@@ -45,6 +49,12 @@ class Cargo extends Model
     public function concepto()
     {
         return $this->belongsTo(ConceptoPago::class, 'concepto_id');
+    }
+
+
+    public function planRecurrente()
+    {
+        return $this->belongsTo(PlanCargoRecurrente::class, 'cargo_recurrente_plan_id');
     }
 
     public function beca()

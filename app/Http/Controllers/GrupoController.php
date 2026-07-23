@@ -6,15 +6,13 @@ use App\Models\Grupo;
 use App\Models\CicloEscolar;
 use App\Models\Programa;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use App\Traits\RegistraBitacora;
 
 class GrupoController extends Controller
 {
     use RegistraBitacora;
 
-    /**
-     * LISTADO DE GRUPOS (solo lectura)
-     */
     public function index()
     {
         $grupos = Grupo::with(['cicloEscolar', 'programa'])
@@ -24,47 +22,34 @@ class GrupoController extends Controller
         return view('grupos.index', compact('grupos'));
     }
 
-    /**
-     * FORMULARIO PARA CREAR GRUPO (solo vista)
-     */
     public function create()
     {
         $ciclos = CicloEscolar::orderByDesc('created_at')->get();
-        $programas = Programa::orderBy('nombre')->get();
+        $programas = Programa::where('activo', true)->orderBy('nombre')->get();
 
         return view('grupos.create', compact('ciclos', 'programas'));
     }
 
-    /**
-     * GUARDAR NUEVO GRUPO (BITÁCORA)
-     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'nombre' => 'required|string|max:255',
-            'ciclo_escolar_id' => 'required|exists:ciclos_escolares,id',
-            'programa_id' => 'required|exists:programas,id',
-            'semestre_o_cuatrimestre' => 'required|integer|min:1|max:12',
-            'turno' => 'required|in:Matutino,Vespertino,Sabatino,Mixto',
-            'aula' => 'nullable|string|max:50',
-            'cupo_maximo' => 'required|integer|min:1|max:60',
-        ]);
+        $validated = $this->validar($request);
+        $programa = Programa::findOrFail($validated['programa_id']);
+        $this->validarSemestreContraPrograma($programa, (int) $validated['semestre_o_cuatrimestre']);
+
+        $validated['turno'] = 'Mixto';
+        $validated['aula'] = null;
 
         $grupo = Grupo::create($validated);
 
-        // 🔥 BITÁCORA
         $this->bitacora(
             'Crear Grupo',
-            "Se creó el grupo {$grupo->nombre} (ID {$grupo->id}) del programa {$grupo->programa->nombre}."
+            "Se creó el grupo {$grupo->nombre} (ID {$grupo->id}) de Educación Programática {$grupo->programa->nombre}."
         );
 
         return redirect()->route('grupos.index')
-            ->with('success', 'Grupo académico creado correctamente.');
+            ->with('success', 'Grupo académico creado correctamente. El aula será asignada posteriormente por Sistemas.');
     }
 
-    /**
-     * MOSTRAR GRUPO (solo lectura)
-     */
     public function show(Grupo $grupo)
     {
         $grupo->load([
@@ -79,35 +64,25 @@ class GrupoController extends Controller
         return view('grupos.show', compact('grupo'));
     }
 
-    /**
-     * FORMULARIO EDITAR GRUPO (solo vista)
-     */
     public function edit(Grupo $grupo)
     {
         $ciclos = CicloEscolar::orderByDesc('created_at')->get();
-        $programas = Programa::orderBy('nombre')->get();
+        $programas = Programa::where('activo', true)->orWhere('id', $grupo->programa_id)->orderBy('nombre')->get();
 
         return view('grupos.edit', compact('grupo', 'ciclos', 'programas'));
     }
 
-    /**
-     * ACTUALIZAR GRUPO (BITÁCORA)
-     */
     public function update(Request $request, Grupo $grupo)
     {
-        $validated = $request->validate([
-            'nombre' => 'required|string|max:255',
-            'ciclo_escolar_id' => 'required|exists:ciclos_escolares,id',
-            'programa_id' => 'required|exists:programas,id',
-            'semestre_o_cuatrimestre' => 'required|integer|min:1|max:12',
-            'turno' => 'required|in:Matutino,Vespertino,Sabatino,Mixto',
-            'aula' => 'nullable|string|max:50',
-            'cupo_maximo' => 'required|integer|min:1|max:60',
-        ]);
+        $validated = $this->validar($request);
+        $programa = Programa::findOrFail($validated['programa_id']);
+        $this->validarSemestreContraPrograma($programa, (int) $validated['semestre_o_cuatrimestre']);
+
+        $validated['turno'] = 'Mixto';
+        $validated['aula'] = null;
 
         $grupo->update($validated);
 
-        // 🔥 BITÁCORA
         $this->bitacora(
             'Actualizar Grupo',
             "Actualización del grupo {$grupo->nombre} (ID {$grupo->id})."
@@ -117,9 +92,6 @@ class GrupoController extends Controller
             ->with('success', 'Grupo académico actualizado correctamente.');
     }
 
-    /**
-     * ELIMINAR GRUPO (BITÁCORA)
-     */
     public function destroy(Grupo $grupo)
     {
         $id = $grupo->id;
@@ -127,7 +99,6 @@ class GrupoController extends Controller
 
         $grupo->delete();
 
-        // 🔥 BITÁCORA
         $this->bitacora(
             'Eliminar Grupo',
             "Se eliminó el grupo {$nombre} (ID {$id})."
@@ -135,5 +106,30 @@ class GrupoController extends Controller
 
         return redirect()->route('grupos.index')
             ->with('success', 'Grupo eliminado correctamente.');
+    }
+
+    private function validar(Request $request): array
+    {
+        return $request->validate([
+            'nombre' => 'required|string|max:255',
+            'ciclo_escolar_id' => 'required|exists:ciclos_escolares,id',
+            'programa_id' => 'required|exists:programas,id',
+            'semestre_o_cuatrimestre' => 'required|integer|min:1|max:20',
+            'cupo_maximo' => 'required|integer|min:1|max:60',
+        ], [
+            'programa_id.required' => 'Selecciona la Educación Programática del grupo.',
+            'semestre_o_cuatrimestre.required' => 'Selecciona el semestre del grupo.',
+        ]);
+    }
+
+    private function validarSemestreContraPrograma(Programa $programa, int $semestre): void
+    {
+        $duracion = (int) ($programa->duracion_periodos ?? 0);
+
+        if ($duracion > 0 && $semestre > $duracion) {
+            throw ValidationException::withMessages([
+                'semestre_o_cuatrimestre' => "La Educación Programática seleccionada tiene {$duracion} semestre(s). No puedes registrar semestre {$semestre}.",
+            ]);
+        }
     }
 }

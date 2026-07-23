@@ -9,6 +9,7 @@ use App\Models\Docente;
 use App\Models\Rol;
 use App\Models\SolicitudPagoDocente;
 use App\Traits\RegistraBitacora;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -275,11 +276,17 @@ class SolicitudPagoDocenteController extends Controller
         $validated = $request->validate([
             'fecha_pago' => 'required|date',
             'metodo_pago' => ['required', Rule::in(SolicitudPagoDocente::metodosPago())],
-            'referencia_pago' => 'nullable|string|max:200',
-            'banco_pago' => 'nullable|string|max:120',
-            'comprobante_pago' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'referencia_pago' => ['nullable', 'string', 'max:200', 'required_if:metodo_pago,Transferencia,Cheque,Tarjeta'],
+            'banco_pago' => ['nullable', 'string', 'max:120', 'required_if:metodo_pago,Transferencia,Cheque,Tarjeta'],
+            'comprobante_pago' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:5120', 'required_if:metodo_pago,Transferencia,Cheque,Tarjeta'],
             'observaciones_administracion' => 'nullable|string|max:1000',
             'pago_operacion_uuid' => ['required', 'uuid'],
+        ], [
+            'referencia_pago.required_if' => 'Captura la referencia, folio, clave de rastreo o número de operación del pago.',
+            'banco_pago.required_if' => 'Indica el banco, cuenta o medio utilizado para este método de pago.',
+            'comprobante_pago.required_if' => 'Adjunta el comprobante del pago para este método.',
+            'comprobante_pago.mimetypes' => 'El comprobante debe ser PDF o imagen válida.',
+            'comprobante_pago.max' => 'El comprobante no debe pesar más de 5 MB.',
         ]);
 
         DB::transaction(function () use ($solicitud_pago, $validated, $request) {
@@ -405,6 +412,42 @@ class SolicitudPagoDocenteController extends Controller
         );
     }
 
+
+    public function acusePago(SolicitudPagoDocente $solicitud_pago)
+    {
+        if (! in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION], true)) {
+            abort(403);
+        }
+
+        if ($solicitud_pago->estatus !== SolicitudPagoDocente::ESTATUS_PAGADA) {
+            return back()->with('error', 'El formato de pago docente se genera hasta que la solicitud está pagada.');
+        }
+
+        $solicitud_pago->load([
+            'docente',
+            'creadoPor',
+            'autorizadoPor',
+            'procesadoPor',
+            'calendarioMateria.calendario.grupo.programa',
+            'calendarioMateria.materia',
+            'curso',
+            'cursoSesion',
+        ]);
+
+        $pdf = Pdf::loadView('solicitudes_pago.acuse_pdf', [
+            'solicitud' => $solicitud_pago,
+        ])->setPaper('letter', 'portrait');
+
+        $this->bitacora(
+            'Generar Formato de Pago Docente',
+            "Se generó formato de pago docente para la solicitud {$solicitud_pago->folio}.",
+            'Solicitudes de Pago Docente',
+            $solicitud_pago
+        );
+
+        return $pdf->stream('pago_docente_'.str_replace(['/', '\\', ' '], '_', $solicitud_pago->folio ?: $solicitud_pago->id).'.pdf');
+    }
+
     public function destroy(SolicitudPagoDocente $solicitud_pago)
     {
         if (Auth::user()->rolClave() !== Rol::ADMIN) {
@@ -432,15 +475,16 @@ class SolicitudPagoDocenteController extends Controller
 
     private function formData(SolicitudPagoDocente $solicitud): array
     {
-        $calendarioMaterias = CalendarioMateria::with(['calendario.grupo.programa', 'materia', 'docente'])
+        $calendarioMaterias = CalendarioMateria::with(['calendario.grupo.programa', 'calendario.grupo.cicloEscolar', 'calendario.cicloEscolar', 'materia', 'docente', 'sesiones'])
             ->whereNotIn('estatus', [CalendarioMateria::ESTATUS_CANCELADA])
             ->orderByDesc('id')
             ->limit(150)
             ->get();
 
         $cursos = CursoEducacionContinua::operativos()
+            ->withCount(['sesiones as sesiones_count' => fn ($q) => $q->where('estatus', '!=', CursoSesion::ESTATUS_CANCELADA)])
             ->orderByDesc('fecha_inicio')
-            ->get(['id', 'nombre', 'tipo', 'fecha_inicio', 'fecha_fin']);
+            ->get(['id', 'nombre', 'tipo', 'modalidad', 'horas_totales', 'fecha_inicio', 'fecha_fin']);
 
         $cursoSesiones = CursoSesion::with(['curso', 'docente'])
             ->whereDate('fecha', '>=', now()->subMonths(2)->toDateString())
@@ -459,17 +503,133 @@ class SolicitudPagoDocenteController extends Controller
             'cursoSesiones' => $cursoSesiones,
             'niveles' => ['Licenciatura', 'Maestría', 'Doctorado', 'Posdoctorado', 'Educación continua', 'Otro'],
             'modalidades' => ['Presencial', 'Virtual', 'Mixta'],
+            'puedeCalcularPago' => in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true),
         ];
+    }
+
+    private function normalizarSolicitudDesdeOrigen(Request $request): void
+    {
+        $mergeIfBlank = function (string $key, mixed $value) use ($request): void {
+            if (! $request->filled($key) && $value !== null && $value !== '') {
+                $request->merge([$key => $value]);
+            }
+        };
+
+        $formatDate = function ($date) {
+            if (! $date) {
+                return null;
+            }
+
+            try {
+                return \Carbon\Carbon::parse($date)->format('Y-m-d');
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+
+        if ($request->input('origen') === SolicitudPagoDocente::ORIGEN_CALENDARIO && $request->filled('calendario_materia_id')) {
+            $cm = CalendarioMateria::with(['calendario.grupo.programa', 'calendario.grupo.cicloEscolar', 'calendario.cicloEscolar', 'materia', 'docente', 'sesiones'])
+                ->find($request->input('calendario_materia_id'));
+
+            if ($cm) {
+                $cal = $cm->calendario;
+                $grupo = $cal?->grupo;
+                $programa = $grupo?->programa;
+                $ciclo = $grupo?->cicloEscolar ?? $cal?->cicloEscolar;
+                $sesiones = $cm->sesiones->whereNotIn('estatus', [\App\Models\CalendarioSesion::ESTATUS_CANCELADA, \App\Models\CalendarioSesion::ESTATUS_SUSPENDIDA]);
+                $seleccionadas = collect($request->input('calendario_sesion_ids', []))->map(fn ($id) => (int) $id)->filter()->all();
+                if (! empty($seleccionadas)) {
+                    $sesiones = $sesiones->whereIn('id', $seleccionadas);
+                }
+                $primera = $sesiones->sortBy('fecha')->first();
+                $ultima = $sesiones->sortByDesc('fecha')->first();
+                $horas = $sesiones->sum(function ($sesion) {
+                    if (! $sesion->hora_inicio || ! $sesion->hora_fin) {
+                        return 0;
+                    }
+
+                    try {
+                        $inicio = \Carbon\Carbon::parse($sesion->hora_inicio);
+                        $fin = \Carbon\Carbon::parse($sesion->hora_fin);
+                        return $fin->greaterThan($inicio) ? $inicio->diffInMinutes($fin) / 60 : 0;
+                    } catch (\Throwable $e) {
+                        return 0;
+                    }
+                });
+
+                $mergeIfBlank('docente_id', $cm->docente_id);
+                $mergeIfBlank('nivel', $programa?->nivel ?? $cm->materia?->nivel);
+                $mergeIfBlank('programa_grupo', trim(($programa?->nombre ?? '').($grupo?->nombre ? ' · '.$grupo->nombre : '')));
+                $mergeIfBlank('periodo', $cal?->periodo ?? $ciclo?->nombre);
+                $mergeIfBlank('materia_actividad', $cm->nombre_materia);
+                $mergeIfBlank('modalidad', $cal?->modalidad);
+                $mergeIfBlank('numero_sesiones', $sesiones->count() ?: null);
+                $mergeIfBlank('horas_totales', $horas > 0 ? round($horas, 2) : null);
+                $mergeIfBlank('fecha_inicio_periodo', $formatDate($primera?->fecha ?? $cal?->fecha_inicio));
+                $mergeIfBlank('fecha_fin_periodo', $formatDate($ultima?->fecha ?? $cal?->fecha_fin));
+            }
+        }
+
+        if ($request->input('origen') === SolicitudPagoDocente::ORIGEN_EDUCACION_CONTINUA) {
+            $idsSesion = collect($request->input('curso_sesion_ids', []))->map(fn ($id) => (int) $id)->filter()->values();
+            if ($idsSesion->isEmpty() && $request->filled('curso_sesion_id')) {
+                $idsSesion = collect([(int) $request->input('curso_sesion_id')]);
+            }
+
+            if ($idsSesion->isNotEmpty()) {
+                $sesiones = CursoSesion::with(['curso', 'docente'])->whereIn('id', $idsSesion)->orderBy('fecha')->get();
+                $sesion = $sesiones->first();
+
+                if ($sesion) {
+                    $curso = $sesion->curso;
+                    $primera = $sesiones->first();
+                    $ultima = $sesiones->sortByDesc('fecha')->first();
+                    $horas = $sesiones->sum(fn ($s) => (float) ($s->duracion_horas ?: $s->calcularDuracion()));
+                    $mergeIfBlank('curso_id', $sesion->curso_id);
+                    $mergeIfBlank('docente_id', $sesion->docente_id);
+                    $mergeIfBlank('nivel', 'Educación continua');
+                    $mergeIfBlank('programa_grupo', trim(($curso?->tipo ?? 'Curso').' · '.($curso?->nombre ?? '')));
+                    $mergeIfBlank('periodo', $primera?->fecha?->format('d/m/Y').' - '.$ultima?->fecha?->format('d/m/Y'));
+                    $mergeIfBlank('materia_actividad', trim(($curso?->nombre ?? 'Sesiones de educación continua')));
+                    $mergeIfBlank('modalidad', $sesion->modalidad ?? $curso?->modalidad);
+                    $mergeIfBlank('numero_sesiones', $sesiones->count());
+                    $mergeIfBlank('horas_totales', $horas > 0 ? round($horas, 2) : null);
+                    $mergeIfBlank('fecha_inicio_periodo', $formatDate($primera?->fecha));
+                    $mergeIfBlank('fecha_fin_periodo', $formatDate($ultima?->fecha));
+                }
+            } elseif ($request->filled('curso_id')) {
+                $curso = CursoEducacionContinua::with(['sesiones'])->find($request->input('curso_id'));
+
+                if ($curso) {
+                    $sesiones = $curso->sesiones->where('estatus', '!=', CursoSesion::ESTATUS_CANCELADA);
+                    $mergeIfBlank('nivel', 'Educación continua');
+                    $mergeIfBlank('programa_grupo', trim(($curso->tipo ?? 'Curso').' · '.($curso->nombre ?? '')));
+                    $mergeIfBlank('periodo', trim((optional($curso->fecha_inicio)->format('d/m/Y') ?? '').' - '.(optional($curso->fecha_fin)->format('d/m/Y') ?? '')));
+                    $mergeIfBlank('materia_actividad', $curso->nombre);
+                    $mergeIfBlank('modalidad', $curso->modalidad);
+                    $mergeIfBlank('numero_sesiones', $sesiones->count() ?: null);
+                    $mergeIfBlank('horas_totales', $curso->horas_totales);
+                    $mergeIfBlank('fecha_inicio_periodo', $formatDate($curso->fecha_inicio));
+                    $mergeIfBlank('fecha_fin_periodo', $formatDate($curso->fecha_fin));
+                }
+            }
+        }
     }
 
     private function validateSolicitud(Request $request, ?SolicitudPagoDocente $solicitud = null): array
     {
+        $this->normalizarSolicitudDesdeOrigen($request);
+
         $validated = $request->validate([
             'docente_id' => 'required|exists:docentes,id',
             'origen' => ['required', Rule::in(SolicitudPagoDocente::origenes())],
             'calendario_materia_id' => 'nullable|exists:calendario_materias,id',
             'curso_id' => 'nullable|exists:cursos_educacion_continua,id',
             'curso_sesion_id' => 'nullable|exists:curso_sesiones,id',
+            'calendario_sesion_ids' => ['nullable', 'array'],
+            'calendario_sesion_ids.*' => ['integer', 'exists:calendario_sesiones,id'],
+            'curso_sesion_ids' => ['nullable', 'array'],
+            'curso_sesion_ids.*' => ['integer', 'exists:curso_sesiones,id'],
             'concepto_pago' => ['required', Rule::in(SolicitudPagoDocente::conceptos())],
             'nivel' => 'required|string|max:50',
             'programa_grupo' => 'nullable|string|max:180',
@@ -479,14 +639,34 @@ class SolicitudPagoDocenteController extends Controller
             'numero_sesiones' => 'nullable|integer|min:1|max:300',
             'horas_totales' => 'nullable|numeric|min:0|max:9999',
             'tarifa_hora' => 'nullable|numeric|min:0|max:999999',
-            'monto' => 'required|numeric|min:1|max:9999999',
+            'monto' => in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) ? 'required|numeric|min:1|max:9999999' : 'nullable|numeric|min:0|max:9999999',
             'fecha_solicitud' => 'required|date',
             'fecha_inicio_periodo' => 'nullable|date',
             'fecha_fin_periodo' => 'nullable|date|after_or_equal:fecha_inicio_periodo',
             'fecha_limite_pago' => 'nullable|date',
+            'fecha_tentativa_pago' => 'nullable|date',
             'prioridad' => ['required', Rule::in(SolicitudPagoDocente::prioridades())],
             'observaciones_academica' => 'nullable|string|max:1500',
         ]);
+
+        if (! in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
+            $validated['tarifa_hora'] = 0;
+            $validated['monto'] = 0;
+            $validated['fecha_limite_pago'] = null;
+        }
+
+        $montoSugerido = SolicitudPagoDocente::calcularMontoSugerido(
+            $validated['concepto_pago'] ?? null,
+            round((float) ($validated['horas_totales'] ?? 0), 2),
+            (int) ($validated['numero_sesiones'] ?? 0),
+            round((float) ($validated['tarifa_hora'] ?? 0), 2)
+        );
+
+        if (in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && $montoSugerido !== null && abs(round((float) $validated['monto'], 2) - $montoSugerido) > 0.01) {
+            throw ValidationException::withMessages([
+                'monto' => 'El monto no coincide con el cálculo esperado para el concepto seleccionado. Revisa sesiones/horas, tarifa y monto.',
+            ]);
+        }
 
         if ($validated['origen'] === SolicitudPagoDocente::ORIGEN_CALENDARIO) {
             $validated['curso_id'] = null;

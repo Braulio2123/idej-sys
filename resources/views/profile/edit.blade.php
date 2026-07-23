@@ -3,6 +3,11 @@
 @section('title', 'Mi perfil')
 
 @section('content')
+@php
+    $requiereCambioPassword = (bool) ($user->must_change_password ?? false);
+    $puedeModificarCorreo = $puedeModificarCorreo ?? ($user->esAdmin() || $user->esSistemas());
+@endphp
+
 <div class="max-w-6xl mx-auto space-y-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -15,6 +20,18 @@
             {{ $user->rol?->nombre ?? 'Sin rol asignado' }}
         </div>
     </div>
+
+    @if (session('warning'))
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {{ session('warning') }}
+        </div>
+    @endif
+
+    @if($requiereCambioPassword)
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Debes cambiar la contraseña temporal antes de continuar. Por seguridad no podrás navegar por otros módulos hasta actualizarla.
+        </div>
+    @endif
 
     @if (session('status') === 'profile-updated')
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -33,7 +50,11 @@
             <section class="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
                 <div class="mb-5">
                     <h3 class="text-lg font-semibold text-slate-800">Información personal</h3>
-                    <p class="text-sm text-slate-500">Puedes actualizar tu nombre y correo institucional. Tu rol solo puede ser modificado por Admin o Sistemas.</p>
+                    @if($requiereCambioPassword)
+                        <p class="text-sm text-amber-700">Por seguridad, primero cambia la contraseña temporal. Después podrás actualizar los datos permitidos.</p>
+                    @else
+                        <p class="text-sm text-slate-500">Puedes actualizar tu nombre. El correo institucional solo puede modificarse con rol Admin o Sistemas.</p>
+                    @endif
                 </div>
 
                 <form method="POST" action="{{ route('profile.update') }}" class="space-y-5">
@@ -49,7 +70,8 @@
                             value="{{ old('nombre', $user->nombre) }}"
                             required
                             autocomplete="name"
-                            class="mt-1 w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            @disabled($requiereCambioPassword)
+                            class="mt-1 w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
                         >
                         @error('nombre')
                             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
@@ -57,16 +79,21 @@
                     </div>
 
                     <div>
-                        <label for="email" class="block text-sm font-semibold text-slate-700">Correo electrónico</label>
+                        <label for="email" class="block text-sm font-semibold text-slate-700">Correo electrónico institucional</label>
                         <input
                             id="email"
-                            name="email"
+                            @if($puedeModificarCorreo && ! $requiereCambioPassword) name="email" @endif
                             type="email"
                             value="{{ old('email', $user->email) }}"
-                            required
                             autocomplete="username"
-                            class="mt-1 w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            @readonly(! $puedeModificarCorreo || $requiereCambioPassword)
+                            class="mt-1 w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 {{ (! $puedeModificarCorreo || $requiereCambioPassword) ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : '' }}"
                         >
+                        @if(! $puedeModificarCorreo)
+                            <p class="mt-2 text-xs text-slate-500">El correo institucional solo puede cambiarlo Admin o Sistemas desde Gestión de Usuarios.</p>
+                        @elseif($requiereCambioPassword)
+                            <p class="mt-2 text-xs text-amber-700">Primero cambia la contraseña temporal para continuar.</p>
+                        @endif
                         @error('email')
                             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -76,8 +103,8 @@
                         <a href="{{ route('dashboard') }}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
                             Cancelar
                         </a>
-                        <button class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-800">
-                            Guardar cambios
+                        <button class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed" @disabled($requiereCambioPassword)>
+                            {{ $requiereCambioPassword ? 'Bloqueado hasta cambiar contraseña' : 'Guardar cambios' }}
                         </button>
                     </div>
                 </form>
@@ -86,7 +113,7 @@
             <section class="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
                 <div class="mb-5">
                     <h3 class="text-lg font-semibold text-slate-800">Cambiar contraseña</h3>
-                    <p class="text-sm text-slate-500">Usa una contraseña fuerte. No compartas tu acceso porque toda acción queda ligada a tu usuario en bitácora.</p>
+                    <p class="text-sm text-slate-500">Usa una contraseña fuerte. No compartas tu acceso porque toda acción queda ligada a tu usuario en bitácora. No puedes reutilizar contraseñas usadas en los últimos 6 meses.</p>
                 </div>
 
                 <form method="POST" action="{{ route('password.update') }}" class="space-y-5">

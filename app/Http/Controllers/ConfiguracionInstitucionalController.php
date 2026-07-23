@@ -30,7 +30,7 @@ class ConfiguracionInstitucionalController extends Controller
             'razon_social' => ['nullable', 'string', 'max:180'],
             'rfc' => ['nullable', 'string', 'max:20'],
             'lema' => ['nullable', 'string', 'max:180'],
-            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'mimetypes:image/jpeg,image/png,image/webp', 'max:2048'],
             'eliminar_logo' => ['nullable', 'boolean'],
 
             'domicilio' => ['nullable', 'string', 'max:220'],

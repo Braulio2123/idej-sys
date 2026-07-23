@@ -23,6 +23,10 @@ class Docente extends Model
         'creado_por_id',
         'rfc',
         'numero_cuenta',
+        'banco',
+        'curriculum_path',
+        'titulo_cedula_path',
+        'constancia_fiscal_path',
         'estatus'
     ];
 
@@ -39,7 +43,7 @@ class Docente extends Model
     {
         return Attribute::make(
             get: fn ($value) => $value ? decrypt($value) : null,
-            set: fn ($value) => $value ? encrypt($value) : null,
+            set: fn ($value) => $value ? encrypt(mb_strtoupper(trim($value))) : null,
         );
     }
 
@@ -118,10 +122,10 @@ class Docente extends Model
             'nombre_completo',
             'email',
             'telefono',
-            'domicilio',
             'area_especialidad',
             'rfc',
             'numero_cuenta',
+            'banco',
         ];
 
         foreach ($campos as $campo) {

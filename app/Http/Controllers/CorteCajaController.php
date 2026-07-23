@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\CorteCaja;
+use App\Models\MovimientoCaja;
 use App\Models\Pago;
 use App\Models\Usuario;
 use App\Traits\RegistraBitacora;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -89,7 +91,7 @@ class CorteCajaController extends Controller
 
             $this->bitacora(
                 'Abrir Caja',
-                "Se abrió la caja #{$corte->id} con saldo inicial de $ " . number_format((float) $corte->saldo_inicial, 2)
+                "Se abrió el corte de caja #{$corte->id} con saldo inicial de $ " . number_format((float) $corte->saldo_inicial, 2)
             );
 
             return $corte;
@@ -119,6 +121,8 @@ class CorteCajaController extends Controller
             'ajustes.usuario',
             'ajustes.alumno',
             'ajustes.pago',
+            'movimientos.usuario',
+            'movimientos.canceladoPor',
         ]);
 
         // En cajas abiertas se muestran totales vivos. En cajas cerradas se conservan
@@ -134,8 +138,9 @@ class CorteCajaController extends Controller
             : $corteCaja->calcularTotalesSistema();
 
         $resumenAjustes = $corteCaja->resumenAjustes();
+        $resumenMovimientos = $corteCaja->resumenMovimientos();
 
-        return view('cortes_caja.show', compact('corteCaja', 'totalesActuales', 'resumenAjustes'));
+        return view('cortes_caja.show', compact('corteCaja', 'totalesActuales', 'resumenAjustes', 'resumenMovimientos'));
     }
 
     public function cierre(CorteCaja $corteCaja)
@@ -146,10 +151,11 @@ class CorteCajaController extends Controller
                 ->with('info', 'Esta caja ya fue cerrada.');
         }
 
-        $corteCaja->load(['usuario', 'pagos.alumno']);
+        $corteCaja->load(['usuario', 'pagos.alumno', 'movimientos.usuario']);
         $totalesActuales = $corteCaja->calcularTotalesSistema();
+        $resumenMovimientos = $corteCaja->resumenMovimientos();
 
-        return view('cortes_caja.cierre', compact('corteCaja', 'totalesActuales'));
+        return view('cortes_caja.cierre', compact('corteCaja', 'totalesActuales', 'resumenMovimientos'));
     }
 
     public function cerrar(Request $request, CorteCaja $corteCaja)
@@ -183,7 +189,9 @@ class CorteCajaController extends Controller
             $tarjetaReportada = round((float) $validated['tarjeta_reportado'], 2);
             $totalReportado = round($efectivoReportado + $transferenciaReportada + $tarjetaReportada, 2);
 
-            $efectivoEsperado = round((float) $corte->saldo_inicial + (float) $totales['efectivo_sistema'], 2);
+            $resumenMovimientos = $corte->resumenMovimientos();
+            $efectivoEsperado = round((float) $corte->saldo_inicial + (float) $totales['efectivo_sistema'] + (float) $resumenMovimientos['neto_efectivo'], 2);
+            $totalEsperado = round((float) $corte->saldo_inicial + (float) $totales['total_sistema'] + (float) $resumenMovimientos['neto_total'], 2);
 
             $corte->update([
                 'fecha_cierre' => now(),
@@ -197,7 +205,7 @@ class CorteCajaController extends Controller
                 'tarjeta_reportado' => $tarjetaReportada,
                 'total_reportado' => $totalReportado,
                 'diferencia_efectivo' => round($efectivoReportado - $efectivoEsperado, 2),
-                'diferencia_total' => round($totalReportado - ((float) $corte->saldo_inicial + (float) $totales['total_sistema']), 2),
+                'diferencia_total' => round($totalReportado - $totalEsperado, 2),
                 'estatus' => CorteCaja::ESTATUS_CERRADA,
                 'usuario_caja_abierta_id' => null,
                 'observaciones_cierre' => $validated['observaciones_cierre'] ?? null,
@@ -205,7 +213,7 @@ class CorteCajaController extends Controller
 
             $this->bitacora(
                 'Cerrar Caja',
-                "Se cerró la caja #{$corte->id}. Total sistema: $ " . number_format((float) $totales['total_sistema'], 2) .
+                "Se cerró el corte de caja #{$corte->id}. Total sistema: $ " . number_format((float) $totales['total_sistema'], 2) .
                 ". Total reportado: $ " . number_format($totalReportado, 2) .
                 ". Diferencia total: $ " . number_format((float) $corte->diferencia_total, 2)
             );
@@ -215,4 +223,171 @@ class CorteCajaController extends Controller
             ->route('cortes-caja.show', $corteCaja)
             ->with('success', 'Caja cerrada correctamente.');
     }
+
+
+    public function registrarMovimiento(Request $request, CorteCaja $corteCaja)
+    {
+        if ($corteCaja->estaCerrada()) {
+            return back()->with('error', 'No se pueden registrar movimientos en una caja cerrada. Usa un ajuste administrativo si necesitas documentar una corrección posterior.');
+        }
+
+        if ((int) $corteCaja->usuario_id !== (int) Auth::id() && ! Auth::user()?->tieneRol('Admin', 'CAdmin', 'Finanzas')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'tipo' => ['required', 'in:Entrada,Salida'],
+            'concepto' => ['required', 'string', 'max:120'],
+            'monto' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            'metodo_pago' => ['required', 'in:Efectivo,Transferencia,Tarjeta,Otro'],
+            'referencia' => ['nullable', 'string', 'max:200'],
+            'comprobante' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:4096'],
+            'observaciones' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'tipo.required' => 'Selecciona si el movimiento es entrada o salida.',
+            'concepto.required' => 'Indica el concepto del movimiento.',
+            'monto.required' => 'Captura el monto del movimiento.',
+            'monto.min' => 'El monto debe ser mayor a cero.',
+            'comprobante.mimetypes' => 'El comprobante debe ser PDF o imagen válida.',
+            'comprobante.max' => 'El comprobante no debe pesar más de 4 MB.',
+        ]);
+
+        DB::transaction(function () use ($validated, $request, $corteCaja) {
+            $corte = CorteCaja::whereKey($corteCaja->id)->lockForUpdate()->firstOrFail();
+
+            if ($corte->estaCerrada()) {
+                throw ValidationException::withMessages([
+                    'monto' => 'La caja fue cerrada por otro proceso. No se registró el movimiento.',
+                ]);
+            }
+
+            $path = null;
+            $original = null;
+
+            if ($request->hasFile('comprobante')) {
+                $path = $request->file('comprobante')->store('comprobantes/movimientos_caja', 'local');
+                $original = $request->file('comprobante')->getClientOriginalName();
+            }
+
+            $movimiento = MovimientoCaja::create([
+                'corte_caja_id' => $corte->id,
+                'usuario_id' => Auth::id(),
+                'tipo' => $validated['tipo'],
+                'concepto' => $validated['concepto'],
+                'monto' => round((float) $validated['monto'], 2),
+                'metodo_pago' => $validated['metodo_pago'],
+                'referencia' => $validated['referencia'] ?? null,
+                'comprobante_path' => $path,
+                'comprobante_original' => $original,
+                'observaciones' => $validated['observaciones'] ?? null,
+                'fecha_movimiento' => now(),
+                'estatus' => MovimientoCaja::ESTATUS_APLICADO,
+            ]);
+
+            $this->bitacora(
+                'Registrar Movimiento de Caja',
+                "Se registró un movimiento operativo ({$movimiento->tipo}) en el corte de caja #{$corte->id} por $" . number_format((float) $movimiento->monto, 2) . ". Concepto: {$movimiento->concepto}.",
+                'Caja y Cortes',
+                $movimiento
+            );
+        }, 3);
+
+        return redirect()
+            ->route('cortes-caja.show', $corteCaja)
+            ->with('success', 'Movimiento de caja registrado correctamente.');
+    }
+
+    public function cancelarMovimiento(Request $request, CorteCaja $corteCaja, MovimientoCaja $movimientoCaja)
+    {
+        if ((int) $movimientoCaja->corte_caja_id !== (int) $corteCaja->id) {
+            abort(404);
+        }
+
+        if ($corteCaja->estaCerrada()) {
+            return back()->with('error', 'No se puede cancelar un movimiento de una caja cerrada. Registra un ajuste administrativo para conservar el cierre original.');
+        }
+
+        $validated = $request->validate([
+            'motivo_cancelacion' => ['required', 'string', 'min:8', 'max:1000'],
+        ], [
+            'motivo_cancelacion.required' => 'Indica el motivo de cancelación del movimiento.',
+            'motivo_cancelacion.min' => 'El motivo debe explicar claramente por qué se cancela el movimiento.',
+        ]);
+
+        DB::transaction(function () use ($validated, $movimientoCaja) {
+            $movimiento = MovimientoCaja::whereKey($movimientoCaja->id)->lockForUpdate()->firstOrFail();
+
+            if ($movimiento->estaCancelado()) {
+                throw ValidationException::withMessages([
+                    'motivo_cancelacion' => 'Este movimiento ya fue cancelado anteriormente.',
+                ]);
+            }
+
+            $movimiento->update([
+                'estatus' => MovimientoCaja::ESTATUS_CANCELADO,
+                'cancelado_por_id' => Auth::id(),
+                'fecha_cancelacion' => now(),
+                'motivo_cancelacion' => $validated['motivo_cancelacion'],
+            ]);
+
+            $this->bitacora(
+                'Cancelar Movimiento de Caja',
+                "Se canceló un movimiento operativo del corte de caja #{$movimiento->corte_caja_id}. Folio interno del movimiento: #{$movimiento->id}. Motivo: {$validated['motivo_cancelacion']}.",
+                'Caja y Cortes',
+                $movimiento
+            );
+        }, 3);
+
+        return redirect()
+            ->route('cortes-caja.show', $corteCaja)
+            ->with('success', 'Movimiento de caja cancelado correctamente.');
+    }
+
+    public function pdf(CorteCaja $corteCaja)
+    {
+        if (! Auth::user()?->tieneRol('Admin', 'CAdmin', 'Finanzas', 'Direccion')) {
+            abort(403);
+        }
+
+        if ($corteCaja->estaAbierta()) {
+            return back()->with('error', 'El PDF oficial del corte se genera cuando la caja ya está cerrada.');
+        }
+
+        $corteCaja->load([
+            'usuario',
+            'pagos.alumno',
+            'pagos.usuario',
+            'pagos.canceladoPor',
+            'ajustes.usuario',
+            'ajustes.alumno',
+            'ajustes.pago',
+            'movimientos.usuario',
+            'movimientos.canceladoPor',
+        ]);
+
+        $totalesActuales = [
+            'efectivo_sistema' => (float) $corteCaja->efectivo_sistema,
+            'transferencia_sistema' => (float) $corteCaja->transferencia_sistema,
+            'tarjeta_sistema' => (float) $corteCaja->tarjeta_sistema,
+            'total_sistema' => (float) $corteCaja->total_sistema,
+            'cantidad_pagos' => (int) $corteCaja->cantidad_pagos,
+        ];
+
+        $pdf = Pdf::loadView('cortes_caja.pdf', [
+            'corteCaja' => $corteCaja,
+            'totalesActuales' => $totalesActuales,
+            'resumenMovimientos' => $corteCaja->resumenMovimientos(),
+            'resumenAjustes' => $corteCaja->resumenAjustes(),
+        ])->setPaper('letter', 'portrait');
+
+        $this->bitacora(
+            'Generar PDF Corte de Caja',
+            "Se generó PDF oficial del corte de caja #{$corteCaja->id}.",
+            'Caja y Cortes',
+            $corteCaja
+        );
+
+        return $pdf->stream('corte_caja_'.$corteCaja->id.'.pdf');
+    }
+
 }

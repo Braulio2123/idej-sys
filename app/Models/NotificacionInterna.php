@@ -131,6 +131,41 @@ class NotificacionInterna extends Model
         return sha1($base);
     }
 
+
+    public function urlSegura(): string
+    {
+        $fallback = route('notificaciones.index');
+        $url = trim((string) ($this->url ?? ''));
+
+        if ($url === '') {
+            return $fallback;
+        }
+
+        if (str_starts_with($url, '/')) {
+            if (str_contains($url, '/public/index.php') || str_contains($url, '/idej-sys/public')) {
+                return $fallback;
+            }
+
+            return $url;
+        }
+
+        if (preg_match('/^https?:\/\//i', $url)) {
+            $partes = parse_url($url);
+            $path = $partes['path'] ?? '';
+
+            if ($path === '' || str_contains($path, '/public/index.php') || str_contains($path, '/idej-sys/public')) {
+                return $fallback;
+            }
+
+            $query = isset($partes['query']) ? '?'.$partes['query'] : '';
+            $fragment = isset($partes['fragment']) ? '#'.$partes['fragment'] : '';
+
+            return $path.$query.$fragment;
+        }
+
+        return $fallback;
+    }
+
     public function etiquetaSeveridad(): string
     {
         return match ($this->severidad) {

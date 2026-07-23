@@ -21,6 +21,14 @@ class CicloEscolar extends Model
         'activo',
     ];
 
+    protected $casts = [
+        'fecha_inicio_inscripcion' => 'date',
+        'fecha_fin_inscripcion' => 'date',
+        'fecha_inicio_clases' => 'date',
+        'fecha_fin_clases' => 'date',
+        'activo' => 'boolean',
+    ];
+
     public function grupos()
     {
         return $this->hasMany(Grupo::class, 'ciclo_escolar_id');

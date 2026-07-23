@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Docentes')
+
 @section('content')
 
 <div class="max-w-7xl mx-auto mt-6">

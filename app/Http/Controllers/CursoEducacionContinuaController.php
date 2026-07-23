@@ -9,6 +9,7 @@ use App\Models\CursoInscrito;
 use App\Models\CursoSesion;
 use App\Models\Docente;
 use App\Models\Prospecto;
+use App\Models\Rol;
 use App\Models\Usuario;
 use App\Traits\RegistraBitacora;
 use Illuminate\Http\Request;
@@ -21,6 +22,24 @@ use Carbon\CarbonPeriod;
 class CursoEducacionContinuaController extends Controller
 {
     use RegistraBitacora;
+
+    private function usuarioPuedeAsignarAula(): bool
+    {
+        return in_array(Auth::user()?->rolClave(), [
+            Rol::ADMIN,
+            Rol::SISTEMAS,
+            Rol::CADMIN,
+        ], true);
+    }
+
+    private function usuarioPuedeEditarCostos(): bool
+    {
+        return in_array(Auth::user()?->rolClave(), [
+            Rol::ADMIN,
+            Rol::CADMIN,
+            Rol::FINANZAS,
+        ], true);
+    }
 
     public function index(Request $request)
     {
@@ -62,6 +81,7 @@ class CursoEducacionContinuaController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validatedCurso($request);
+        $validated['estatus'] = CursoEducacionContinua::estatusAutomatico($validated['fecha_inicio'] ?? null, $validated['fecha_fin'] ?? null, $validated['estatus'] ?? null);
         $validated['creado_por_id'] = Auth::id();
         $validated['equipo_requerido'] = $request->input('equipo_requerido', []);
         $validated['requiere_equipo'] = !empty($validated['equipo_requerido']);
@@ -119,6 +139,7 @@ class CursoEducacionContinuaController extends Controller
             'estatusesInscrito' => CursoInscrito::estatuses(),
             'tiposParticipante' => CursoInscrito::tiposParticipante(),
             'equipos' => CursoEducacionContinua::equiposDisponibles(),
+            'puedeAsignarAula' => $this->usuarioPuedeAsignarAula(),
         ]);
     }
 
@@ -130,6 +151,7 @@ class CursoEducacionContinuaController extends Controller
     public function update(Request $request, CursoEducacionContinua $educacionContinua)
     {
         $validated = $this->validatedCurso($request);
+        $validated['estatus'] = CursoEducacionContinua::estatusAutomatico($validated['fecha_inicio'] ?? null, $validated['fecha_fin'] ?? null, $validated['estatus'] ?? null);
         $validated['equipo_requerido'] = $request->input('equipo_requerido', []);
         $validated['requiere_equipo'] = !empty($validated['equipo_requerido']);
 
@@ -175,6 +197,9 @@ class CursoEducacionContinuaController extends Controller
     public function storeSesion(Request $request, CursoEducacionContinua $educacionContinua)
     {
         $validated = $this->validatedSesion($request);
+        if (! $this->usuarioPuedeAsignarAula()) {
+            $validated['aula_liga'] = null;
+        }
         $validated['duracion_horas'] = $this->calcularDuracion($validated['hora_inicio'], $validated['hora_fin']);
         $validated['equipo_requerido'] = $request->input('equipo_requerido', []);
         $validated['requiere_equipo'] = !empty($validated['equipo_requerido']);
@@ -195,6 +220,9 @@ class CursoEducacionContinuaController extends Controller
         $this->validarSesionPerteneceCurso($educacionContinua, $sesion);
 
         $validated = $this->validatedSesion($request);
+        if (! $this->usuarioPuedeAsignarAula()) {
+            $validated['aula_liga'] = $sesion->aula_liga;
+        }
         $validated['duracion_horas'] = $this->calcularDuracion($validated['hora_inicio'], $validated['hora_fin']);
         $validated['equipo_requerido'] = $request->input('equipo_requerido', []);
         $validated['requiere_equipo'] = !empty($validated['equipo_requerido']);
@@ -358,12 +386,14 @@ class CursoEducacionContinuaController extends Controller
             'diasSemana' => $this->diasSemanaPlaneador(),
             'horariosPredefinidos' => $this->horariosPredefinidosPlaneador(),
             'plantillasPlaneador' => $this->plantillasPlaneador(),
+            'puedeEditarCostos' => $this->usuarioPuedeEditarCostos(),
+            'puedeAsignarAula' => $this->usuarioPuedeAsignarAula(),
         ];
     }
 
     private function validatedCurso(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'nombre' => ['required', 'string', 'max:180'],
             'tipo' => ['required', Rule::in(CursoEducacionContinua::tipos())],
             'modalidad' => ['required', Rule::in(CursoEducacionContinua::modalidades())],
@@ -376,6 +406,12 @@ class CursoEducacionContinuaController extends Controller
             'costo' => ['nullable', 'numeric', 'min:0'],
             'observaciones' => ['nullable', 'string'],
         ]);
+
+        if (! $this->usuarioPuedeEditarCostos()) {
+            unset($validated['costo']);
+        }
+
+        return $validated;
     }
 
     private function validatedSesion(Request $request): array

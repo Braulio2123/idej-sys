@@ -68,7 +68,8 @@
                     </p>
 
                     {{-- Tabla --}}
-                    <table class="min-w-full text-sm mt-4 border">
+                    <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm mt-4 border whitespace-nowrap">
                         <thead class="bg-gray-100">
                             <tr>
                                 <th class="px-3 py-2 text-left">#</th>
@@ -102,6 +103,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
 
                 </div>
             @endforeach

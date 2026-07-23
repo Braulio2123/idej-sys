@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             ConceptoPagoSeeder::class,
             BecaSeeder::class,
             CargoMasivoSeeder::class,
+            PlanCargoRecurrenteSeeder::class,
 
             // 4. Demo integral para probar módulos reales del sistema
             DatosDemoIntegralSeeder::class,

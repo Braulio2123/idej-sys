@@ -51,6 +51,7 @@ class CalendarioAcademicoController extends Controller
         $validated = $this->validar($request);
         $validated['creado_por_id'] = Auth::id();
 
+        $validated['estatus'] = $this->estatusAutomatico($validated);
         $calendario = CalendarioAcademico::create($validated);
 
         $this->bitacora('Crear calendario académico', "Se creó el calendario {$calendario->nombre}.", 'Área Académica', $calendario);
@@ -102,10 +103,7 @@ class CalendarioAcademicoController extends Controller
     {
         $validated = $this->validar($request);
 
-        if ($validated['estatus'] === CalendarioAcademico::ESTATUS_APROBADO && !$calendarioAcademico->fecha_aprobacion) {
-            $validated['aprobado_por_id'] = Auth::id();
-            $validated['fecha_aprobacion'] = now();
-        }
+        $validated['estatus'] = $this->estatusAutomatico($validated);
 
         $calendarioAcademico->update($validated);
 
@@ -137,26 +135,72 @@ class CalendarioAcademicoController extends Controller
 
     private function validar(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'grupo_id' => 'required|exists:grupos,id',
             'ciclo_escolar_id' => 'nullable|exists:ciclos_escolares,id',
             'nombre' => 'required|string|max:255',
             'periodo' => 'nullable|string|max:50',
             'modalidad' => 'required|in:Presencial,Virtual,Mixta',
             'tipo_calendario' => 'required|in:'.implode(',', CalendarioAcademico::tiposCalendario()),
-            'estatus' => 'required|in:Borrador,Planeado,Aprobado,En curso,Finalizado,Cancelado',
+            'estatus' => 'required|in:Agendado,En curso,Finalizado,Cancelado',
             'fecha_inicio' => 'nullable|date',
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
             'observaciones' => 'nullable|string|max:3000',
         ]);
+
+        $ciclo = ! blank($validated['ciclo_escolar_id'] ?? null) ? CicloEscolar::find($validated['ciclo_escolar_id']) : null;
+
+        if (blank($validated['periodo'] ?? null) && $ciclo) {
+            $validated['periodo'] = $ciclo->nombre;
+        }
+
+        if ($ciclo && ! empty($validated['fecha_inicio'])) {
+            $inicio = \Carbon\Carbon::parse($validated['fecha_inicio']);
+            $fin = ! empty($validated['fecha_fin']) ? \Carbon\Carbon::parse($validated['fecha_fin']) : null;
+
+            if ($ciclo->fecha_inicio_clases && $inicio->lt($ciclo->fecha_inicio_clases)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'fecha_inicio' => 'La fecha de inicio del calendario no puede estar dentro del periodo de inscripción ni antes del inicio de clases del ciclo escolar.',
+                ]);
+            }
+
+            if ($ciclo->fecha_fin_clases && $fin && $fin->gt($ciclo->fecha_fin_clases)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'fecha_fin' => 'La fecha de fin del calendario no puede exceder la fecha final de clases del ciclo escolar.',
+                ]);
+            }
+        }
+
+        return $validated;
+    }
+
+    private function estatusAutomatico(array $validated): string
+    {
+        if (($validated['estatus'] ?? null) === CalendarioAcademico::ESTATUS_CANCELADO) {
+            return CalendarioAcademico::ESTATUS_CANCELADO;
+        }
+
+        $hoy = now()->toDateString();
+        $inicio = $validated['fecha_inicio'] ?? null;
+        $fin = $validated['fecha_fin'] ?? null;
+
+        if ($inicio && $hoy < $inicio) {
+            return CalendarioAcademico::ESTATUS_AGENDADO;
+        }
+        if ($fin && $hoy > $fin) {
+            return CalendarioAcademico::ESTATUS_FINALIZADO;
+        }
+        if ($inicio && $fin && $hoy >= $inicio && $hoy <= $fin) {
+            return CalendarioAcademico::ESTATUS_EN_CURSO;
+        }
+
+        return CalendarioAcademico::ESTATUS_AGENDADO;
     }
 
     private function estatuses(): array
     {
         return [
-            CalendarioAcademico::ESTATUS_BORRADOR,
-            CalendarioAcademico::ESTATUS_PLANEADO,
-            CalendarioAcademico::ESTATUS_APROBADO,
+            CalendarioAcademico::ESTATUS_AGENDADO,
             CalendarioAcademico::ESTATUS_EN_CURSO,
             CalendarioAcademico::ESTATUS_FINALIZADO,
             CalendarioAcademico::ESTATUS_CANCELADO,

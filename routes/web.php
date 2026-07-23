@@ -6,6 +6,7 @@ use App\Http\Controllers\BecaController;
 use App\Http\Controllers\BitacoraController;
 use App\Http\Controllers\CargoController;
 use App\Http\Controllers\CargoMasivoController;
+use App\Http\Controllers\CobranzaEmailController;
 use App\Http\Controllers\CentroControlOperativoController;
 use App\Http\Controllers\CicloEscolarController;
 use App\Http\Controllers\ConceptoPagoController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\CalendarioMateriaController;
 use App\Http\Controllers\CalendarioSesionController;
 use App\Http\Controllers\DiaNoLaboralController;
 use App\Http\Controllers\PagoController;
+use App\Http\Controllers\PlanCargoRecurrenteController;
 use App\Http\Controllers\ParcialidadConvenioController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProspectoController;
@@ -57,6 +59,13 @@ Route::middleware(['auth'])->group(function () {
     // Notificaciones internas del panel administrativo.
     Route::get('notificaciones', [NotificacionInternaController::class, 'index'])
         ->name('notificaciones.index');
+    Route::get('notificaciones/resumen-json', [NotificacionInternaController::class, 'resumen'])
+        ->name('notificaciones.resumen-json');
+    Route::post('notificaciones/probar', [NotificacionInternaController::class, 'probar'])
+        ->name('notificaciones.probar');
+    Route::post('notificaciones/sincronizar-operativas', [NotificacionInternaController::class, 'sincronizarOperativas'])
+        ->middleware('rol:Admin,Sistemas')
+        ->name('notificaciones.sincronizar-operativas');
     Route::patch('notificaciones/leer-todas', [NotificacionInternaController::class, 'marcarTodasLeidas'])
         ->name('notificaciones.leer-todas');
     Route::patch('notificaciones/{notificacion}/leer', [NotificacionInternaController::class, 'marcarLeida'])
@@ -108,6 +117,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('solicitudes_pago/{solicitud_pago}/comprobante', [SolicitudPagoDocenteController::class, 'descargarComprobante'])
         ->middleware('rol:Admin,CAdmin,Finanzas,Direccion')
         ->name('solicitudes_pago.comprobante');
+
+    Route::get('solicitudes_pago/{solicitud_pago}/acuse-pago', [SolicitudPagoDocenteController::class, 'acusePago'])
+        ->middleware('rol:Admin,CAdmin,Finanzas,Direccion')
+        ->name('solicitudes_pago.acuse_pago');
 
     // Alumnos y operación de caja/recepción.
     Route::middleware('rol:Admin,Recepcion,CAdmin,Finanzas,RRPP,Academica,Direccion')->group(function () {
@@ -169,6 +182,10 @@ Route::middleware(['auth'])->group(function () {
             ->only(['create', 'store', 'show', 'edit', 'update', 'destroy'])
             ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas');
 
+        Route::get('alumnos/{alumno}/convenios/{convenio}/pdf', [ConvenioController::class, 'pdf'])
+            ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,Direccion')
+            ->name('alumnos.convenios.pdf');
+
         Route::get('/alumnos/{alumno}/cargos', [AlumnoController::class, 'cargosIndex'])
             ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,Direccion')
             ->name('alumnos.cargos.index');
@@ -220,6 +237,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('alumnos.documentos.update');
 
         Route::get('alumnos/{alumno}/documentos/{documento}/descargar', [DocumentoAlumnoController::class, 'download'])
+            ->withTrashed()
             ->middleware('rol:Admin,Recepcion,CAdmin,Finanzas,RRPP,Academica,Direccion')
             ->name('alumnos.documentos.download');
 
@@ -280,16 +298,34 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('parcialidades/{parcialidad}', [ParcialidadConvenioController::class, 'destroy'])->name('parcialidades.destroy');
         });
 
-    // Cargos masivos.
+    // Cargos masivos, recurrentes y cobranza por correo.
     Route::middleware('rol:Admin,CAdmin,Finanzas')->group(function () {
         Route::get('cargos/masivo', [CargoMasivoController::class, 'index'])->name('cargos.masivo.index');
         Route::post('cargos/masivo/filtrar', [CargoMasivoController::class, 'filtrarAlumnos'])->name('cargos.masivo.filtrar');
         Route::post('cargos/masivo', [CargoMasivoController::class, 'store'])->name('cargos.masivo.store');
         Route::get('cargos/masivo/{id}', [CargoMasivoController::class, 'show'])->name('cargos.masivo.show');
+
+        Route::resource('cargos/recurrentes', PlanCargoRecurrenteController::class)
+            ->parameters(['recurrentes' => 'recurrente'])
+            ->names('cargos.recurrentes')
+            ->middleware('password.fresh:900')
+            ->except(['show']);
+        Route::post('cargos/recurrentes/{recurrente}/ejecutar', [PlanCargoRecurrenteController::class, 'ejecutar'])
+            ->middleware('password.fresh:900')
+            ->name('cargos.recurrentes.ejecutar');
+
+        Route::get('cobranza/correos', [CobranzaEmailController::class, 'index'])->name('cobranza.correos.index');
+        Route::post('cobranza/correos/enviar', [CobranzaEmailController::class, 'enviar'])
+            ->middleware('password.fresh:900')
+            ->name('cobranza.correos.enviar');
     });
 
     // Usuarios y configuración técnica.
     Route::middleware('rol:Admin,Sistemas')->group(function () {
+        Route::patch('usuarios/{usuario}/password-temporal', [UsuarioController::class, 'generarPasswordTemporal'])
+            ->middleware('password.fresh:900')
+            ->name('usuarios.password-temporal');
+
         Route::patch('usuarios/{usuario}/reactivar', [UsuarioController::class, 'reactivar'])
             ->middleware('password.fresh:900')
             ->name('usuarios.reactivar');
@@ -347,6 +383,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('cortes-caja/create', [CorteCajaController::class, 'create'])->name('cortes-caja.create');
         Route::post('cortes-caja', [CorteCajaController::class, 'store'])->name('cortes-caja.store');
         Route::get('cortes-caja/{corteCaja}', [CorteCajaController::class, 'show'])->name('cortes-caja.show');
+        Route::get('cortes-caja/{corteCaja}/pdf', [CorteCajaController::class, 'pdf'])->name('cortes-caja.pdf');
+        Route::post('cortes-caja/{corteCaja}/movimientos', [CorteCajaController::class, 'registrarMovimiento'])->name('cortes-caja.movimientos.store');
+        Route::put('cortes-caja/{corteCaja}/movimientos/{movimientoCaja}/cancelar', [CorteCajaController::class, 'cancelarMovimiento'])->middleware('password.fresh:900')->name('cortes-caja.movimientos.cancelar');
         Route::get('cortes-caja/{corteCaja}/cierre', [CorteCajaController::class, 'cierre'])->middleware('password.fresh:900')->name('cortes-caja.cierre');
         Route::put('cortes-caja/{corteCaja}/cerrar', [CorteCajaController::class, 'cerrar'])->middleware('password.fresh:900')->name('cortes-caja.cerrar');
     });
@@ -394,6 +433,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('calendarios-academicos/{calendarioAcademico}/sesiones/{calendarioSesion}/reprogramar', [CalendarioSesionController::class, 'reprogramarStore'])
             ->name('calendarios_academicos.sesiones.reprogramar.store');
 
+        Route::post('dias-no-laborales/cargar-oficiales', [DiaNoLaboralController::class, 'cargarOficiales'])
+            ->name('dias_no_laborales.cargar-oficiales');
         Route::resource('dias-no-laborales', DiaNoLaboralController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('dias_no_laborales')

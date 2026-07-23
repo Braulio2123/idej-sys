@@ -31,7 +31,7 @@
     <form method="GET" action="{{ route('prospectos.index') }}" class="bg-white rounded-2xl shadow border border-slate-100 p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
         <div class="xl:col-span-2">
             <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar</label>
-            <input type="text" name="search" value="{{ $search }}" class="w-full rounded-xl border-slate-300 text-sm" placeholder="Nombre, correo, teléfono o WhatsApp">
+            <input type="text" name="search" value="{{ $search }}" class="w-full rounded-xl border-slate-300 text-sm" placeholder="Nombre, correo, teléfono, WhatsApp, programa, asesor o medio">
         </div>
 
         <div>
@@ -93,7 +93,7 @@
                 <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
                     <tr>
                         <th class="px-4 py-3 text-left">Prospecto</th>
-                        <th class="px-4 py-3 text-left">Programa</th>
+                        <th class="px-4 py-3 text-left">Educación Programática</th>
                         <th class="px-4 py-3 text-left">Medio</th>
                         <th class="px-4 py-3 text-left">Asesor</th>
                         <th class="px-4 py-3 text-left">Próximo contacto</th>

@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Educación Programática')
+
 @section('content')
 
 <div class="max-w-6xl mx-auto px-4 py-6">
@@ -20,23 +22,23 @@
             </div>
             <div>
                 <h1 class="text-2xl font-semibold text-slate-800 leading-tight">
-                    Programas Académicos
+                    Educación Programática
                 </h1>
-                <p class="text-xs text-slate-500 mt-0.5">Listado general de programas registrados</p>
+                <p class="text-xs text-slate-500 mt-0.5">Oferta de Educación Programática disponible para grupos, prospectos, requisitos y reportes.</p>
             </div>
         </div>
 
         <a href="{{ route('programas.create') }}"
            class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl shadow-md font-medium transition">
             <i class='bx bx-plus text-xl'></i>
-            Nuevo Programa
+            Nueva Educación Programática
         </a>
     </div>
 
     {{-- Si no hay programas --}}
     @if($programas->isEmpty())
         <div class="bg-white border border-slate-200 shadow rounded-xl p-6 text-center text-slate-500">
-            No hay programas registrados.
+            No hay Educación Programática registrada.
         </div>
 
     @else
@@ -45,9 +47,12 @@
             <table class="min-w-full text-sm text-left text-slate-700">
                 <thead class="bg-indigo-600 text-white uppercase text-xs tracking-wide">
                     <tr>
-                        <th class="px-5 py-3">ID</th>
-                        <th class="px-5 py-3">Nombre del Programa</th>
+                        <th class="px-5 py-3">Clave</th>
+                        <th class="px-5 py-3">Nombre de Educación Programática</th>
                         <th class="px-5 py-3">Nivel</th>
+                        <th class="px-5 py-3">Modalidad</th>
+                        <th class="px-5 py-3">Duración</th>
+                        <th class="px-5 py-3">Estado</th>
                         <th class="px-5 py-3 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -55,7 +60,7 @@
                 <tbody>
                     @foreach($programas as $programa)
                         <tr class="border-b border-slate-200 hover:bg-slate-50 transition">
-                            <td class="px-5 py-3 text-slate-600">{{ $programa->id }}</td>
+                            <td class="px-5 py-3 text-slate-600">{{ $programa->clave ?: '—' }}</td>
 
                             <td class="px-5 py-3 font-medium text-slate-800">
                                 {{ $programa->nombre }}
@@ -63,6 +68,16 @@
 
                             <td class="px-5 py-3 text-slate-600">
                                 {{ $programa->nivel ?? '—' }}
+                            </td>
+
+                            <td class="px-5 py-3 text-slate-600">{{ $programa->modalidad ?: '—' }}</td>
+                            <td class="px-5 py-3 text-slate-600">{{ $programa->duracion_periodos ? $programa->duracion_periodos.' semestre(s)' : '—' }}</td>
+                            <td class="px-5 py-3">
+                                @if($programa->activo ?? true)
+                                    <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">Activo</span>
+                                @else
+                                    <span class="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-600">Inactivo</span>
+                                @endif
                             </td>
 
                             <td class="px-5 py-3 text-center">
@@ -78,7 +93,7 @@
                                     <!-- Eliminar -->
                                     <form action="{{ route('programas.destroy', $programa) }}"
                                           method="POST"
-                                          onsubmit="return confirm('¿Eliminar este programa?')">
+                                          onsubmit="return confirm('¿Eliminar esta Educación Programática? Si ya tiene historial, se inactivará para conservar evidencia.')">
                                         @csrf
                                         @method('DELETE')
 

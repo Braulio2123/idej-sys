@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Grupos Académicos')
+
 @section('content')
 <div class="container mx-auto px-4 py-6">
 
@@ -27,10 +29,9 @@
                 <tr>
                     <th class="px-4 py-3">Nombre</th>
                     <th class="px-4 py-3">Ciclo</th>
-                    <th class="px-4 py-3">Programa</th>
-                    <th class="px-4 py-3">Nivel</th>
-                    <th class="px-4 py-3">Turno</th>
-                    <th class="px-4 py-3">Aula</th>
+                    <th class="px-4 py-3">Educación Programática</th>
+                    <th class="px-4 py-3">Semestre</th>
+                    <th class="px-4 py-3">Horario institucional</th>
                     <th class="px-4 py-3">Cupo</th>
                     <th class="px-4 py-3 text-center">Acciones</th>
                 </tr>
@@ -43,8 +44,7 @@
                     <td class="px-4 py-3">{{ $grupo->cicloEscolar->nombre }}</td>
                     <td class="px-4 py-3">{{ $grupo->programa->nombre }}</td>
                     <td class="px-4 py-3">{{ $grupo->semestre_o_cuatrimestre }}</td>
-                    <td class="px-4 py-3">{{ $grupo->turno }}</td>
-                    <td class="px-4 py-3">{{ $grupo->aula ?? '—' }}</td>
+                    <td class="px-4 py-3">Viernes 17:00-21:00 · Sábado 08:00-13:00</td>
                     <td class="px-4 py-3">{{ $grupo->cupo_maximo }}</td>
 
                     <td class="px-4 py-3 text-center">

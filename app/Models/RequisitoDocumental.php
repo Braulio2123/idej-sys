@@ -46,6 +46,18 @@ class RequisitoDocumental extends Model
         ];
     }
 
+
+    public static function siguienteOrden(?int $programaId = null, ?string $nivel = null): int
+    {
+        $max = self::query()
+            ->when($programaId, fn ($q) => $q->where('programa_id', $programaId), fn ($q) => $q->whereNull('programa_id'))
+            ->when($programaId === null && $nivel, fn ($q) => $q->where('nivel', $nivel))
+            ->when($programaId === null && ! $nivel, fn ($q) => $q->whereNull('nivel'))
+            ->max('orden');
+
+        return ((int) floor(((int) $max) / 10) + 1) * 10;
+    }
+
     public function programa()
     {
         return $this->belongsTo(Programa::class, 'programa_id');

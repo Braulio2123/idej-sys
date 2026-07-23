@@ -40,7 +40,7 @@
     <table>
         <thead>
             <tr>
-                <th>Fecha</th>
+                <th>Fecha y hora ({{ config('app.timezone') }})</th>
                 <th>Usuario</th>
                 <th>Módulo</th>
                 <th>Acción</th>
@@ -51,7 +51,7 @@
         <tbody>
             @forelse($bitacoras as $b)
                 <tr>
-                    <td>{{ ($b->fecha_evento ?? $b->created_at)?->format('d/m/Y H:i') }}</td>
+                    <td>{{ ($b->fecha_evento ?? $b->created_at)?->timezone(config('app.timezone'))->format('d/m/Y H:i:s') }}</td>
                     <td>{{ $b->usuario->nombre ?? 'Sistema' }}</td>
                     <td>{{ $b->modulo ?? 'Sistema' }}</td>
                     <td>{{ $b->accion ?? $b->tipo }}</td>
@@ -67,7 +67,7 @@
     </table>
 
     <div class="footer">
-        {{ $configuracion->nombre_corto }} · Sistema Administrativo · Reporte generado el {{ now()->format('d/m/Y H:i') }}
+        {{ $configuracion->nombre_corto }} · Sistema Administrativo · Reporte generado el {{ now()->timezone(config('app.timezone'))->format('d/m/Y H:i:s') }}
     </div>
 </body>
 </html>

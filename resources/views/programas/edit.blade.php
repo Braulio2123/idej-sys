@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Editar Educación Programática')
+
 @section('content')
 
 <div class="max-w-4xl mx-auto px-4 py-6">
@@ -11,7 +13,7 @@
         </div>
         <div>
             <h1 class="text-2xl font-semibold text-slate-800 leading-tight">
-                Editar Programa Académico
+                Editar Educación Programática
             </h1>
             <p class="text-xs text-slate-500 mt-0.5">
                 Modifica la información del programa registrado

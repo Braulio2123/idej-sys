@@ -26,12 +26,8 @@ class SolicitudPagoDocente extends Model
     public const ORIGEN_EDUCACION_CONTINUA = 'Educación continua';
     public const ORIGEN_MANUAL = 'Manual';
 
-    public const CONCEPTO_HONORARIOS = 'Honorarios por clase';
-    public const CONCEPTO_REPOSICION = 'Reposición de clase';
-    public const CONCEPTO_CONFERENCIA = 'Conferencia';
-    public const CONCEPTO_MASTERCLASS = 'MasterClass';
-    public const CONCEPTO_ASESORIA = 'Asesoría académica';
-    public const CONCEPTO_OTRO = 'Otro';
+    public const CONCEPTO_EDUCACION_CONTINUA_HORAS = 'Educación continua - pago por horas';
+    public const CONCEPTO_EDUCACION_PROGRAMATICA_NIVEL_MATERIA = 'Educación Programática - pago por nivel y materia';
 
     protected $fillable = [
         'folio',
@@ -43,6 +39,8 @@ class SolicitudPagoDocente extends Model
         'calendario_materia_id',
         'curso_id',
         'curso_sesion_id',
+        'calendario_sesion_ids',
+        'curso_sesion_ids',
         'origen',
         'concepto_pago',
         'nivel',
@@ -58,6 +56,7 @@ class SolicitudPagoDocente extends Model
         'fecha_inicio_periodo',
         'fecha_fin_periodo',
         'fecha_limite_pago',
+        'fecha_tentativa_pago',
         'fecha_autorizacion',
         'fecha_pago',
         'fecha_cancelacion',
@@ -85,6 +84,9 @@ class SolicitudPagoDocente extends Model
         'fecha_inicio_periodo' => 'date',
         'fecha_fin_periodo' => 'date',
         'fecha_limite_pago' => 'date',
+        'fecha_tentativa_pago' => 'date',
+        'calendario_sesion_ids' => 'array',
+        'curso_sesion_ids' => 'array',
         'fecha_autorizacion' => 'datetime',
         'fecha_pago' => 'date',
         'fecha_cancelacion' => 'datetime',
@@ -110,12 +112,8 @@ class SolicitudPagoDocente extends Model
     public static function conceptos(): array
     {
         return [
-            self::CONCEPTO_HONORARIOS,
-            self::CONCEPTO_REPOSICION,
-            self::CONCEPTO_CONFERENCIA,
-            self::CONCEPTO_MASTERCLASS,
-            self::CONCEPTO_ASESORIA,
-            self::CONCEPTO_OTRO,
+            self::CONCEPTO_EDUCACION_CONTINUA_HORAS,
+            self::CONCEPTO_EDUCACION_PROGRAMATICA_NIVEL_MATERIA,
         ];
     }
 
@@ -127,6 +125,23 @@ class SolicitudPagoDocente extends Model
     public static function metodosPago(): array
     {
         return ['Efectivo', 'Transferencia', 'Cheque', 'Tarjeta', 'Otro'];
+    }
+
+    public static function calcularMontoSugerido(?string $concepto, float $horasTotales = 0, int $numeroSesiones = 0, float $tarifa = 0): ?float
+    {
+        if ($tarifa <= 0) {
+            return null;
+        }
+
+        if ($concepto === self::CONCEPTO_EDUCACION_CONTINUA_HORAS) {
+            return $horasTotales > 0 ? round($horasTotales * $tarifa, 2) : null;
+        }
+
+        if ($concepto === self::CONCEPTO_EDUCACION_PROGRAMATICA_NIVEL_MATERIA) {
+            return $numeroSesiones > 0 ? round($numeroSesiones * $tarifa, 2) : null;
+        }
+
+        return null;
     }
 
     public function docente()

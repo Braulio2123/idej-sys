@@ -38,7 +38,7 @@ class CicloEscolarController extends Controller
     {
         $validated = $request->validate([
             'nombre' => 'required|string|unique:ciclos_escolares,nombre',
-            'tipo_periodo' => 'required|in:Cuatrimestral,Semestral,Anual,Otro',
+            'tipo_periodo' => 'required|in:Semestral,Anual,Otro',
             'fecha_inicio_inscripcion' => 'required|date',
             'fecha_fin_inscripcion' => 'required|date|after:fecha_inicio_inscripcion',
             'fecha_inicio_clases' => 'required|date',
@@ -46,10 +46,12 @@ class CicloEscolarController extends Controller
             'activo' => 'nullable|boolean',
         ]);
 
+        $validated['activo'] = $request->boolean('activo');
+
         DB::transaction(function () use ($validated) {
 
-            // Desactivar ciclo activo, si se indicó activar este
-            if (!empty($validated['activo'])) {
+            // Solo debe existir un ciclo activo.
+            if ($validated['activo']) {
                 CicloEscolar::where('activo', true)->update(['activo' => false]);
             }
 
@@ -85,7 +87,7 @@ class CicloEscolarController extends Controller
     {
         $validated = $request->validate([
             'nombre' => 'required|string|unique:ciclos_escolares,nombre,' . $ciclo_escolar->id,
-            'tipo_periodo' => 'required|in:Cuatrimestral,Semestral,Anual,Otro',
+            'tipo_periodo' => 'required|in:Semestral,Anual,Otro',
             'fecha_inicio_inscripcion' => 'required|date',
             'fecha_fin_inscripcion' => 'required|date|after:fecha_inicio_inscripcion',
             'fecha_inicio_clases' => 'required|date',
@@ -93,9 +95,11 @@ class CicloEscolarController extends Controller
             'activo' => 'nullable|boolean',
         ]);
 
+        $validated['activo'] = $request->boolean('activo');
+
         DB::transaction(function () use ($validated, $ciclo_escolar) {
 
-            if (!empty($validated['activo'])) {
+            if ($validated['activo']) {
                 CicloEscolar::where('id', '!=', $ciclo_escolar->id)
                     ->update(['activo' => false]);
             }

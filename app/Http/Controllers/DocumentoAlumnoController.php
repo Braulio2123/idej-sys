@@ -17,15 +17,24 @@ class DocumentoAlumnoController extends Controller
 {
     use RegistraBitacora;
 
-    public function index(Alumno $alumno)
+    public function index(Request $request, Alumno $alumno)
     {
         $alumno->load('grupo.programa');
 
-        $documentos = $alumno->documentos()
-            ->with(['usuarioSubio', 'usuarioReviso', 'requisitoDocumental.programa'])
+        $mostrarArchivados = $request->boolean('archivados');
+
+        $documentosQuery = $alumno->documentos()
+            ->with(['usuarioSubio', 'usuarioReviso', 'requisitoDocumental.programa']);
+
+        if ($mostrarArchivados) {
+            $documentosQuery->withTrashed()->whereNotNull('deleted_at');
+        }
+
+        $documentos = $documentosQuery
             ->orderByRaw("FIELD(estatus, 'Rechazado', 'Pendiente', 'Entregado', 'En revisión', 'Aceptado')")
             ->orderBy('tipo_documento')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         $requisitosDisponibles = RequisitoDocumental::paraAlumno($alumno)
             ->with('programa')
@@ -42,6 +51,7 @@ class DocumentoAlumnoController extends Controller
             'aceptados' => $alumno->documentos()->aceptados()->count(),
             'revision' => $alumno->documentos()->where('estatus', DocumentoAlumno::ESTATUS_EN_REVISION)->count(),
             'rechazados' => $alumno->documentos()->where('estatus', DocumentoAlumno::ESTATUS_RECHAZADO)->count(),
+            'archivados' => $alumno->documentos()->onlyTrashed()->count(),
             'requisitos' => $requisitosDisponibles->count(),
         ];
 
@@ -51,7 +61,8 @@ class DocumentoAlumnoController extends Controller
             'tiposDocumento',
             'estatusDocumento',
             'requisitosDisponibles',
-            'resumen'
+            'resumen',
+            'mostrarArchivados'
         ));
     }
 
@@ -122,10 +133,10 @@ class DocumentoAlumnoController extends Controller
             'tipo_documento' => ['required_without:requisito_documental_id', 'nullable', 'string', 'max:120'],
             'estatus' => ['required', Rule::in(DocumentoAlumno::estatusDisponibles())],
             'fecha_documento' => ['nullable', 'date'],
-            'archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:5120'],
             'observaciones' => ['nullable', 'string', 'max:5000'],
             'motivo_rechazo' => ['nullable', 'string', 'max:5000'],
-        ]);
+        ], $this->mensajesValidacionDocumento(), $this->atributosDocumento());
 
         $requisito = $this->obtenerRequisitoValido($alumno, $validated['requisito_documental_id'] ?? null);
 
@@ -184,10 +195,10 @@ class DocumentoAlumnoController extends Controller
             'tipo_documento' => ['required_without:requisito_documental_id', 'nullable', 'string', 'max:120'],
             'estatus' => ['required', Rule::in(DocumentoAlumno::estatusDisponibles())],
             'fecha_documento' => ['nullable', 'date'],
-            'archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:5120'],
             'observaciones' => ['nullable', 'string', 'max:5000'],
             'motivo_rechazo' => ['nullable', 'string', 'max:5000'],
-        ]);
+        ], $this->mensajesValidacionDocumento(), $this->atributosDocumento());
 
         $requisito = $this->obtenerRequisitoValido($alumno, $validated['requisito_documental_id'] ?? null);
 
@@ -205,6 +216,12 @@ class DocumentoAlumnoController extends Controller
         }
 
         $estatusAnterior = $documento->estatus;
+
+        if ($request->hasFile('archivo') && in_array($estatusAnterior, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
+            return back()
+                ->withInput()
+                ->with('error', 'No se puede reemplazar el archivo de un documento aceptado o rechazado porque debe conservarse como evidencia. Archiva este registro y carga un nuevo documento.');
+        }
 
         $documento->requisito_documental_id = $requisito?->id;
         $documento->tipo_documento = $requisito?->tipo_documento ?? $validated['tipo_documento'];
@@ -277,24 +294,23 @@ class DocumentoAlumnoController extends Controller
         $this->validarDocumentoDelAlumno($alumno, $documento);
 
         $tipo = $documento->tipo_documento;
+        $teniaArchivo = filled($documento->archivo_path);
 
-        if ($documento->archivo_path) {
-            $this->eliminarArchivoFisico($documento->archivo_path);
-        }
-
+        // No se elimina el archivo físico. El registro usa SoftDeletes y el archivo
+        // permanece en disco privado para conservar evidencia institucional.
         $documento->delete();
 
         $this->bitacora(
-            'Eliminar Documento Alumno',
-            "Se eliminó el documento {$tipo} del alumno {$alumno->nombre_completo}.",
+            'Archivar Documento Alumno',
+            "Se archivó el documento {$tipo} del alumno {$alumno->nombre_completo}. Archivo conservado: ".($teniaArchivo ? 'sí' : 'no').'.',
             'Documentos de Alumnos',
-            null,
+            $documento,
             $alumno->id
         );
 
         return redirect()
             ->route('alumnos.documentos.index', $alumno)
-            ->with('success', 'Documento eliminado correctamente.');
+            ->with('success', 'Documento archivado correctamente. El archivo privado se conserva como evidencia.');
     }
 
     private function asignarArchivo(DocumentoAlumno $documento, $archivo, Alumno $alumno): void
@@ -343,6 +359,30 @@ class DocumentoAlumnoController extends Controller
         if (Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }
+    }
+
+    private function mensajesValidacionDocumento(): array
+    {
+        return [
+            'tipo_documento.required_without' => 'Selecciona un requisito del catálogo o indica el tipo de documento que estás registrando.',
+            'estatus.required' => 'Selecciona el estatus del documento.',
+            'archivo.mimes' => 'El archivo debe ser PDF, JPG, JPEG o PNG.',
+            'archivo.mimetypes' => 'El contenido del archivo no coincide con un formato permitido. Verifica que sea PDF o imagen válida.',
+            'archivo.max' => 'El archivo no debe ser mayor a 5 MB.',
+        ];
+    }
+
+    private function atributosDocumento(): array
+    {
+        return [
+            'requisito_documental_id' => 'requisito documental',
+            'tipo_documento' => 'tipo de documento',
+            'estatus' => 'estatus',
+            'fecha_documento' => 'fecha del documento',
+            'archivo' => 'archivo',
+            'observaciones' => 'observaciones',
+            'motivo_rechazo' => 'motivo de rechazo',
+        ];
     }
 
     private function validarDocumentoDelAlumno(Alumno $alumno, DocumentoAlumno $documento): void

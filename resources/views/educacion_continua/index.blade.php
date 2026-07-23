@@ -32,8 +32,8 @@
         <button class="rounded-xl bg-slate-900 text-white font-semibold">Filtrar</button>
     </form>
 
-    <div class="bg-white rounded-2xl shadow border border-slate-100 overflow-hidden">
-        <table class="w-full text-sm">
+    <div class="bg-white rounded-2xl shadow border border-slate-100 overflow-hidden overflow-x-auto">
+        <table class="min-w-full text-sm">
             <thead class="bg-indigo-600 text-white">
                 <tr>
                     <th class="text-left px-4 py-3">Curso</th>

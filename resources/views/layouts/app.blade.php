@@ -26,6 +26,8 @@
         .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 999px; }
         .idej-table-responsive { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .idej-table-responsive > table { min-width: 760px; }
+        @keyframes idejNotificationPulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220,38,38,.45); } 70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(220,38,38,0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220,38,38,0); } }
+        .idej-notification-pulse { animation: idejNotificationPulse .9s ease-out 1; }
     </style>
 </head>
 
@@ -196,7 +198,7 @@
 
             <a href="{{ route('programas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('programas.*') ? $active : $inactive }}">
                 <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book text-2xl'></i></span>
-                <span x-show="sidebarOpen">Programas</span>
+                <span x-show="sidebarOpen">Educación Programática</span>
             </a>
 
             <a href="{{ route('requisitos_documentales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('requisitos_documentales.*') ? $active : $inactive }}">
@@ -245,6 +247,12 @@
                     <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-layer-plus text-2xl'></i></span>
                     <span x-show="sidebarOpen">Cargos Masivos</span>
                 </a>
+
+                <a href="{{ route('cargos.recurrentes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('cargos.recurrentes.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-refresh text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Cargos recurrentes</span>
+                </a>
+
             @endif
 
             @if($puedeReportes)
@@ -314,25 +322,23 @@
             <div class="relative" @click.away="notificacionesMenu = false">
                 <button @click="notificacionesMenu = !notificacionesMenu" class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" title="Notificaciones internas">
                     <i class='bx bx-bell text-xl'></i>
-                    @if(($resumenNotificacionesInternas['pendientes'] ?? 0) > 0)
-                        <span class="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                            {{ ($resumenNotificacionesInternas['pendientes'] ?? 0) > 99 ? '99+' : $resumenNotificacionesInternas['pendientes'] }}
-                        </span>
-                    @endif
+                    <span id="notificaciones-pendientes-badge" class="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white {{ ($resumenNotificacionesInternas['pendientes'] ?? 0) > 0 ? '' : 'hidden' }}">
+                        {{ ($resumenNotificacionesInternas['pendientes'] ?? 0) > 99 ? '99+' : ($resumenNotificacionesInternas['pendientes'] ?? 0) }}
+                    </span>
                 </button>
 
                 <div x-show="notificacionesMenu" x-transition class="absolute right-0 z-30 mt-2 w-[calc(100vw-2rem)] sm:w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-xl">
                     <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                         <div>
                             <p class="font-semibold text-slate-800">Notificaciones</p>
-                            <p class="text-xs text-slate-500">{{ $resumenNotificacionesInternas['pendientes'] ?? 0 }} pendientes</p>
+                            <p class="text-xs text-slate-500"><span id="notificaciones-pendientes-text">{{ $resumenNotificacionesInternas['pendientes'] ?? 0 }}</span> pendientes</p>
                         </div>
                         <a href="{{ route('notificaciones.index') }}" class="text-xs font-semibold text-blue-600 hover:text-blue-800">Ver todas</a>
                     </div>
 
-                    <div class="max-h-80 overflow-y-auto">
+                    <div id="notificaciones-recientes-lista" class="max-h-80 overflow-y-auto">
                         @forelse($notificacionesInternasRecientes as $notificacionInterna)
-                            <a href="{{ $notificacionInterna->url ?: route('notificaciones.index') }}" class="block border-b border-slate-100 px-4 py-3 hover:bg-slate-50">
+                            <a href="{{ $notificacionInterna->urlSegura() }}" class="block border-b border-slate-100 px-4 py-3 hover:bg-slate-50">
                                 <div class="flex items-start gap-3">
                                     <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full {{ in_array($notificacionInterna->severidad, ['critica', 'alta'], true) ? 'bg-red-500' : 'bg-amber-400' }}"></span>
                                     <div class="min-w-0">
@@ -390,7 +396,16 @@
     </header>
 
     <main class="min-w-0 overflow-x-hidden p-3 md:p-6">
-        @if(session('success') || session('error') || session('info') || session('status'))
+        @php
+            $statusGlobal = session('info') ?? session('status');
+            $statusTecnicosOcultos = ['profile-updated', 'password-updated', 'verification-link-sent'];
+
+            if (in_array($statusGlobal, $statusTecnicosOcultos, true)) {
+                $statusGlobal = null;
+            }
+        @endphp
+
+        @if(session('success') || session('error') || $statusGlobal)
             <div class="mb-4 space-y-2">
                 @if(session('success'))
                     <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
@@ -404,9 +419,9 @@
                     </div>
                 @endif
 
-                @if(session('info') || session('status'))
+                @if($statusGlobal)
                     <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
-                        {{ session('info') ?? session('status') }}
+                        {{ $statusGlobal }}
                     </div>
                 @endif
             </div>
@@ -426,6 +441,15 @@
             return;
         }
 
+        if (event.defaultPrevented) {
+            return;
+        }
+
+        if (form.dataset.confirm && ! window.confirm(form.dataset.confirm)) {
+            event.preventDefault();
+            return;
+        }
+
         if (form.dataset.submitted === 'true') {
             event.preventDefault();
             return;
@@ -441,11 +465,11 @@
                 button.dataset.originalText = button.innerHTML;
             }
 
-            if (! button.dataset.keepText) {
+            if (! button.dataset.keepText && form.dataset.keepText !== 'true') {
                 button.innerHTML = 'Procesando...';
             }
         });
-    }, true);
+    });
 
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('main table').forEach(function (table) {
@@ -458,6 +482,98 @@
             table.parentNode.insertBefore(wrapper, table);
             wrapper.appendChild(table);
             table.classList.add('min-w-full');
+        });
+    });
+</script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const badge = document.getElementById('notificaciones-pendientes-badge');
+        const text = document.getElementById('notificaciones-pendientes-text');
+        const list = document.getElementById('notificaciones-recientes-lista');
+        const endpoint = @json(route('notificaciones.resumen-json'));
+        const intervalo = Math.max(3000, Number(@json(config('idej_recordatorios.notificaciones.polling_milisegundos', 5000))) || 5000);
+        let ultimaNotificacionId = 0;
+        let primeraCarga = true;
+        let solicitudEnCurso = false;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, function (char) {
+                return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;'})[char];
+            });
+        }
+
+        function renderNotificaciones(items) {
+            if (! list) return;
+            if (! items || items.length === 0) {
+                list.innerHTML = `<div class="px-4 py-6 text-center text-sm text-slate-500">
+                    <i class='bx bx-bell-off mb-2 block text-3xl text-slate-300'></i>
+                    Sin notificaciones pendientes.
+                </div>`;
+                return;
+            }
+
+            list.innerHTML = items.map(function (item) {
+                const punto = ['critica', 'alta'].includes(item.severidad) ? 'bg-red-500' : 'bg-amber-400';
+                return `<a href="${escapeHtml(item.url)}" class="block border-b border-slate-100 px-4 py-3 hover:bg-slate-50">
+                    <div class="flex items-start gap-3">
+                        <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${punto}"></span>
+                        <div class="min-w-0">
+                            <p class="truncate font-semibold text-slate-800">${escapeHtml(item.titulo)}</p>
+                            <p class="line-clamp-2 text-xs text-slate-500">${escapeHtml(item.mensaje)}</p>
+                            <p class="mt-1 text-[11px] text-slate-400">${escapeHtml(item.fecha)}</p>
+                        </div>
+                    </div>
+                </a>`;
+            }).join('');
+        }
+
+        function actualizarNotificaciones() {
+            if (solicitudEnCurso || document.visibilityState === 'hidden') return;
+            solicitudEnCurso = true;
+
+            fetch(endpoint, {
+                cache: 'no-store',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+                .then(response => response.ok ? response.json() : null)
+                .then(data => {
+                    if (! data) return;
+                    const pendientes = Number(data.resumen?.pendientes ?? 0);
+                    const nuevaUltimaId = Number(data.ultima_id ?? 0);
+
+                    if (text) text.textContent = pendientes;
+                    if (badge) {
+                        badge.textContent = pendientes > 99 ? '99+' : pendientes;
+                        badge.classList.toggle('hidden', pendientes <= 0);
+
+                        if (! primeraCarga && nuevaUltimaId > ultimaNotificacionId) {
+                            badge.classList.remove('idej-notification-pulse');
+                            void badge.offsetWidth;
+                            badge.classList.add('idej-notification-pulse');
+                        }
+                    }
+
+                    renderNotificaciones(data.recientes ?? []);
+                    ultimaNotificacionId = Math.max(ultimaNotificacionId, nuevaUltimaId);
+                    primeraCarga = false;
+                })
+                .catch(() => {})
+                .finally(() => {
+                    solicitudEnCurso = false;
+                });
+        }
+
+        actualizarNotificaciones();
+        window.setInterval(actualizarNotificaciones, intervalo);
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                actualizarNotificaciones();
+            }
         });
     });
 </script>

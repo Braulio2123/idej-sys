@@ -41,12 +41,26 @@
 
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Fecha de inicio</label>
-                <input type="date" name="fecha_inicio" value="{{ old('fecha_inicio', now()->toDateString()) }}" required class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500">
+                <input type="date" name="fecha_inicio" id="fecha_inicio_beca" value="{{ old('fecha_inicio', now()->toDateString()) }}" required class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Duración sugerida</label>
+                <select id="duracion_beca" class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">Elegir manualmente</option>
+                    <option value="1">1 mes</option>
+                    <option value="3">3 meses</option>
+                    <option value="4">4 meses</option>
+                    <option value="6">6 meses</option>
+                    <option value="12">12 meses</option>
+                    <option value="indefinida">Indefinida</option>
+                </select>
+                <p class="text-xs text-slate-500 mt-1">Ayuda a definir la vigencia sin calcular fechas manualmente.</p>
             </div>
 
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Fecha fin</label>
-                <input type="date" name="fecha_fin" value="{{ old('fecha_fin') }}" class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500">
+                <input type="date" name="fecha_fin" id="fecha_fin_beca" value="{{ old('fecha_fin') }}" class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500">
                 <p class="text-xs text-slate-500 mt-1">Déjala vacía si la beca queda indefinida.</p>
             </div>
 
@@ -82,3 +96,28 @@
     </div>
 </div>
 @endsection
+
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const inicio = document.getElementById('fecha_inicio_beca');
+        const fin = document.getElementById('fecha_fin_beca');
+        const duracion = document.getElementById('duracion_beca');
+        if (!inicio || !fin || !duracion) return;
+
+        duracion.addEventListener('change', function () {
+            if (duracion.value === 'indefinida') {
+                fin.value = '';
+                return;
+            }
+            const meses = parseInt(duracion.value, 10);
+            if (!meses || !inicio.value) return;
+            const fecha = new Date(inicio.value + 'T00:00:00');
+            fecha.setMonth(fecha.getMonth() + meses);
+            fecha.setDate(fecha.getDate() - 1);
+            fin.value = fecha.toISOString().slice(0, 10);
+        });
+    });
+</script>
+@endpush

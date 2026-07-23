@@ -16,7 +16,6 @@
         <div class="mb-3">
             <label class="font-semibold">Tipo de periodo</label>
             <select name="tipo_periodo" class="w-full border p-2 rounded">
-                <option value="Cuatrimestral">Cuatrimestral</option>
                 <option value="Semestral">Semestral</option>
                 <option value="Anual">Anual</option>
                 <option value="Otro">Otro</option>

@@ -43,8 +43,8 @@
 
         <div class="mb-6">
             <h2 class="text-sm font-semibold text-gray-700 mb-2">Cargos relacionados</h2>
-            <div class="border rounded-lg overflow-hidden">
-                <table class="w-full text-sm">
+            <div class="border rounded-lg overflow-hidden overflow-x-auto">
+                <table class="min-w-full text-sm">
                     <thead class="bg-gray-100">
                         <tr>
                             <th class="px-3 py-2 text-left">Concepto</th>

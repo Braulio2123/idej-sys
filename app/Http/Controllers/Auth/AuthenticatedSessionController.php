@@ -37,6 +37,10 @@ class AuthenticatedSessionController extends Controller
             'ultimo_user_agent' => $request->userAgent(),
         ])->save();
 
+        if ($request->user()?->password_changed_at) {
+            $request->session()->put('auth.password_changed_at', $request->user()->password_changed_at->timestamp);
+        }
+
         $this->bitacora(
             'Inicio de sesión interno',
             'El usuario inició sesión correctamente en el panel administrativo.',

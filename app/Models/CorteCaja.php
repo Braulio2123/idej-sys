@@ -67,6 +67,11 @@ class CorteCaja extends Model
         return $this->hasMany(AjusteCaja::class, 'corte_caja_id');
     }
 
+    public function movimientos()
+    {
+        return $this->hasMany(MovimientoCaja::class, 'corte_caja_id');
+    }
+
     public function scopeAbierta($query)
     {
         return $query->where('estatus', self::ESTATUS_ABIERTA);
@@ -114,6 +119,26 @@ class CorteCaja extends Model
     public function sincronizarTotalesSistema(): void
     {
         $this->forceFill($this->calcularTotalesSistema())->save();
+    }
+
+    public function resumenMovimientos(): array
+    {
+        $movimientos = $this->movimientos()->aplicados();
+
+        $entradasEfectivo = (float) (clone $movimientos)->where('tipo', MovimientoCaja::TIPO_ENTRADA)->where('metodo_pago', 'Efectivo')->sum('monto');
+        $salidasEfectivo = (float) (clone $movimientos)->where('tipo', MovimientoCaja::TIPO_SALIDA)->where('metodo_pago', 'Efectivo')->sum('monto');
+        $entradasTotal = (float) $this->movimientos()->aplicados()->where('tipo', MovimientoCaja::TIPO_ENTRADA)->sum('monto');
+        $salidasTotal = (float) $this->movimientos()->aplicados()->where('tipo', MovimientoCaja::TIPO_SALIDA)->sum('monto');
+
+        return [
+            'entradas_efectivo' => round($entradasEfectivo, 2),
+            'salidas_efectivo' => round($salidasEfectivo, 2),
+            'neto_efectivo' => round($entradasEfectivo - $salidasEfectivo, 2),
+            'entradas_total' => round($entradasTotal, 2),
+            'salidas_total' => round($salidasTotal, 2),
+            'neto_total' => round($entradasTotal - $salidasTotal, 2),
+            'cantidad' => (int) $this->movimientos()->aplicados()->count(),
+        ];
     }
 
     public function resumenAjustes(): array

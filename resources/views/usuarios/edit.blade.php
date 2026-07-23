@@ -35,6 +35,7 @@
                 Nueva contraseña <span class="text-gray-500 text-xs">(opcional)</span>
             </label>
             <input type="password" name="password" class="w-full border rounded p-2">
+            <p class="mt-1 text-xs text-slate-500">No se permite reutilizar contraseñas usadas por este usuario en los últimos 6 meses.</p>
         </div>
 
         <div>
@@ -42,6 +43,16 @@
                 Confirmar nueva contraseña <span class="text-gray-500 text-xs">(opcional)</span>
             </label>
             <input type="password" name="password_confirmation" class="w-full border rounded p-2">
+        </div>
+
+
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <p class="font-semibold">Avisos internos por correo</p>
+            <p class="text-xs mt-1">En esta fase los avisos automáticos del sistema se manejarán únicamente por correo electrónico. SMS y WhatsApp no están activos.</p>
+            <label class="inline-flex items-center gap-2 mt-3">
+                <input type="checkbox" name="notificar_email" value="1" @checked(old('notificar_email', $usuario->notificar_email ?? true))>
+                Recibir avisos internos por correo
+            </label>
         </div>
 
         <div>

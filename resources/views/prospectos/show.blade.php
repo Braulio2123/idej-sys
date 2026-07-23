@@ -9,7 +9,7 @@
     $vencido = $prospecto->fecha_proximo_contacto && $prospecto->fecha_proximo_contacto->isPast() && !in_array($prospecto->estatus, [Prospecto::ESTATUS_INSCRITO, Prospecto::ESTATUS_DESCARTADO], true);
 @endphp
 
-<div class="max-w-7xl mx-auto space-y-6" x-data="{ seguimiento: false, conversion: false }">
+<div class="max-w-7xl mx-auto space-y-6" x-data="{ seguimiento: false, conversion: {{ old('matricula') || $errors->has('matricula') || $errors->has('correo') || $errors->has('grupo_id') ? 'true' : 'false' }} }">
     <div class="bg-gradient-to-r from-blue-900 via-blue-800 to-slate-900 text-white rounded-3xl shadow overflow-hidden">
         <div class="p-6 md:p-8 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div>
@@ -41,7 +41,7 @@
                 @unless($convertido)
                     <a href="{{ route('prospectos.edit', $prospecto) }}" class="bg-white text-blue-900 hover:bg-blue-50 px-4 py-2 rounded-xl text-sm font-semibold shadow">Editar</a>
                     <button type="button" @click="seguimiento = !seguimiento" class="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">+ Seguimiento</button>
-                    <button type="button" @click="conversion = !conversion" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">Convertir a alumno</button>
+                    <button type="button" @click="conversion = !conversion" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">Abrir conversión a alumno</button>
                 @else
                     <a href="{{ route('alumnos.show', $prospecto->alumno) }}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">Ver alumno</a>
                 @endunless
@@ -164,12 +164,12 @@
             <div class="flex items-start justify-between gap-4 mb-4">
                 <div>
                     <h2 class="text-xl font-bold text-green-900">Convertir prospecto a alumno</h2>
-                    <p class="text-sm text-green-700">Se creará un alumno y se conservará la trazabilidad del prospecto.</p>
+                    <p class="text-sm text-green-700">Se creará un alumno y se conservará la trazabilidad del prospecto. Captura matrícula y revisa correo/grupo antes de confirmar.</p>
                 </div>
                 <button type="button" @click="conversion = false" class="text-green-700 hover:text-green-900 font-semibold">Cerrar</button>
             </div>
 
-            <form method="POST" action="{{ route('prospectos.convertir', $prospecto) }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+            <form method="POST" action="{{ route('prospectos.convertir', $prospecto) }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4" data-confirm="¿Crear alumno desde este prospecto? Se conservará el historial de seguimiento.">
                 @csrf
 
                 <div>

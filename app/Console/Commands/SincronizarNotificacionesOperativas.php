@@ -43,7 +43,7 @@ class SincronizarNotificacionesOperativas extends Command
         foreach ($cortes as $corte) {
             $fecha = optional($corte->fecha_apertura)->format('d/m/Y H:i') ?? 'fecha no registrada';
             $usuario = $corte->usuario?->nombre ?? 'Usuario no identificado';
-            $url = route('cortes-caja.show', $corte);
+            $url = route('cortes-caja.show', $corte, false);
 
             if ($corte->usuario_id) {
                 $this->sincronizar([
@@ -87,7 +87,7 @@ class SincronizarNotificacionesOperativas extends Command
                 'modulo' => 'Solicitudes docentes',
                 'titulo' => 'Solicitud docente pendiente de revisión',
                 'mensaje' => $this->resumenSolicitud($solicitud).' sigue pendiente desde '.($solicitud->fecha_solicitud?->format('d/m/Y') ?? 'fecha no registrada').'.',
-                'url' => route('solicitudes_pago.show', $solicitud),
+                'url' => route('solicitudes_pago.show', $solicitud, false),
                 'severidad' => NotificacionInterna::SEVERIDAD_MEDIA,
                 'referencia_tipo' => SolicitudPagoDocente::class,
                 'referencia_id' => $solicitud->id,
@@ -105,7 +105,7 @@ class SincronizarNotificacionesOperativas extends Command
                 'modulo' => 'Solicitudes docentes',
                 'titulo' => 'Solicitud docente observada',
                 'mensaje' => $this->resumenSolicitud($solicitud).' requiere corrección o revisión por Académica.',
-                'url' => route('solicitudes_pago.show', $solicitud),
+                'url' => route('solicitudes_pago.show', $solicitud, false),
                 'severidad' => NotificacionInterna::SEVERIDAD_MEDIA,
                 'referencia_tipo' => SolicitudPagoDocente::class,
                 'referencia_id' => $solicitud->id,
@@ -131,7 +131,7 @@ class SincronizarNotificacionesOperativas extends Command
                 'modulo' => 'Solicitudes docentes',
                 'titulo' => 'Solicitud docente autorizada vencida sin pago',
                 'mensaje' => $this->resumenSolicitud($solicitud).' tenía fecha límite '.($solicitud->fecha_limite_pago?->format('d/m/Y') ?? 'fecha no registrada').'.',
-                'url' => route('solicitudes_pago.show', $solicitud),
+                'url' => route('solicitudes_pago.show', $solicitud, false),
                 'severidad' => NotificacionInterna::SEVERIDAD_ALTA,
                 'referencia_tipo' => SolicitudPagoDocente::class,
                 'referencia_id' => $solicitud->id,
@@ -178,7 +178,7 @@ class SincronizarNotificacionesOperativas extends Command
             'modulo' => 'Agenda operativa',
             'titulo' => 'Sesiones incompletas en los próximos 7 días',
             'mensaje' => "Hay {$total} sesión(es) próximas con aula/liga u horario pendiente. Revísalas antes de la operación diaria.",
-            'url' => route('centro-control.index', ['rango' => 'semana']),
+            'url' => route('centro-control.index', ['rango' => 'semana'], false),
             'severidad' => $total >= 3 ? NotificacionInterna::SEVERIDAD_ALTA : NotificacionInterna::SEVERIDAD_MEDIA,
             'referencia_tipo' => 'agenda_operativa',
             'referencia_id' => 0,

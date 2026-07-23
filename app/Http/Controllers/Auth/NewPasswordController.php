@@ -28,21 +28,35 @@ class NewPasswordController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
+        $usuarioExistente = Usuario::where('email', $request->email)->first();
+        if ($usuarioExistente && $usuarioExistente->passwordUsadaRecientemente($request->password, 6)) {
+            return back()->withInput($request->only('email'))
+                ->withErrors(['password' => 'Por seguridad, usa una contraseña que no hayas utilizado en los últimos 6 meses.']);
+        }
+
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (Usuario $user) use ($request) {
+                $hashPassword = Hash::make($request->password);
+
                 $user->forceFill([
-                    'password' => Hash::make($request->password),
+                    'password' => $hashPassword,
+                    'password_changed_at' => now(),
+                    'must_change_password' => false,
+                    'temporary_password_generated_at' => null,
+                    'temporary_password_expires_at' => null,
                     'remember_token' => Str::random(60),
                 ])->save();
+
+                $user->registrarPasswordEnHistorial($hashPassword);
 
                 event(new PasswordReset($user));
             }
         );
 
         return $status === Password::PASSWORD_RESET
-            ? redirect()->route('login')->with('status', __($status))
+            ? redirect()->route('login')->with('status', 'La contraseña se actualizó correctamente. Ya puedes iniciar sesión.')
             : back()->withInput($request->only('email'))
-                ->withErrors(['email' => __($status)]);
+                ->withErrors(['email' => 'El enlace de recuperación no es válido, ya expiró o el correo no corresponde a un usuario interno.']);
     }
 }

@@ -27,7 +27,7 @@
             <p><strong>Docente:</strong><br>{{ $solicitud->docente->nombre_completo }}</p>
             <p><strong>Monto:</strong><br><span class="text-xl text-green-700 font-bold">${{ number_format($solicitud->monto, 2) }}</span></p>
             <p><strong>Servicio:</strong><br>{{ $solicitud->materia_actividad }}</p>
-            <p><strong>Programa / grupo:</strong><br>{{ $solicitud->programa_grupo ?? '—' }}</p>
+            <p><strong>Educación Programática / grupo:</strong><br>{{ $solicitud->programa_grupo ?? '—' }}</p>
         </div>
 
         <form method="POST" action="{{ route('solicitudes_pago.pagar', $solicitud) }}" enctype="multipart/form-data" class="space-y-5">
@@ -43,7 +43,7 @@
 
                 <div>
                     <label class="block text-gray-700 font-semibold mb-1">Método de pago *</label>
-                    <select name="metodo_pago" required class="w-full p-2 border rounded-lg">
+                    <select name="metodo_pago" id="metodo_pago" required class="w-full p-2 border rounded-lg">
                         <option value="">Selecciona método</option>
                         @foreach($metodosPago as $metodo)
                             <option value="{{ $metodo }}" @selected(old('metodo_pago') === $metodo)>{{ $metodo }}</option>
@@ -52,19 +52,21 @@
                 </div>
 
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-1">Referencia / folio bancario</label>
-                    <input type="text" name="referencia_pago" value="{{ old('referencia_pago') }}" class="w-full p-2 border rounded-lg" placeholder="Clave de rastreo, transferencia, cheque, etc.">
+                    <label class="block text-gray-700 font-semibold mb-1" id="label_referencia_pago">Referencia / folio bancario</label>
+                    <input type="text" name="referencia_pago" id="referencia_pago" value="{{ old('referencia_pago') }}" class="w-full p-2 border rounded-lg" placeholder="Clave de rastreo, transferencia, cheque, etc.">
+                    <p class="text-xs text-slate-500 mt-1" id="ayuda_referencia_pago">Para transferencia, cheque o tarjeta, captura un dato que permita rastrear el pago.</p>
                 </div>
 
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-1">Banco / cuenta</label>
-                    <input type="text" name="banco_pago" value="{{ old('banco_pago') }}" class="w-full p-2 border rounded-lg" placeholder="Banco origen/destino o cuenta usada">
+                    <label class="block text-gray-700 font-semibold mb-1" id="label_banco_pago">Banco / cuenta</label>
+                    <input type="text" name="banco_pago" id="banco_pago" value="{{ old('banco_pago') }}" class="w-full p-2 border rounded-lg" placeholder="Banco origen/destino o cuenta usada">
+                    <p class="text-xs text-slate-500 mt-1" id="ayuda_banco_pago">Indica el banco, cuenta, terminal o medio utilizado.</p>
                 </div>
 
                 <div class="md:col-span-2">
-                    <label class="block text-gray-700 font-semibold mb-1">Comprobante de pago</label>
-                    <input type="file" name="comprobante_pago" accept=".pdf,.jpg,.jpeg,.png" class="w-full p-2 border rounded-lg bg-slate-50">
-                    <p class="text-xs text-slate-500 mt-1">PDF, JPG o PNG. Máximo 5 MB.</p>
+                    <label class="block text-gray-700 font-semibold mb-1" id="label_comprobante_pago">Comprobante de pago</label>
+                    <input type="file" name="comprobante_pago" id="comprobante_pago" accept=".pdf,.jpg,.jpeg,.png" class="w-full p-2 border rounded-lg bg-slate-50">
+                    <p class="text-xs text-slate-500 mt-1" id="ayuda_comprobante_pago">PDF, JPG o PNG. Máximo 5 MB.</p>
                 </div>
 
                 <div class="md:col-span-2">
@@ -78,6 +80,72 @@
                 <button class="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 shadow font-semibold">Registrar pago</button>
             </div>
         </form>
+
+        <div class="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            Al guardar el pago, el sistema conservará el comprobante y permitirá generar un formato PDF institucional desde el detalle de la solicitud pagada.
+        </div>
     </div>
 </div>
 @endsection
+
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const metodo = document.getElementById('metodo_pago');
+    const referencia = document.getElementById('referencia_pago');
+    const banco = document.getElementById('banco_pago');
+    const comprobante = document.getElementById('comprobante_pago');
+    const labelReferencia = document.getElementById('label_referencia_pago');
+    const labelBanco = document.getElementById('label_banco_pago');
+    const labelComprobante = document.getElementById('label_comprobante_pago');
+    const ayudaReferencia = document.getElementById('ayuda_referencia_pago');
+    const ayudaBanco = document.getElementById('ayuda_banco_pago');
+    const ayudaComprobante = document.getElementById('ayuda_comprobante_pago');
+
+    const metodosConComprobante = ['Transferencia', 'Cheque', 'Tarjeta'];
+
+    const aplicarCampos = () => {
+        const valor = metodo.value;
+        const requerido = metodosConComprobante.includes(valor);
+
+        referencia.required = requerido;
+        banco.required = requerido;
+        comprobante.required = requerido;
+
+        labelReferencia.textContent = requerido ? 'Referencia / folio obligatorio *' : 'Referencia / folio';
+        labelBanco.textContent = requerido ? 'Banco / cuenta obligatorio *' : 'Banco / cuenta';
+        labelComprobante.textContent = requerido ? 'Comprobante obligatorio *' : 'Comprobante de pago';
+
+        if (valor === 'Transferencia') {
+            referencia.placeholder = 'Clave de rastreo SPEI, folio o referencia bancaria';
+            banco.placeholder = 'Banco emisor, banco receptor o cuenta institucional';
+            ayudaReferencia.textContent = 'Este dato ayuda a comprobar y conciliar la transferencia.';
+            ayudaBanco.textContent = 'Indica banco/cuenta usada para el pago.';
+            ayudaComprobante.textContent = 'Adjunta comprobante SPEI, PDF o captura legible.';
+        } else if (valor === 'Cheque') {
+            referencia.placeholder = 'Número de cheque o folio';
+            banco.placeholder = 'Banco del cheque';
+            ayudaReferencia.textContent = 'Captura el número de cheque para rastreo administrativo.';
+            ayudaBanco.textContent = 'Indica el banco asociado al cheque.';
+            ayudaComprobante.textContent = 'Adjunta imagen o PDF del cheque/comprobante.';
+        } else if (valor === 'Tarjeta') {
+            referencia.placeholder = 'Folio de terminal, autorización o voucher';
+            banco.placeholder = 'Terminal, banco o cuenta';
+            ayudaReferencia.textContent = 'Captura el folio de autorización o voucher.';
+            ayudaBanco.textContent = 'Indica terminal, banco o medio usado.';
+            ayudaComprobante.textContent = 'Adjunta voucher o comprobante de operación.';
+        } else {
+            referencia.placeholder = 'Opcional para efectivo';
+            banco.placeholder = 'Opcional para efectivo';
+            ayudaReferencia.textContent = 'En efectivo puede quedar vacío, salvo que exista folio interno.';
+            ayudaBanco.textContent = 'En efectivo puede quedar vacío.';
+            ayudaComprobante.textContent = 'En efectivo es opcional. PDF, JPG o PNG. Máximo 5 MB.';
+        }
+    };
+
+    metodo.addEventListener('change', aplicarCampos);
+    aplicarCampos();
+});
+</script>
+@endpush

@@ -64,7 +64,7 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-4 mb-6">
         <div class="bg-white border border-slate-100 rounded-2xl shadow p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">Requisitos</p>
             <p class="text-3xl font-bold text-cyan-800 mt-1">{{ $resumen['requisitos'] }}</p>
@@ -89,6 +89,10 @@
             <p class="text-xs uppercase tracking-wide text-slate-500">Rechazados</p>
             <p class="text-3xl font-bold text-red-800 mt-1">{{ $resumen['rechazados'] }}</p>
         </div>
+        <div class="bg-white border border-slate-100 rounded-2xl shadow p-5">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Archivados</p>
+            <p class="text-3xl font-bold text-slate-700 mt-1">{{ $resumen['archivados'] }}</p>
+        </div>
     </div>
 
     @if($requisitosDisponibles->isEmpty())
@@ -97,7 +101,19 @@
         </div>
     @endif
 
-    @if($puedeGestionar)
+    <div class="mb-6 flex flex-wrap items-center gap-2">
+        <a href="{{ route('alumnos.documentos.index', $alumno) }}" class="px-4 py-2 rounded-lg text-sm font-semibold {{ $mostrarArchivados ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-cyan-600 text-white' }}">
+            Documentos activos
+        </a>
+        <a href="{{ route('alumnos.documentos.index', [$alumno, 'archivados' => 1]) }}" class="px-4 py-2 rounded-lg text-sm font-semibold {{ $mostrarArchivados ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+            Ver archivados
+        </a>
+        @if($mostrarArchivados)
+            <span class="text-sm text-slate-500">Los documentos archivados se conservan como evidencia y no aparecen en el expediente activo.</span>
+        @endif
+    </div>
+
+    @if($puedeGestionar && ! $mostrarArchivados)
         <div class="bg-white rounded-2xl shadow border border-slate-100 p-6 mb-6">
             <h2 class="text-xl font-bold text-slate-900 mb-1">Registrar documento</h2>
             <p class="text-sm text-slate-500 mb-5">Puedes capturarlo manualmente o relacionarlo con un requisito del catálogo.</p>
@@ -170,14 +186,14 @@
     <div class="bg-white rounded-2xl shadow border border-slate-100 overflow-hidden">
         <div class="bg-slate-900 text-white px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
             <div>
-                <h2 class="text-xl font-bold">Documentos registrados</h2>
-                <p class="text-sm text-slate-300">Control del expediente documental del alumno.</p>
+                <h2 class="text-xl font-bold">{{ $mostrarArchivados ? 'Documentos archivados' : 'Documentos registrados' }}</h2>
+                <p class="text-sm text-slate-300">{{ $mostrarArchivados ? 'Evidencia histórica conservada del expediente documental.' : 'Control del expediente documental del alumno.' }}</p>
             </div>
         </div>
 
         @if($documentos->isEmpty())
             <div class="p-8 text-center text-slate-500">
-                No hay documentos registrados para este alumno.
+                {{ $mostrarArchivados ? 'No hay documentos archivados para este alumno.' : 'No hay documentos registrados para este alumno.' }}
             </div>
         @else
             <div class="divide-y divide-slate-100">
@@ -187,6 +203,9 @@
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2 mb-2">
                                     <h3 class="text-lg font-bold text-slate-900">{{ $documento->tipo_documento }}</h3>
+                                    @if($documento->trashed())
+                                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">Archivado</span>
+                                    @endif
                                     @if($documento->requisitoDocumental)
                                         <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">
                                             {{ $documento->requisitoDocumental->obligatorio ? 'Requisito obligatorio' : 'Requisito opcional' }}
@@ -233,19 +252,19 @@
                                     </a>
                                 @endif
 
-                                @if($puedeEliminar)
-                                    <form action="{{ route('alumnos.documentos.destroy', [$alumno, $documento]) }}" method="POST" onsubmit="return confirm('¿Eliminar este documento y su archivo? Esta acción no se puede deshacer.');">
+                                @if($puedeEliminar && ! $documento->trashed())
+                                    <form action="{{ route('alumnos.documentos.destroy', [$alumno, $documento]) }}" method="POST" onsubmit="return confirm('¿Archivar este documento? El archivo privado se conservará como evidencia y dejará de mostrarse en el expediente activo.');">
                                         @csrf
                                         @method('DELETE')
                                         <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow">
-                                            Eliminar
+                                            Archivar
                                         </button>
                                     </form>
                                 @endif
                             </div>
                         </div>
 
-                        @if($puedeGestionar)
+                        @if($puedeGestionar && ! $documento->trashed())
                             <details class="mt-5 bg-slate-50 border border-slate-200 rounded-xl p-4">
                                 <summary class="cursor-pointer font-semibold text-slate-700">Editar / revisar documento</summary>
 
@@ -292,6 +311,9 @@
                                     <div class="md:col-span-2">
                                         <label class="block text-sm font-semibold text-slate-700 mb-1">Reemplazar archivo</label>
                                         <input type="file" name="archivo" accept=".pdf,.jpg,.jpeg,.png" class="w-full rounded-lg border-slate-300 focus:border-cyan-500 focus:ring-cyan-500">
+                                        @if(in_array($documento->estatus, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true))
+                                            <p class="text-xs text-amber-700 mt-1">Para conservar evidencia, los archivos aceptados o rechazados no se reemplazan. Archiva este registro y carga uno nuevo.</p>
+                                        @endif
                                     </div>
 
                                     <div class="md:col-span-2">

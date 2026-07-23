@@ -17,6 +17,7 @@ class ProfileController extends Controller
     {
         return view('profile.edit', [
             'user' => $request->user(),
+            'puedeModificarCorreo' => $this->puedeModificarCorreo($request->user()),
         ]);
     }
 
@@ -24,7 +25,18 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        $user->fill($request->validated());
+        if (method_exists($user, 'requiereCambioPassword') && $user->requiereCambioPassword()) {
+            return Redirect::route('profile.edit')
+                ->with('warning', 'Primero debes cambiar la contraseña temporal. Después podrás actualizar otros datos permitidos.');
+        }
+
+        $datos = $request->validated();
+
+        if (! $this->puedeModificarCorreo($user)) {
+            unset($datos['email']);
+        }
+
+        $user->fill($datos);
         $user->save();
 
         $this->bitacora(
@@ -42,5 +54,13 @@ class ProfileController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         abort(403, 'La eliminación de cuentas solo puede realizarla un administrador desde el módulo Usuarios.');
+    }
+
+    private function puedeModificarCorreo($usuario): bool
+    {
+        return $usuario
+            && method_exists($usuario, 'esAdmin')
+            && method_exists($usuario, 'esSistemas')
+            && ($usuario->esAdmin() || $usuario->esSistemas());
     }
 }

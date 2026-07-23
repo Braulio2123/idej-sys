@@ -13,7 +13,7 @@
             <option value="">Selecciona un grupo</option>
             @foreach($grupos as $grupo)
                 <option value="{{ $grupo->id }}" @selected((string) old('grupo_id', $calendario->grupo_id) === (string) $grupo->id)>
-                    {{ $grupo->nombre }} — {{ $grupo->programa->nombre ?? 'Sin programa' }}
+                    {{ $grupo->nombre }} — {{ $grupo->programa->nombre ?? 'Sin Educación Programática' }}
                 </option>
             @endforeach
         </select>
@@ -22,7 +22,7 @@
 
     <div>
         <label class="block text-sm font-semibold text-slate-700 mb-1">Ciclo escolar</label>
-        <select name="ciclo_escolar_id" class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
+        <select name="ciclo_escolar_id" id="ciclo_escolar_id" class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
             <option value="">Sin ciclo específico</option>
             @foreach($ciclos as $ciclo)
                 <option value="{{ $ciclo->id }}" @selected((string) old('ciclo_escolar_id', $calendario->ciclo_escolar_id) === (string) $ciclo->id)>{{ $ciclo->nombre }}</option>
@@ -32,8 +32,9 @@
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Periodo</label>
-        <input type="text" name="periodo" value="{{ old('periodo', $calendario->periodo) }}" class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500" placeholder="Ej. 2026 A">
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Periodo operativo</label>
+        <input type="text" name="periodo" id="periodo" value="{{ old('periodo', $calendario->periodo) }}" class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500" placeholder="Se puede llenar con el ciclo escolar">
+        <p class="text-xs text-slate-500 mt-1">Normalmente coincide con el ciclo escolar. Solo cámbialo si Académica necesita una etiqueta operativa distinta.</p>
         @error('periodo') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
     </div>
 
@@ -60,13 +61,14 @@
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Estatus *</label>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Estatus operativo</label>
         <select name="estatus" class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
             @foreach($estatuses as $estatus)
                 <option value="{{ $estatus }}" @selected(old('estatus', $calendario->estatus ?? 'Borrador') === $estatus)>{{ $estatus }}</option>
             @endforeach
         </select>
         @error('estatus') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
+        <p class="text-xs text-slate-500 mt-1">El sistema recalcula automáticamente Agendado, En curso o Finalizado con base en las fechas. Cancelado se mantiene solo si se selecciona manualmente.</p>
     </div>
 
     <div>
@@ -92,3 +94,23 @@
     <a href="{{ route('calendarios_academicos.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">Cancelar</a>
     <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Guardar calendario</button>
 </div>
+
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const selectCiclo = document.getElementById('ciclo_escolar_id');
+        const periodo = document.getElementById('periodo');
+        const ciclos = @json($ciclos->map(fn ($ciclo) => ['id' => (string) $ciclo->id, 'nombre' => $ciclo->nombre])->values());
+        if (!selectCiclo || !periodo) return;
+
+        selectCiclo.addEventListener('change', function () {
+            const seleccionado = ciclos.find(ciclo => ciclo.id === String(selectCiclo.value));
+            if (!seleccionado) return;
+            if (!periodo.value.trim() || ciclos.some(ciclo => ciclo.nombre === periodo.value.trim())) {
+                periodo.value = seleccionado.nombre;
+            }
+        });
+    });
+</script>
+@endpush

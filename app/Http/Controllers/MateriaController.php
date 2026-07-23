@@ -113,7 +113,7 @@ class MateriaController extends Controller
             'clave' => 'nullable|string|max:50',
             'nombre' => 'required|string|max:255',
             'nivel' => 'nullable|string|max:80',
-            'semestre_o_cuatrimestre' => 'nullable|integer|min:1|max:12',
+            'semestre_o_cuatrimestre' => 'nullable|integer|min:1|max:20',
             'creditos' => 'nullable|integer|min:0|max:99',
             'horas_teoricas' => 'required|integer|min:0|max:99',
             'horas_practicas' => 'required|integer|min:0|max:99',

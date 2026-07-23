@@ -82,6 +82,11 @@
                 ← Volver al Alumno
             </a>
 
+            <a href="{{ route('alumnos.convenios.pdf', [$alumno, $convenio]) }}" target="_blank"
+               class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-900">
+                Formato PDF
+            </a>
+
             <a href="{{ route('parcialidades.index', $convenio) }}"
                class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
                 Ver Parcialidades
@@ -201,6 +206,8 @@
                                     <span class="text-green-700 font-semibold">Pagado</span>
                                 @elseif($p->estatus === 'Parcialmente Pagado')
                                     <span class="text-yellow-700 font-semibold">Parcialmente</span>
+                                @elseif($p->fecha_vencimiento && $p->fecha_vencimiento->isPast())
+                                    <span class="text-red-700 font-semibold">Vencida</span>
                                 @else
                                     <span class="text-red-700 font-semibold">Pendiente</span>
                                 @endif

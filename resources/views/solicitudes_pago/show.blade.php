@@ -78,7 +78,7 @@
                     <div><dt class="text-slate-500">Origen</dt><dd class="font-semibold text-slate-800">{{ $solicitud->origen ?? 'Manual' }}</dd></div>
                     <div><dt class="text-slate-500">Concepto</dt><dd class="font-semibold text-slate-800">{{ $solicitud->concepto_pago ?? '—' }}</dd></div>
                     <div><dt class="text-slate-500">Nivel</dt><dd class="font-semibold text-slate-800">{{ $solicitud->nivel ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Programa / grupo</dt><dd class="font-semibold text-slate-800">{{ $solicitud->programa_grupo ?? '—' }}</dd></div>
+                    <div><dt class="text-slate-500">Educación Programática / grupo</dt><dd class="font-semibold text-slate-800">{{ $solicitud->programa_grupo ?? '—' }}</dd></div>
                     <div><dt class="text-slate-500">Materia / actividad</dt><dd class="font-semibold text-slate-800">{{ $solicitud->materia_actividad ?? '—' }}</dd></div>
                     <div><dt class="text-slate-500">Periodo</dt><dd class="font-semibold text-slate-800">{{ $solicitud->periodo ?? '—' }}</dd></div>
                     <div><dt class="text-slate-500">Modalidad</dt><dd class="font-semibold text-slate-800">{{ $solicitud->modalidad ?? '—' }}</dd></div>
@@ -161,6 +161,10 @@
 
             @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && $solicitud->estatus === SolicitudPagoDocente::ESTATUS_AUTORIZADA)
                 <a href="{{ route('solicitudes_pago.form_pagar', $solicitud) }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">Registrar pago</a>
+            @endif
+
+            @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION], true) && $solicitud->estatus === SolicitudPagoDocente::ESTATUS_PAGADA)
+                <a href="{{ route('solicitudes_pago.acuse_pago', $solicitud) }}" target="_blank" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow">Formato de pago PDF</a>
             @endif
 
             @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && !in_array($solicitud->estatus, [SolicitudPagoDocente::ESTATUS_PAGADA, SolicitudPagoDocente::ESTATUS_CANCELADA], true))

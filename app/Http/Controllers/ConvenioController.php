@@ -7,6 +7,7 @@ use App\Models\Cargo;
 use App\Models\Convenio;
 use App\Models\ParcialidadConvenio;
 use App\Traits\RegistraBitacora;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,12 @@ class ConvenioController extends Controller
      */
     public function create(Alumno $alumno)
     {
+        if ($alumno->estatus_academico !== 'Activo') {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('error', 'El alumno no está activo académicamente. No se pueden crear convenios nuevos hasta reactivarlo.');
+        }
+
         if ($alumno->becaVigente()) {
             return redirect()
                 ->route('alumnos.show', $alumno)
@@ -47,6 +54,12 @@ class ConvenioController extends Controller
      */
     public function store(Request $request, Alumno $alumno)
     {
+        if ($alumno->estatus_academico !== 'Activo') {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('error', 'El alumno no está activo académicamente. No se pueden crear convenios nuevos hasta reactivarlo.');
+        }
+
         $validated = $request->validate([
             'cargos' => ['required', 'array', 'min:1'],
             'cargos.*' => ['integer', 'distinct'],
@@ -254,6 +267,29 @@ class ConvenioController extends Controller
             'convenio' => $convenio,
             'alumno' => $alumno,
         ]);
+    }
+
+
+    public function pdf(Alumno $alumno, Convenio $convenio)
+    {
+        $this->verificarRelacion($alumno, $convenio);
+
+        $convenio->load(['parcialidades', 'cargos.concepto']);
+
+        $this->bitacora(
+            'Generar Formato de Convenio',
+            "Se generó formato PDF del convenio #{$convenio->id} del alumno {$alumno->nombre_completo}.",
+            'Convenios',
+            $convenio,
+            $alumno->id
+        );
+
+        $pdf = Pdf::loadView('convenios.pdf', [
+            'alumno' => $alumno,
+            'convenio' => $convenio,
+        ])->setPaper('letter', 'portrait');
+
+        return $pdf->stream('convenio_'.str_replace(['/', '\\', ' '], '_', $alumno->matricula ?: $alumno->id).'_'.$convenio->id.'.pdf');
     }
 
     private function verificarRelacion(Alumno $alumno, Convenio $convenio): void

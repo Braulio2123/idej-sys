@@ -18,6 +18,10 @@ class Pago extends Model
         'corte_caja_id',
         'metodo_pago',
         'monto_total_pagado',
+        'monto_recibido_efectivo',
+        'cambio_entregado',
+        'tratamiento_excedente',
+        'es_pago_anticipado',
         'saldo_a_favor_generado',
         'estatus',
         'fecha_pago',
@@ -42,6 +46,9 @@ class Pago extends Model
 
     protected $casts = [
         'monto_total_pagado' => 'decimal:2',
+        'monto_recibido_efectivo' => 'decimal:2',
+        'cambio_entregado' => 'decimal:2',
+        'es_pago_anticipado' => 'boolean',
         'saldo_a_favor_generado' => 'decimal:2',
         'fecha_pago' => 'date',
         'fecha_cancelacion' => 'datetime',

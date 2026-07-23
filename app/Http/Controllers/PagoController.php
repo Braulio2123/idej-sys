@@ -9,6 +9,8 @@ use App\Models\ConfiguracionInstitucional;
 use App\Models\CorteCaja;
 use App\Models\Pago;
 use App\Models\ParcialidadConvenio;
+use App\Models\NotificacionInterna;
+use App\Models\Rol;
 use App\Traits\RegistraBitacora;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
@@ -60,6 +62,9 @@ class PagoController extends Controller
         $validated = $request->validate([
             'metodo_pago' => ['required', Rule::in(['Efectivo', 'Transferencia', 'Tarjeta'])],
             'monto_total_pagado' => ['required', 'numeric', 'min:0.01'],
+            'monto_recibido_efectivo' => ['nullable', 'numeric', 'min:0.01'],
+            'tratamiento_excedente' => ['nullable', Rule::in(['cambio', 'saldo_favor'])],
+            'es_pago_anticipado' => ['nullable', 'boolean'],
             'fecha_pago' => ['nullable', 'date'],
             'operacion_uuid' => ['required', 'uuid'],
 
@@ -80,12 +85,12 @@ class PagoController extends Controller
             'referencia_transferencia' => ['nullable', 'string', 'max:150'],
             'fecha_transferencia' => ['nullable', 'date'],
             'banco_destino' => ['nullable', 'string', 'max:150'],
-            'archivo_comprobante' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
+            'archivo_comprobante' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:4096'],
 
             // Tarjeta
             'tarjeta_banco_emisor' => ['nullable', 'string', 'max:150'],
             'tarjeta_numero_autorizacion' => ['nullable', 'string', 'max:100'],
-            'comprobante_tarjeta' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:4096'],
+            'comprobante_tarjeta' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:4096'],
         ], [
             'monto_total_pagado.min' => 'El monto del pago debe ser mayor a cero.',
             'archivo_comprobante.mimes' => 'El comprobante de transferencia debe ser PDF o imagen JPG/PNG.',
@@ -95,9 +100,11 @@ class PagoController extends Controller
         $cargoIds = collect($validated['cargos'] ?? [])->filter()->unique()->values();
         $parcialidadIds = collect($validated['parcialidades'] ?? [])->filter()->unique()->values();
 
-        if ($cargoIds->isEmpty() && $parcialidadIds->isEmpty()) {
+        $esPagoAnticipado = (bool) ($validated['es_pago_anticipado'] ?? false);
+
+        if ($cargoIds->isEmpty() && $parcialidadIds->isEmpty() && ! $esPagoAnticipado) {
             throw ValidationException::withMessages([
-                'cargos' => 'Selecciona al menos un cargo o una parcialidad para aplicar el pago.',
+                'cargos' => 'Selecciona al menos un cargo o parcialidad, o marca el pago como anticipo/saldo a favor.',
             ]);
         }
 
@@ -153,6 +160,25 @@ class PagoController extends Controller
 
             $archivoComprobante = $this->guardarComprobante($request, $validated['metodo_pago']);
             $montoDisponible = round((float) $validated['monto_total_pagado'], 2);
+            $montoRecibidoEfectivo = null;
+            $cambioEntregado = 0.00;
+
+            if ($validated['metodo_pago'] === 'Efectivo') {
+                $montoRecibidoEfectivo = round((float) ($validated['monto_recibido_efectivo'] ?? $montoDisponible), 2);
+
+                if ($montoRecibidoEfectivo + 0.0001 < $montoDisponible) {
+                    throw ValidationException::withMessages([
+                        'monto_recibido_efectivo' => 'El efectivo recibido no puede ser menor al monto que se está registrando como pago.',
+                    ]);
+                }
+
+                if (($validated['tratamiento_excedente'] ?? null) === 'saldo_favor' && $montoRecibidoEfectivo > $montoDisponible) {
+                    $montoDisponible = $montoRecibidoEfectivo;
+                    $cambioEntregado = 0.00;
+                } else {
+                    $cambioEntregado = max(0, round($montoRecibidoEfectivo - $montoDisponible, 2));
+                }
+            }
 
             $pago = Pago::create([
                 'alumno_id' => $alumno->id,
@@ -160,6 +186,10 @@ class PagoController extends Controller
                 'corte_caja_id' => $corteCaja->id,
                 'metodo_pago' => $validated['metodo_pago'],
                 'monto_total_pagado' => $montoDisponible,
+                'monto_recibido_efectivo' => $montoRecibidoEfectivo,
+                'cambio_entregado' => $cambioEntregado,
+                'tratamiento_excedente' => $validated['tratamiento_excedente'] ?? null,
+                'es_pago_anticipado' => (bool) ($validated['es_pago_anticipado'] ?? false),
                 'saldo_a_favor_generado' => 0,
                 'estatus' => 'Activo',
                 'fecha_pago' => $validated['fecha_pago'] ?? now()->toDateString(),
@@ -247,7 +277,7 @@ class PagoController extends Controller
 
             $this->bitacora(
                 'Registrar Pago',
-                "Se registró un pago de $ {$validated['monto_total_pagado']} para el alumno {$alumno->nombre_completo} (ID {$alumno->id}). Pago ID {$pago->id}. Corte de caja #{$corteCaja->id}.",
+                "Se registró un pago de $ {$pago->monto_total_pagado} para el alumno {$alumno->nombre_completo} (ID {$alumno->id}). Pago ID {$pago->id}. Corte de caja #{$corteCaja->id}." . ($pago->es_pago_anticipado ? ' Se registró como anticipo/saldo a favor.' : ''),
                 'Pagos',
                 $pago,
                 $alumno->id
@@ -272,6 +302,8 @@ class PagoController extends Controller
 
             throw $e;
         }
+
+        $this->notificarPagoAcademicoSiAplica($pago);
 
         return redirect()
             ->route('alumnos.show', $alumno)
@@ -584,6 +616,43 @@ class PagoController extends Controller
             $pago->forceFill($datos)->save();
             $pago->refresh();
         }
+    }
+
+    private function notificarPagoAcademicoSiAplica(Pago $pago): void
+    {
+        $pago->loadMissing(['alumno', 'cargos.concepto']);
+
+        $conceptosAcademicos = $pago->cargos
+            ->pluck('concepto.nombre')
+            ->filter(fn ($nombre) => filled($nombre))
+            ->filter(fn ($nombre) => preg_match('/constancia|credencial|certificado|titulaci[oó]n/iu', $nombre))
+            ->unique()
+            ->values();
+
+        if ($conceptosAcademicos->isEmpty()) {
+            return;
+        }
+
+        NotificacionInterna::sincronizar([
+            'rol_clave' => Rol::ACADEMICA,
+            'tipo' => 'pago_tramite_academico',
+            'modulo' => 'Pagos',
+            'titulo' => 'Pago de trámite académico registrado',
+            'mensaje' => sprintf(
+                'Se registró el pago #%d de %s por: %s.',
+                $pago->id,
+                $pago->alumno?->nombre_completo ?? 'un alumno',
+                $conceptosAcademicos->implode(', ')
+            ),
+            'url' => route('alumnos.show', $pago->alumno_id),
+            'severidad' => NotificacionInterna::SEVERIDAD_MEDIA,
+            'referencia_tipo' => Pago::class,
+            'referencia_id' => $pago->id,
+            'metadata' => [
+                'alumno_id' => $pago->alumno_id,
+                'conceptos' => $conceptosAcademicos->all(),
+            ],
+        ]);
     }
 
     private function generarFolioRecibo(Pago $pago): string

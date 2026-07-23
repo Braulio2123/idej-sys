@@ -14,6 +14,12 @@ class CargoController extends Controller
 
     public function create(Alumno $alumno)
     {
+        if ($alumno->estatus_academico !== 'Activo') {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('error', 'El alumno no está activo académicamente. No se pueden generar cargos nuevos hasta reactivarlo. Los pagos de adeudos existentes sí pueden registrarse desde el expediente financiero.');
+        }
+
         $conceptos = ConceptoPago::orderBy('nombre')->get();
         $becaActiva = $alumno->becaVigente();
 
@@ -22,6 +28,12 @@ class CargoController extends Controller
 
     public function store(Request $request, Alumno $alumno)
     {
+        if ($alumno->estatus_academico !== 'Activo') {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('error', 'El alumno no está activo académicamente. No se pueden generar cargos nuevos hasta reactivarlo.');
+        }
+
         $validated = $request->validate([
             'concepto_id'       => 'required|exists:conceptos_pagos,id',
             'descripcion_cargo' => 'required|string|max:255',
@@ -32,7 +44,8 @@ class CargoController extends Controller
         $concepto = ConceptoPago::findOrFail($validated['concepto_id']);
         $becaActiva = $alumno->becaVigente();
 
-        $montoBase = round((float) $validated['monto_original'], 2);
+        $montoCapturado = round((float) $validated['monto_original'], 2);
+        $montoBase = $concepto->montoConIvaEducacionContinua($montoCapturado);
         $becaPorcentaje = 0;
         $becaMonto = 0.00;
         $becaId = null;
@@ -59,7 +72,9 @@ class CargoController extends Controller
             'alumno_id'         => $alumno->id,
             'concepto_id'       => $concepto->id,
             'beca_id'           => $becaId,
-            'descripcion_cargo' => $validated['descripcion_cargo'],
+            'descripcion_cargo' => $concepto->aplicaIvaEducacionContinua()
+                ? $validated['descripcion_cargo'].' (incluye IVA 16% por Educación Continua)'
+                : $validated['descripcion_cargo'],
             'monto_original'    => $montoBase,
             'beca_porcentaje_aplicado' => $becaPorcentaje,
             'beca_monto_aplicado' => $becaMonto,
@@ -77,13 +92,17 @@ class CargoController extends Controller
                 : 'Al Corriente';
         $alumno->save();
 
+        $detalleIva = $concepto->aplicaIvaEducacionContinua()
+            ? ' IVA Educación Continua 16% aplicado sobre $' . number_format($montoCapturado, 2) . '. Monto con IVA: $' . number_format($montoBase, 2) . '.'
+            : '';
+
         $detalleBeca = $becaPorcentaje > 0
             ? " Beca aplicada: {$becaPorcentaje}% (-$" . number_format($becaMonto, 2) . ")."
             : ' Sin beca aplicada.';
 
         $this->bitacora(
             'Crear Cargo',
-            "Se creó un cargo para el alumno {$alumno->nombre_completo}. Concepto: {$concepto->nombre}, Monto original: $" . number_format($montoBase, 2) . ", Adeudo final: $" . number_format($montoAdeudo, 2) . ".{$detalleBeca}"
+            "Se creó un cargo para el alumno {$alumno->nombre_completo}. Concepto: {$concepto->nombre}, Monto original: $" . number_format($montoBase, 2) . ", Adeudo final: $" . number_format($montoAdeudo, 2) . ".{$detalleIva}{$detalleBeca}"
         );
 
         return redirect()

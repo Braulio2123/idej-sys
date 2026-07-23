@@ -25,7 +25,7 @@
         <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar por materia o clave"
                class="rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
         <select name="programa_id" class="rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
-            <option value="">Todos los programas</option>
+            <option value="">Toda la Educación Programática</option>
             @foreach($programas as $programa)
                 <option value="{{ $programa->id }}" @selected((string) request('programa_id') === (string) $programa->id)>{{ $programa->nombre }}</option>
             @endforeach
@@ -44,7 +44,7 @@
                 <thead class="bg-indigo-600 text-white text-xs uppercase">
                     <tr>
                         <th class="px-4 py-3 text-left">Materia</th>
-                        <th class="px-4 py-3 text-left">Programa</th>
+                        <th class="px-4 py-3 text-left">Educación Programática</th>
                         <th class="px-4 py-3 text-center">Nivel/periodo</th>
                         <th class="px-4 py-3 text-center">Horas</th>
                         <th class="px-4 py-3 text-center">Estatus</th>
@@ -61,7 +61,7 @@
                             <td class="px-4 py-3 text-slate-600">{{ $materia->programa->nombre ?? 'General' }}</td>
                             <td class="px-4 py-3 text-center text-slate-600">
                                 {{ $materia->nivel ?: '—' }}<br>
-                                <span class="text-xs">{{ $materia->semestre_o_cuatrimestre ? 'Periodo '.$materia->semestre_o_cuatrimestre : 'Sin periodo' }}</span>
+                                <span class="text-xs">{{ $materia->semestre_o_cuatrimestre ? 'Semestre '.$materia->semestre_o_cuatrimestre : 'Sin periodo' }}</span>
                             </td>
                             <td class="px-4 py-3 text-center text-slate-600">T: {{ $materia->horas_teoricas }} · P: {{ $materia->horas_practicas }}</td>
                             <td class="px-4 py-3 text-center">

@@ -107,7 +107,11 @@
                     </select>
                 </div>
                 <div><label class="text-sm font-semibold text-slate-700">Expositor externo</label><input type="text" name="expositor_nombre" class="w-full rounded-xl border-slate-300"></div>
+                @if($puedeAsignarAula ?? false)
                 <div><label class="text-sm font-semibold text-slate-700">Aula / liga</label><input type="text" name="aula_liga" class="w-full rounded-xl border-slate-300"></div>
+                @else
+                <div class="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">Sistemas asignará aula o liga; Académica solo registra la planeación de la sesión.</div>
+                @endif
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-sm font-semibold text-slate-700">Modalidad</label>
