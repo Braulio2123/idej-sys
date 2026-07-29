@@ -33,6 +33,14 @@ class LoginRequest extends FormRequest
         ];
     }
 
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'email' => Str::lower(trim((string) $this->input('email'))),
+        ]);
+    }
+
     /**
      * Attempt to authenticate the request's credentials.
      *
@@ -42,7 +50,11 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt([
+            'email' => $this->string('email')->toString(),
+            'password' => $this->string('password')->toString(),
+            'activo' => true,
+        ], false)) {
             RateLimiter::hit($this->throttleKey());
 
             $this->registrarEventoSeguridad(
@@ -51,16 +63,16 @@ class LoginRequest extends FormRequest
             );
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'El correo o la contraseña no coinciden con un usuario interno activo.',
             ]);
         }
 
         $usuario = Auth::user();
 
-        if ($usuario && method_exists($usuario, 'estaActivo') && ! $usuario->estaActivo()) {
+        if ($usuario && method_exists($usuario, 'requiereCambioPassword') && $usuario->requiereCambioPassword() && $usuario->temporary_password_expires_at?->isPast()) {
             $this->registrarEventoSeguridad(
-                'Intento de ingreso con usuario desactivado',
-                'Usuario desactivado intentó iniciar sesión: '.$usuario->email.'. IP '.$this->ip().'.',
+                'Intento de ingreso con contraseña temporal vencida',
+                'Usuario intentó iniciar sesión con una contraseña temporal vencida: '.$usuario->email.'. IP '.$this->ip().'.',
                 $usuario->id
             );
 
@@ -68,7 +80,7 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => 'Tu usuario interno está desactivado. Solicita reactivación al área de Sistemas o Administración.',
+                'email' => 'La contraseña temporal ya venció. Solicita a Sistemas o Administración una nueva contraseña temporal.',
             ]);
         }
 
@@ -96,10 +108,7 @@ class LoginRequest extends FormRequest
         );
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'email' => 'Demasiados intentos de acceso. Intenta nuevamente en '.$seconds.' segundos.',
         ]);
     }
 

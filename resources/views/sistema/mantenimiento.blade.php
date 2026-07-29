@@ -3,25 +3,37 @@
 @section('title', 'Mantenimiento del Sistema')
 
 @section('content')
+@php
+    $puedeDescargarBackups = usuarioTienePermiso('mantenimiento.backups');
+    $puedeLimpiarLogs = usuarioTienePermiso('mantenimiento.logs');
+@endphp
 <div class="max-w-7xl mx-auto space-y-6">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-slate-800">Mantenimiento del sistema</h1>
             <p class="text-sm text-slate-500 mt-1">
-                Herramientas técnicas para revisar salud del sistema, limpiar caché, generar respaldos y validar condiciones antes de producción.
+                Panel para revisar el estado del sistema, respaldar información y ejecutar tareas de soporte. Úsalo solo con autorización de Sistemas.
             </p>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('sistema.mantenimiento.backup-db') }}" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                <i class='bx bx-data'></i>
-                Backup BD
-            </a>
-            <a href="{{ route('sistema.mantenimiento.backup-archivos') }}" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
-                <i class='bx bx-archive'></i>
-                Backup archivos
-            </a>
-        </div>
+        @if($puedeDescargarBackups)
+            <div class="flex flex-wrap gap-2">
+                <form method="POST" action="{{ route('sistema.mantenimiento.backup-db') }}" onsubmit="return confirm('El respaldo contiene información institucional sensible. ¿Deseas generarlo y descargarlo ahora?');">
+                    @csrf
+                    <button class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                        <i class='bx bx-data'></i>
+                        Respaldo de base de datos
+                    </button>
+                </form>
+                <form method="POST" action="{{ route('sistema.mantenimiento.backup-archivos') }}" onsubmit="return confirm('El respaldo contiene documentos privados y comprobantes. ¿Deseas generarlo y descargarlo ahora?');">
+                    @csrf
+                    <button class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                        <i class='bx bx-archive'></i>
+                        Respaldo de archivos
+                    </button>
+                </form>
+            </div>
+        @endif
     </div>
 
     @if(session('success'))
@@ -55,8 +67,8 @@
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
             <div class="px-5 py-4 bg-slate-50 border-b border-slate-200">
-                <h2 class="font-semibold text-slate-800">Diagnóstico técnico</h2>
-                <p class="text-xs text-slate-500">Información de referencia para soporte local, despliegue y validación del entorno.</p>
+                <h2 class="font-semibold text-slate-800">Estado del sistema</h2>
+                <p class="text-xs text-slate-500">Indicadores de soporte para revisar instalación, archivos, base de datos y operación general.</p>
             </div>
 
             <div class="divide-y divide-slate-100">
@@ -83,8 +95,8 @@
         <div class="space-y-5">
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                 <div class="px-5 py-4 bg-slate-50 border-b border-slate-200">
-                    <h2 class="font-semibold text-slate-800">Acciones rápidas</h2>
-                    <p class="text-xs text-slate-500">Úsalas con cuidado. Todas quedan registradas en bitácora.</p>
+                    <h2 class="font-semibold text-slate-800">Acciones de soporte</h2>
+                    <p class="text-xs text-slate-500">Usar solo cuando sea necesario. Todas quedan registradas en bitácora.</p>
                 </div>
 
                 <div class="p-5 space-y-3">
@@ -92,61 +104,74 @@
                         @csrf
                         <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900">
                             <i class='bx bx-brush'></i>
-                            Limpiar caché
+                            Actualizar configuración del sistema
                         </button>
+                        <p class="mt-2 text-xs text-slate-500 leading-relaxed">Útil después de cambiar configuración, rutas o vistas. No elimina información de alumnos ni pagos.</p>
                     </form>
 
                     <form method="POST" action="{{ route('sistema.mantenimiento.storage-link') }}">
                         @csrf
                         <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
                             <i class='bx bx-link'></i>
-                            Crear/verificar storage link
+                            Reparar acceso a archivos públicos
                         </button>
+                        <p class="mt-2 text-xs text-slate-500 leading-relaxed">Usar si logos o archivos públicos no se muestran después de instalar o mover el sistema. No expone documentos privados.</p>
                     </form>
 
-                    <form method="POST" action="{{ route('sistema.mantenimiento.limpiar-logs') }}" onsubmit="return confirm('¿Seguro que deseas vaciar storage/logs/laravel.log?');">
-                        @csrf
-                        <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700">
-                            <i class='bx bx-trash'></i>
-                            Limpiar log principal
-                        </button>
-                    </form>
+                    @if($puedeLimpiarLogs)
+                        <form method="POST" action="{{ route('sistema.mantenimiento.limpiar-logs') }}" onsubmit="return confirm('¿Seguro que deseas vaciar el registro técnico principal? Esta acción elimina evidencia técnica reciente; la bitácora institucional no se borra.');">
+                            @csrf
+                            <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700">
+                                <i class='bx bx-trash'></i>
+                                Vaciar registro técnico principal
+                            </button>
+                            <p class="mt-2 text-xs text-slate-500 leading-relaxed">Reservado a Admin. La bitácora institucional no se borra.</p>
+                        </form>
+                    @endif
                 </div>
             </div>
 
-            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-5 py-4 bg-slate-50 border-b border-slate-200">
-                    <h2 class="font-semibold text-slate-800">Respaldos manuales</h2>
-                    <p class="text-xs text-slate-500">Descargas inmediatas para resguardo local.</p>
+            @if($puedeDescargarBackups)
+                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                        <h2 class="font-semibold text-slate-800">Respaldos manuales</h2>
+                        <p class="text-xs text-slate-500">Descargas inmediatas para resguardo institucional autorizado.</p>
+                    </div>
+
+                    <div class="p-5 space-y-3 text-sm text-slate-600">
+                        <form method="POST" action="{{ route('sistema.mantenimiento.backup-db') }}" onsubmit="return confirm('¿Generar y descargar un respaldo completo de la base de datos?');">
+                            @csrf
+                            <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700">
+                                <i class='bx bx-download'></i>
+                                Descargar respaldo de base de datos
+                            </button>
+                        </form>
+
+                        <form method="POST" action="{{ route('sistema.mantenimiento.backup-archivos') }}" onsubmit="return confirm('¿Generar y descargar un respaldo con documentos privados y comprobantes?');">
+                            @csrf
+                            <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 font-semibold text-white hover:bg-purple-700">
+                                <i class='bx bx-folder-open'></i>
+                                Descargar respaldo de documentos y archivos
+                            </button>
+                        </form>
+
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            Estos respaldos contienen información sensible. Deben almacenarse cifrados, con acceso restringido y junto con una política de retención.
+                        </p>
+                    </div>
                 </div>
-
-                <div class="p-5 space-y-3 text-sm text-slate-600">
-                    <a href="{{ route('sistema.mantenimiento.backup-db') }}" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700">
-                        <i class='bx bx-download'></i>
-                        Descargar respaldo SQL
-                    </a>
-
-                    <a href="{{ route('sistema.mantenimiento.backup-archivos') }}" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 font-semibold text-white hover:bg-purple-700">
-                        <i class='bx bx-folder-open'></i>
-                        Descargar archivos cargados
-                    </a>
-
-                    <p class="text-xs text-slate-500 leading-relaxed">
-                        El respaldo de archivos incluye lo almacenado en <code>storage/app/public</code>: comprobantes, documentos de alumnos, logos institucionales y otros adjuntos públicos.
-                    </p>
-                </div>
-            </div>
+            @endif
 
             <div class="bg-slate-900 text-slate-100 rounded-2xl shadow-sm overflow-hidden">
                 <div class="px-5 py-4 border-b border-white/10">
                     <h2 class="font-semibold">Checklist antes de producción</h2>
                 </div>
                 <div class="p-5 text-sm space-y-2 text-slate-300">
-                    <p>• APP_DEBUG debe estar en <strong>false</strong>.</p>
+                    <p>• El modo de errores detallados debe estar desactivado.</p>
                     <p>• Cambiar contraseñas de usuarios semilla.</p>
-                    <p>• Confirmar dominio en APP_URL.</p>
+                    <p>• Confirmar la dirección oficial del sistema.</p>
                     <p>• Validar respaldos de BD y archivos.</p>
-                    <p>• Confirmar permisos de storage.</p>
+                    <p>• Confirmar permisos de carpetas de archivos.</p>
                     <p>• Revisar correos institucionales si se usarán recordatorios.</p>
                 </div>
             </div>

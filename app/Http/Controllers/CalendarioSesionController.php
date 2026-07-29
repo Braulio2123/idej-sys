@@ -19,6 +19,7 @@ class CalendarioSesionController extends Controller
 
     public function cancelar(CalendarioAcademico $calendarioAcademico, CalendarioSesion $calendarioSesion)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         $this->validarSesionDelCalendario($calendarioAcademico, $calendarioSesion);
         $calendarioSesion->load(['calendarioMateria.materia', 'calendarioMateria.docente']);
 
@@ -30,6 +31,7 @@ class CalendarioSesionController extends Controller
 
     public function cancelarStore(Request $request, CalendarioAcademico $calendarioAcademico, CalendarioSesion $calendarioSesion)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         $this->validarSesionDelCalendario($calendarioAcademico, $calendarioSesion);
 
         $data = $request->validate([
@@ -60,6 +62,7 @@ class CalendarioSesionController extends Controller
 
     public function reprogramar(CalendarioAcademico $calendarioAcademico, CalendarioSesion $calendarioSesion)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         $this->validarSesionDelCalendario($calendarioAcademico, $calendarioSesion);
         $calendarioSesion->load(['calendarioMateria.materia', 'calendarioMateria.docente']);
 
@@ -73,6 +76,7 @@ class CalendarioSesionController extends Controller
 
     public function reprogramarStore(Request $request, CalendarioAcademico $calendarioAcademico, CalendarioSesion $calendarioSesion)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         $this->validarSesionDelCalendario($calendarioAcademico, $calendarioSesion);
 
         $data = $request->validate([
@@ -132,6 +136,19 @@ class CalendarioSesionController extends Controller
 
         return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
             ->with('success', 'Sesión reprogramada correctamente y con trazabilidad.');
+    }
+
+    private function asegurarCalendarioEditable(CalendarioAcademico $calendario): void
+    {
+        $calendario->loadMissing('grupo');
+
+        if (! $calendario->grupo?->activo) {
+            abort(409, 'El grupo está archivado y su calendario se conserva únicamente como historial.');
+        }
+
+        if (in_array($calendario->estatus, [CalendarioAcademico::ESTATUS_CANCELADO, CalendarioAcademico::ESTATUS_FINALIZADO], true)) {
+            abort(409, 'El calendario está cancelado o finalizado y se conserva únicamente como historial.');
+        }
     }
 
     private function validarSesionDelCalendario(CalendarioAcademico $calendario, CalendarioSesion $sesion): void

@@ -60,7 +60,7 @@ class BecaController extends Controller
     public function create(Alumno $alumno)
     {
         $usuariosAutorizadores = Usuario::whereHas('rol', function ($query) {
-                $query->whereIn('clave', [Rol::ADMIN, Rol::DIRECCION, Rol::CADMIN, Rol::FINANZAS]);
+                $query->whereIn('clave', [Rol::ADMIN, Rol::DIRECCION, Rol::CADMIN]);
             })
             ->orderBy('nombre')
             ->get();

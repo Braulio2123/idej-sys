@@ -13,14 +13,14 @@ return new class extends Migration
 
             $table->foreignId('convenio_id')
                 ->constrained('convenios')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->decimal('monto_parcialidad', 10, 2);
             $table->decimal('monto_adeudo', 10, 2)->default(0);
 
             $table->date('fecha_vencimiento');
 
-            $table->enum('estatus', ['Pendiente', 'Pagado', 'Parcialmente Pagado'])
+            $table->enum('estatus', ['Pendiente', 'Pagado', 'Parcialmente Pagado', 'Cancelada'])
                 ->default('Pendiente');
 
             $table->timestamps();

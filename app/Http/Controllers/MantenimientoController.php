@@ -27,18 +27,18 @@ class MantenimientoController extends Controller
                 'Laravel' => app()->version(),
                 'PHP' => PHP_VERSION,
                 'Ambiente' => config('app.env'),
-                'Debug' => config('app.debug') ? 'Activo' : 'Desactivado',
+                'Errores detallados' => config('app.debug') ? 'Activo' : 'Desactivado',
                 'URL' => config('app.url'),
                 'Zona horaria' => config('app.timezone'),
             ],
             'base_datos' => $this->estadoBaseDatos(),
             'archivos' => [
-                'Storage link' => $this->storageLinkActivo() ? 'Activo' : 'No detectado',
-                'storage/app/public' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/public'))),
-                'storage/app/private' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/private'))),
-                'storage/logs' => $this->formatearBytes($this->tamanoDirectorio(storage_path('logs'))),
-                'bootstrap/cache' => is_writable(base_path('bootstrap/cache')) ? 'Escribible' : 'No escribible',
-                'storage' => is_writable(storage_path()) ? 'Escribible' : 'No escribible',
+                'Acceso a archivos públicos' => $this->storageLinkActivo() ? 'Disponible' : 'No detectado',
+                'Archivos públicos' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/public'))),
+                'Documentos privados' => $this->formatearBytes($this->tamanoDirectorio(storage_path('app/private'))),
+                'Registros técnicos' => $this->formatearBytes($this->tamanoDirectorio(storage_path('logs'))),
+                'Carpeta de configuración' => is_writable(base_path('bootstrap/cache')) ? 'Disponible' : 'Sin permisos',
+                'Carpeta de archivos' => is_writable(storage_path()) ? 'Disponible' : 'Sin permisos',
             ],
             'logs' => $this->estadoLogs(),
             'migraciones' => $this->estadoMigraciones(),
@@ -58,11 +58,12 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return back()->with('success', 'Caché de configuración, rutas, vistas y aplicación limpiada correctamente.');
+            return redirect()->route('sistema.mantenimiento.index')
+                ->with('success', 'La configuración del sistema se actualizó correctamente.');
         } catch (Throwable $e) {
             Log::error('Error al limpiar caché desde mantenimiento: '.$e->getMessage());
 
-            return back()->with('error', 'No se pudo limpiar la caché: '.$e->getMessage());
+            return back()->with('error', 'No se pudo actualizar la configuración. Revisa permisos del servidor o solicita apoyo técnico.');
         }
     }
 
@@ -77,11 +78,12 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return back()->with('success', 'Enlace público de storage verificado o creado correctamente.');
+            return redirect()->route('sistema.mantenimiento.index')
+                ->with('success', 'Se verificó el acceso a archivos públicos del sistema.');
         } catch (Throwable $e) {
             Log::error('Error al crear storage link desde mantenimiento: '.$e->getMessage());
 
-            return back()->with('error', 'No se pudo crear el enlace de storage: '.$e->getMessage());
+            return back()->with('error', 'No se pudo verificar el acceso a archivos públicos. Revisa permisos del servidor o solicita apoyo técnico.');
         }
     }
 
@@ -100,16 +102,19 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return back()->with('success', 'Log principal de Laravel limpiado correctamente.');
+            return redirect()->route('sistema.mantenimiento.index')
+                ->with('success', 'El registro técnico principal se vació correctamente.');
         } catch (Throwable $e) {
             Log::error('Error al limpiar logs desde mantenimiento: '.$e->getMessage());
 
-            return back()->with('error', 'No se pudieron limpiar los logs: '.$e->getMessage());
+            return back()->with('error', 'No se pudo vaciar el registro técnico principal. Revisa permisos del servidor.');
         }
     }
 
     public function descargarBackupBaseDatos()
     {
+        $path = null;
+
         try {
             $backupDir = storage_path('app/backups');
             File::ensureDirectoryExists($backupDir);
@@ -126,19 +131,32 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return response()->download($path)->deleteFileAfterSend(true);
+            return response()->download($path, $filename, [
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ])->deleteFileAfterSend(true);
         } catch (Throwable $e) {
-            Log::error('Error al generar backup de base de datos: '.$e->getMessage());
+            if ($path && File::exists($path)) {
+                File::delete($path);
+            }
 
-            return back()->with('error', 'No se pudo generar el respaldo de base de datos: '.$e->getMessage());
+            Log::error('Error al generar backup de base de datos.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'No se pudo generar el respaldo de base de datos. Contacta al área de Sistemas y revisa el registro técnico.');
         }
     }
 
     public function descargarBackupArchivos()
     {
+        $path = null;
+        $zip = null;
+
         try {
             if (! class_exists(ZipArchive::class)) {
-                return back()->with('error', 'La extensión PHP ZipArchive no está disponible. Activa ext-zip para generar respaldos de archivos.');
+                return back()->with('error', 'El servidor no tiene disponible el componente necesario para generar respaldos ZIP. Contacta al área de Sistemas.');
             }
 
             $backupDir = storage_path('app/backups');
@@ -149,7 +167,7 @@ class MantenimientoController extends Controller
 
             $zip = new ZipArchive();
             if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-                return back()->with('error', 'No se pudo crear el archivo ZIP de respaldo.');
+                throw new \RuntimeException('No fue posible crear el contenedor ZIP temporal.');
             }
 
             $agregados = 0;
@@ -171,6 +189,10 @@ class MantenimientoController extends Controller
 
                 foreach ($iterator as $file) {
                     $filePath = $file->getRealPath();
+                    if (! $filePath) {
+                        continue;
+                    }
+
                     $relativePath = str_replace('\\', '/', Str::after($filePath, $source.DIRECTORY_SEPARATOR));
                     $zipPath = trim($prefijo.'/'.$relativePath, '/');
 
@@ -181,7 +203,9 @@ class MantenimientoController extends Controller
                     if ($file->isDir()) {
                         $zip->addEmptyDir($zipPath);
                     } else {
-                        $zip->addFile($filePath, $zipPath);
+                        if (! $zip->addFile($filePath, $zipPath)) {
+                            throw new \RuntimeException('No fue posible agregar un archivo al respaldo temporal.');
+                        }
                         $agregados++;
                     }
                 }
@@ -191,7 +215,10 @@ class MantenimientoController extends Controller
                 $zip->addFromString('LEEME.txt', 'No había archivos cargados al momento de generar este respaldo.');
             }
 
-            $zip->close();
+            if (! $zip->close()) {
+                throw new \RuntimeException('No fue posible cerrar el respaldo ZIP temporal.');
+            }
+            $zip = null;
 
             $this->bitacora(
                 'Descargar Backup de Archivos',
@@ -199,11 +226,25 @@ class MantenimientoController extends Controller
                 'Mantenimiento'
             );
 
-            return response()->download($path)->deleteFileAfterSend(true);
+            return response()->download($path, $filename, [
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, private',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ])->deleteFileAfterSend(true);
         } catch (Throwable $e) {
-            Log::error('Error al generar backup de archivos: '.$e->getMessage());
+            if ($zip instanceof ZipArchive) {
+                $zip->close();
+            }
 
-            return back()->with('error', 'No se pudo generar el respaldo de archivos: '.$e->getMessage());
+            if ($path && File::exists($path)) {
+                File::delete($path);
+            }
+
+            Log::error('Error al generar backup de archivos.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'No se pudo generar el respaldo de archivos. Contacta al área de Sistemas y revisa el registro técnico.');
         }
     }
 
@@ -213,7 +254,7 @@ class MantenimientoController extends Controller
         $connection = config('database.default');
 
         if (config("database.connections.$connection.driver") !== 'mysql') {
-            throw new \RuntimeException('El respaldo SQL integrado actualmente está preparado para MySQL/MariaDB.');
+            throw new \RuntimeException('El motor de base de datos configurado no es compatible con el respaldo integrado.');
         }
 
         $tables = collect(DB::select('SHOW TABLES'))
@@ -221,81 +262,84 @@ class MantenimientoController extends Controller
             ->filter()
             ->values();
 
-        $handle = fopen($path, 'w');
+        $handle = fopen($path, 'wb');
         if (! $handle) {
-            throw new \RuntimeException('No se pudo abrir el archivo de respaldo para escritura.');
+            throw new \RuntimeException('No fue posible abrir el archivo temporal de respaldo.');
         }
 
-        fwrite($handle, "-- Respaldo SQL generado por IDEJ-SYS\n");
-        fwrite($handle, '-- Fecha: '.now()->format('Y-m-d H:i:s')."\n");
-        fwrite($handle, '-- Base de datos: '.$database."\n\n");
-        fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
-        fwrite($handle, "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';\n\n");
+        try {
+            fwrite($handle, "-- Respaldo SQL generado por IDEJ-SYS\n");
+            fwrite($handle, '-- Fecha: '.now()->format('Y-m-d H:i:s')."\n");
+            fwrite($handle, '-- Base de datos: '.$database."\n\n");
+            fwrite($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
+            fwrite($handle, "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';\n\n");
 
-        foreach ($tables as $table) {
-            $tableEscaped = $this->quoteIdentifier($table);
-            $createResult = DB::select("SHOW CREATE TABLE $tableEscaped");
-            $createRow = array_values((array) $createResult[0]);
-            $createSql = $createRow[1] ?? null;
+            foreach ($tables as $table) {
+                $tableEscaped = $this->quoteIdentifier($table);
+                $createResult = DB::select("SHOW CREATE TABLE $tableEscaped");
+                $createRow = array_values((array) ($createResult[0] ?? []));
+                $createSql = $createRow[1] ?? null;
 
-            if (! $createSql) {
-                continue;
+                if (! $createSql) {
+                    continue;
+                }
+
+                fwrite($handle, "-- --------------------------------------------------------\n");
+                fwrite($handle, "-- Estructura de tabla $tableEscaped\n");
+                fwrite($handle, "DROP TABLE IF EXISTS $tableEscaped;\n");
+                fwrite($handle, $createSql.";\n\n");
+                fwrite($handle, "-- Datos de tabla $tableEscaped\n");
+
+                $registros = 0;
+                foreach (DB::table($table)->cursor() as $row) {
+                    $data = (array) $row;
+                    $columns = collect(array_keys($data))
+                        ->map(fn ($column) => $this->quoteIdentifier($column))
+                        ->implode(', ');
+
+                    $values = collect(array_values($data))
+                        ->map(function ($value) use ($pdo) {
+                            if ($value === null) {
+                                return 'NULL';
+                            }
+
+                            if (is_bool($value)) {
+                                return $value ? '1' : '0';
+                            }
+
+                            return $pdo->quote((string) $value);
+                        })
+                        ->implode(', ');
+
+                    fwrite($handle, "INSERT INTO $tableEscaped ($columns) VALUES ($values);\n");
+                    $registros++;
+                }
+
+                if ($registros === 0) {
+                    fwrite($handle, "-- Tabla sin registros\n");
+                }
+
+                fwrite($handle, "\n");
             }
 
-            fwrite($handle, "-- --------------------------------------------------------\n");
-            fwrite($handle, "-- Estructura de tabla $tableEscaped\n");
-            fwrite($handle, "DROP TABLE IF EXISTS $tableEscaped;\n");
-            fwrite($handle, $createSql.";\n\n");
-
-            $rows = DB::table($table)->get();
-            if ($rows->isEmpty()) {
-                fwrite($handle, "-- Tabla sin registros\n\n");
-                continue;
-            }
-
-            fwrite($handle, "-- Datos de tabla $tableEscaped\n");
-            foreach ($rows as $row) {
-                $data = (array) $row;
-                $columns = collect(array_keys($data))
-                    ->map(fn ($column) => $this->quoteIdentifier($column))
-                    ->implode(', ');
-
-                $values = collect(array_values($data))
-                    ->map(function ($value) use ($pdo) {
-                        if ($value === null) {
-                            return 'NULL';
-                        }
-
-                        if (is_bool($value)) {
-                            return $value ? '1' : '0';
-                        }
-
-                        return $pdo->quote((string) $value);
-                    })
-                    ->implode(', ');
-
-                fwrite($handle, "INSERT INTO $tableEscaped ($columns) VALUES ($values);\n");
-            }
-
-            fwrite($handle, "\n");
+            fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
+        } finally {
+            fclose($handle);
         }
-
-        fwrite($handle, "SET FOREIGN_KEY_CHECKS=1;\n");
-        fclose($handle);
     }
 
     private function obtenerChecks(): array
     {
         return [
             [
-                'titulo' => 'APP_DEBUG desactivado en producción',
+                'titulo' => 'Errores detallados desactivados en producción',
                 'estado' => ! config('app.debug'),
-                'detalle' => config('app.debug') ? 'Actualmente está activo. Correcto solo en local.' : 'Correcto para producción.',
+                'detalle' => config('app.debug') ? 'Actualmente muestra detalles de errores. Correcto solo en desarrollo local.' : 'Correcto para producción.',
             ],
             [
-                'titulo' => 'APP_KEY configurada',
+                'titulo' => 'Llave de seguridad configurada',
                 'estado' => filled(config('app.key')),
-                'detalle' => filled(config('app.key')) ? 'Llave de aplicación detectada.' : 'Ejecuta php artisan key:generate.',
+                'detalle' => filled(config('app.key')) ? 'Llave de seguridad detectada.' : 'Genera la llave de seguridad antes de usar el sistema.',
             ],
             [
                 'titulo' => 'Conexión a base de datos',
@@ -303,19 +347,19 @@ class MantenimientoController extends Controller
                 'detalle' => $this->baseDatosDisponible() ? 'La conexión responde correctamente.' : 'No se pudo conectar a la base de datos.',
             ],
             [
-                'titulo' => 'Storage link activo',
+                'titulo' => 'Acceso a archivos públicos disponible',
                 'estado' => $this->storageLinkActivo(),
-                'detalle' => $this->storageLinkActivo() ? 'public/storage apunta a storage/app/public.' : 'Ejecuta storage:link desde este módulo.',
+                'detalle' => $this->storageLinkActivo() ? 'Los archivos públicos necesarios se pueden mostrar.' : 'Usa la acción Reparar acceso a archivos públicos.',
             ],
             [
-                'titulo' => 'Carpeta storage escribible',
+                'titulo' => 'Carpeta de archivos disponible',
                 'estado' => is_writable(storage_path()),
                 'detalle' => is_writable(storage_path()) ? 'Laravel puede escribir cachés, sesiones y archivos.' : 'Revisa permisos de storage/.',
             ],
             [
-                'titulo' => 'Carpeta bootstrap/cache escribible',
+                'titulo' => 'Carpeta de configuración disponible',
                 'estado' => is_writable(base_path('bootstrap/cache')),
-                'detalle' => is_writable(base_path('bootstrap/cache')) ? 'Laravel puede cachear configuración y rutas.' : 'Revisa permisos de bootstrap/cache.',
+                'detalle' => is_writable(base_path('bootstrap/cache')) ? 'El sistema puede guardar configuración optimizada.' : 'Revisa permisos de la carpeta de configuración.',
             ],
         ];
     }
@@ -334,8 +378,13 @@ class MantenimientoController extends Controller
                 'Estado' => 'Disponible',
             ];
         } catch (Throwable $e) {
+            Log::warning('No fue posible consultar el estado de la base de datos desde mantenimiento.', [
+                'error' => $e->getMessage(),
+            ]);
+
             return [
-                'Estado' => 'Error: '.$e->getMessage(),
+                'Estado' => 'No disponible',
+                'Detalle' => 'No fue posible consultar la base de datos. Revisa el registro técnico.',
             ];
         }
     }
@@ -371,9 +420,13 @@ class MantenimientoController extends Controller
                 'Detalle' => Str::limit($output ?: 'Sin salida del comando migrate:status.', 900),
             ];
         } catch (Throwable $e) {
+            Log::warning('No fue posible consultar el estado de las migraciones.', [
+                'error' => $e->getMessage(),
+            ]);
+
             return [
                 'Estado' => 'No se pudo consultar',
-                'Detalle' => $e->getMessage(),
+                'Detalle' => 'Revisa la conexión y el registro técnico del servidor.',
             ];
         }
     }

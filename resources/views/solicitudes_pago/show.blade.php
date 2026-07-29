@@ -3,178 +3,68 @@
 @php
     use App\Models\Rol;
     use App\Models\SolicitudPagoDocente;
-
     $rolActual = auth()->user()?->rolClave();
+    $veFinanzas = in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::DIRECCION], true);
     $badge = match ($solicitud->estatus) {
         SolicitudPagoDocente::ESTATUS_PENDIENTE => 'bg-amber-100 text-amber-700',
         SolicitudPagoDocente::ESTATUS_OBSERVADA => 'bg-orange-100 text-orange-700',
         SolicitudPagoDocente::ESTATUS_AUTORIZADA => 'bg-blue-100 text-blue-700',
         SolicitudPagoDocente::ESTATUS_PAGADA => 'bg-green-100 text-green-700',
-        SolicitudPagoDocente::ESTATUS_CANCELADA => 'bg-red-100 text-red-700',
-        default => 'bg-slate-100 text-slate-700',
+        SolicitudPagoDocente::ESTATUS_RECHAZADA => 'bg-red-100 text-red-700',
+        default => 'bg-slate-200 text-slate-700',
     };
 @endphp
 
-@section('title', 'Detalle de Solicitud Docente')
+@section('title', 'Solicitud de pago docente')
 
 @section('content')
-<div class="max-w-6xl mx-auto mt-6 space-y-6">
-    <div class="bg-white/90 backdrop-blur shadow-xl rounded-2xl p-6 border border-slate-200">
-        <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-            <div>
-                <h1 class="text-2xl font-semibold text-slate-800 flex items-center gap-2">
-                    <i class='bx bx-money-withdraw text-3xl text-blue-600'></i>
-                    Solicitud {{ $solicitud->folio ?? '#'.$solicitud->id }}
-                </h1>
-                <p class="text-sm text-slate-500 mt-1">Solicitud de pago a docente con trazabilidad académica y administrativa.</p>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-                <span class="px-4 py-2 rounded-xl text-sm font-bold {{ $badge }}">{{ $solicitud->estatus }}</span>
-                <a href="{{ route('solicitudes_pago.index') }}" class="inline-flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-xl font-medium transition">← Volver</a>
-            </div>
+<div class="mx-auto mt-6 max-w-6xl space-y-6">
+    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div><h1 class="flex items-center gap-2 text-2xl font-semibold text-slate-800"><i class="bx bx-money-withdraw text-3xl text-blue-600"></i>{{ $solicitud->folio }}</h1><p class="mt-1 text-sm text-slate-500">Seguimiento Académica → CAdmin con fecha tentativa visible para informar al docente.</p></div>
+            <div class="flex gap-2"><span class="rounded-xl px-4 py-2 text-sm font-bold {{ $badge }}">{{ $solicitud->estatus }}</span><a href="{{ route('solicitudes_pago.index') }}" class="rounded-xl bg-slate-200 px-4 py-2 font-medium text-slate-800">← Volver</a></div>
         </div>
 
-        @if(session('success'))
-            <div class="bg-green-100 text-green-700 px-4 py-3 rounded-lg mb-4 border border-green-200">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-            <div class="bg-red-100 text-red-700 px-4 py-3 rounded-lg mb-4 border border-red-200">{{ session('error') }}</div>
-        @endif
+        @if(session('success'))<div class="mb-4 rounded-lg border border-green-200 bg-green-100 px-4 py-3 text-green-700">{{ session('success') }}</div>@endif
+        @if(session('error'))<div class="mb-4 rounded-lg border border-red-200 bg-red-100 px-4 py-3 text-red-700">{{ session('error') }}</div>@endif
+        @if($solicitud->estatus === SolicitudPagoDocente::ESTATUS_OBSERVADA)<div class="mb-5 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-orange-800"><p class="font-bold">Devuelta a Académica</p><p>{{ $solicitud->motivo_observacion }}</p></div>@endif
+        @if($solicitud->estatus === SolicitudPagoDocente::ESTATUS_RECHAZADA)<div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800"><p class="font-bold">CAdmin decidió no ejecutar el pago</p><p>{{ $solicitud->motivo_rechazo }}</p></div>@endif
 
-        @if($solicitud->estatus === SolicitudPagoDocente::ESTATUS_OBSERVADA && $solicitud->motivo_observacion)
-            <div class="bg-orange-50 border border-orange-200 text-orange-800 rounded-2xl p-4 mb-5">
-                <p class="font-bold">Solicitud observada por Administración/Finanzas</p>
-                <p class="mt-1 text-sm">{{ $solicitud->motivo_observacion }}</p>
-            </div>
-        @endif
+        <div class="mb-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+            <div class="rounded-xl border bg-slate-50 p-5"><p class="text-xs text-slate-500">Docente</p><p class="mt-1 text-lg font-semibold">{{ $solicitud->docente->nombre_completo }}</p></div>
+            <div class="rounded-xl border border-blue-200 bg-blue-50 p-5"><p class="text-xs text-blue-600">Fecha tentativa de pago</p><p class="mt-1 text-2xl font-bold text-blue-800">{{ $solicitud->fecha_tentativa_pago?->format('d/m/Y') ?? 'Por confirmar' }}</p><p class="mt-1 text-xs text-blue-700">Dato informativo para Académica; puede cambiar.</p></div>
+            @if($veFinanzas)<div class="rounded-xl border bg-slate-50 p-5"><p class="text-xs text-slate-500">Monto autorizado</p><p class="mt-1 text-2xl font-bold text-green-700">${{ number_format($solicitud->monto, 2) }}</p><p class="text-xs text-slate-500">{{ $solicitud->esquema_pago ?: 'Sin valorar' }}</p></div>@else<div class="rounded-xl border bg-slate-50 p-5"><p class="text-xs text-slate-500">Tipo de clase</p><p class="mt-1 text-xl font-bold">{{ $solicitud->tipo_clase }}</p></div>@endif
+        </div>
 
-        @if($solicitud->estatus === SolicitudPagoDocente::ESTATUS_CANCELADA && $solicitud->motivo_cancelacion)
-            <div class="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-4 mb-5">
-                <p class="font-bold">Solicitud cancelada</p>
-                <p class="mt-1 text-sm">{{ $solicitud->motivo_cancelacion }}</p>
-            </div>
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <section class="rounded-2xl border border-slate-200 p-5"><h2 class="mb-4 font-bold">Registro académico</h2><dl class="space-y-3 text-sm"><div><dt class="text-slate-500">Tipo de clase</dt><dd class="font-semibold">{{ $solicitud->tipo_clase }}</dd></div><div><dt class="text-slate-500">Actividad</dt><dd class="font-semibold">{{ $solicitud->materia_actividad }}</dd></div><div><dt class="text-slate-500">Programa / grupo</dt><dd class="font-semibold">{{ $solicitud->programa_grupo ?: '—' }}</dd></div><div><dt class="text-slate-500">Modalidad</dt><dd class="font-semibold">{{ $solicitud->modalidad ?: '—' }}</dd></div><div><dt class="text-slate-500">Horas reportadas</dt><dd class="font-semibold">{{ $solicitud->horas_totales ?: '—' }}</dd></div></dl></section>
+            <section class="rounded-2xl border border-slate-200 p-5"><h2 class="mb-4 font-bold">Fechas impartidas ({{ count($solicitud->fechas_clase_ordenadas) }})</h2><div class="flex flex-wrap gap-2">@forelse($solicitud->fechas_clase_ordenadas as $fecha)<span class="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold">{{ \Carbon\Carbon::parse($fecha)->format('d/m/Y') }}</span>@empty<span class="text-sm text-slate-500">Sin fechas registradas.</span>@endforelse</div></section>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5"><h2 class="mb-3 font-bold">Observaciones de Académica</h2><p class="whitespace-pre-line text-sm">{{ $solicitud->observaciones_academica ?: '—' }}</p></section>
+            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5"><h2 class="mb-3 font-bold">Respuesta de CAdmin</h2><p class="whitespace-pre-line text-sm">{{ $solicitud->observaciones_administracion ?: '—' }}</p></section>
+        </div>
+
+        @if($veFinanzas)
+        <section class="mt-6 rounded-2xl border border-slate-200 p-5"><h2 class="mb-4 font-bold">Información administrativa y de pago</h2><div class="grid grid-cols-1 gap-4 text-sm md:grid-cols-3"><p><span class="text-slate-500">Esquema</span><br><strong>{{ $solicitud->esquema_pago ?: '—' }}</strong></p><p><span class="text-slate-500">Tarifa unitaria</span><br><strong>{{ $solicitud->tarifa_unitaria ? '$'.number_format($solicitud->tarifa_unitaria,2) : '—' }}</strong></p><p><span class="text-slate-500">Valorado por</span><br><strong>{{ $solicitud->valoradoPor->nombre ?? '—' }}</strong></p><p><span class="text-slate-500">Fecha valoración</span><br><strong>{{ $solicitud->fecha_valoracion?->format('d/m/Y H:i') ?? '—' }}</strong></p><p><span class="text-slate-500">Fecha de pago</span><br><strong>{{ $solicitud->fecha_pago?->format('d/m/Y') ?? '—' }}</strong></p><p><span class="text-slate-500">Procesado por</span><br><strong>{{ $solicitud->procesadoPor->nombre ?? '—' }}</strong></p></div></section>
         @endif
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-            <div class="p-5 bg-slate-50 border border-slate-200 rounded-xl">
-                <p class="text-slate-500 text-xs">Docente</p>
-                <p class="text-lg font-semibold text-slate-800 mt-1">{{ $solicitud->docente->nombre_completo ?? 'No disponible' }}</p>
-            </div>
-            <div class="p-5 bg-slate-50 border border-slate-200 rounded-xl">
-                <p class="text-slate-500 text-xs">Monto solicitado</p>
-                <p class="text-2xl font-bold text-green-700 mt-1">${{ number_format($solicitud->monto, 2) }}</p>
-            </div>
-            <div class="p-5 bg-slate-50 border border-slate-200 rounded-xl">
-                <p class="text-slate-500 text-xs">Prioridad</p>
-                <p class="text-lg font-semibold text-slate-800 mt-1">{{ $solicitud->prioridad ?? 'Normal' }}</p>
-            </div>
+        <div class="mt-6 flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50 p-5">
+            @if(in_array($rolActual,[Rol::ADMIN,Rol::ACADEMICA],true) && $solicitud->puedeEditarAcademica())<a href="{{ route('solicitudes_pago.edit',$solicitud) }}" class="rounded-lg bg-amber-500 px-4 py-2 text-white">Editar registro académico</a>@endif
+            @if(in_array($rolActual,[Rol::ADMIN,Rol::CADMIN],true) && in_array($solicitud->estatus,[SolicitudPagoDocente::ESTATUS_PENDIENTE,SolicitudPagoDocente::ESTATUS_AUTORIZADA],true))<a href="{{ route('solicitudes_pago.valorar.form',$solicitud) }}" class="rounded-lg bg-blue-600 px-4 py-2 text-white">{{ $solicitud->estatus === SolicitudPagoDocente::ESTATUS_AUTORIZADA ? 'Corregir valoración' : 'Valorar y programar' }}</a>@endif
+            @if(in_array($rolActual,[Rol::ADMIN,Rol::CADMIN],true) && in_array($solicitud->estatus,[SolicitudPagoDocente::ESTATUS_PENDIENTE,SolicitudPagoDocente::ESTATUS_AUTORIZADA],true))<a href="{{ route('solicitudes_pago.observar.form',$solicitud) }}" class="rounded-lg bg-orange-500 px-4 py-2 text-white">Devolver con observaciones</a><a href="{{ route('solicitudes_pago.rechazar.form',$solicitud) }}" class="rounded-lg bg-red-600 px-4 py-2 text-white">No aprobar</a>@endif
+            @if(in_array($rolActual,[Rol::ADMIN,Rol::CADMIN],true) && $solicitud->estatus===SolicitudPagoDocente::ESTATUS_AUTORIZADA)<a href="{{ route('solicitudes_pago.form_pagar',$solicitud) }}" class="rounded-lg bg-green-600 px-4 py-2 text-white">Registrar pago</a>@endif
+            @if(in_array($rolActual,[Rol::ADMIN,Rol::CADMIN],true) && $solicitud->estatus===SolicitudPagoDocente::ESTATUS_PAGADA)<a href="{{ route('solicitudes_pago.acuse_pago',$solicitud) }}" target="_blank" class="rounded-lg bg-indigo-600 px-4 py-2 text-white">Formato PDF</a>@endif
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <section class="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 class="font-bold text-slate-800 mb-4">Servicio académico</h2>
-                <dl class="space-y-3 text-sm">
-                    <div><dt class="text-slate-500">Origen</dt><dd class="font-semibold text-slate-800">{{ $solicitud->origen ?? 'Manual' }}</dd></div>
-                    <div><dt class="text-slate-500">Concepto</dt><dd class="font-semibold text-slate-800">{{ $solicitud->concepto_pago ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Nivel</dt><dd class="font-semibold text-slate-800">{{ $solicitud->nivel ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Programa / grupo</dt><dd class="font-semibold text-slate-800">{{ $solicitud->programa_grupo ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Materia / actividad</dt><dd class="font-semibold text-slate-800">{{ $solicitud->materia_actividad ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Periodo</dt><dd class="font-semibold text-slate-800">{{ $solicitud->periodo ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Modalidad</dt><dd class="font-semibold text-slate-800">{{ $solicitud->modalidad ?? '—' }}</dd></div>
-                </dl>
-            </section>
-
-            <section class="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 class="font-bold text-slate-800 mb-4">Cálculo y fechas</h2>
-                <dl class="space-y-3 text-sm">
-                    <div><dt class="text-slate-500">Sesiones</dt><dd class="font-semibold text-slate-800">{{ $solicitud->numero_sesiones ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Horas totales</dt><dd class="font-semibold text-slate-800">{{ $solicitud->horas_totales ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Tarifa por hora</dt><dd class="font-semibold text-slate-800">{{ $solicitud->tarifa_hora ? '$'.number_format($solicitud->tarifa_hora, 2) : '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Fecha solicitud</dt><dd class="font-semibold text-slate-800">{{ $solicitud->fecha_solicitud?->format('d/m/Y') ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Periodo del servicio</dt><dd class="font-semibold text-slate-800">{{ $solicitud->fecha_inicio_periodo?->format('d/m/Y') ?? '—' }} — {{ $solicitud->fecha_fin_periodo?->format('d/m/Y') ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Fecha límite sugerida</dt><dd class="font-semibold text-slate-800">{{ $solicitud->fecha_limite_pago?->format('d/m/Y') ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Fecha pago</dt><dd class="font-semibold text-slate-800">{{ $solicitud->fecha_pago?->format('d/m/Y') ?? '—' }}</dd></div>
-                </dl>
-            </section>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <h2 class="font-bold text-slate-800 mb-4">Trazabilidad</h2>
-                <dl class="space-y-3 text-sm">
-                    <div><dt class="text-slate-500">Creado por</dt><dd class="font-semibold text-slate-800">{{ $solicitud->creadoPor->nombre ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Autorizado por</dt><dd class="font-semibold text-slate-800">{{ $solicitud->autorizadoPor->nombre ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Fecha autorización</dt><dd class="font-semibold text-slate-800">{{ $solicitud->fecha_autorizacion?->format('d/m/Y H:i') ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Pagado/procesado por</dt><dd class="font-semibold text-slate-800">{{ $solicitud->procesadoPor->nombre ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Cancelado por</dt><dd class="font-semibold text-slate-800">{{ $solicitud->canceladoPor->nombre ?? '—' }}</dd></div>
-                </dl>
-            </section>
-
-            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <h2 class="font-bold text-slate-800 mb-4">Datos de pago</h2>
-                <dl class="space-y-3 text-sm">
-                    <div><dt class="text-slate-500">Método</dt><dd class="font-semibold text-slate-800">{{ $solicitud->metodo_pago ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Referencia</dt><dd class="font-semibold text-slate-800">{{ $solicitud->referencia_pago ?? '—' }}</dd></div>
-                    <div><dt class="text-slate-500">Banco</dt><dd class="font-semibold text-slate-800">{{ $solicitud->banco_pago ?? '—' }}</dd></div>
-                    <div>
-                        <dt class="text-slate-500">Comprobante</dt>
-                        <dd class="font-semibold text-slate-800">
-                            @if($solicitud->comprobante_pago_path)
-                                <a href="{{ route('solicitudes_pago.comprobante', $solicitud) }}" class="text-blue-600 hover:underline">Descargar comprobante</a>
-                            @else
-                                —
-                            @endif
-                        </dd>
-                    </div>
-                </dl>
-            </section>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <section class="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 class="font-bold text-slate-800 mb-2">Observaciones de Académica</h2>
-                <p class="text-sm text-slate-700 whitespace-pre-line">{{ $solicitud->observaciones_academica ?: $solicitud->observaciones ?: '—' }}</p>
-            </section>
-            <section class="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 class="font-bold text-slate-800 mb-2">Observaciones de Administración/Finanzas</h2>
-                <p class="text-sm text-slate-700 whitespace-pre-line">{{ $solicitud->observaciones_administracion ?: '—' }}</p>
-            </section>
-        </div>
-
-        <div class="bg-slate-50 border border-slate-200 rounded-xl shadow-inner p-5 flex flex-wrap gap-3 mt-6">
-            @if(in_array($rolActual, [Rol::ADMIN, Rol::ACADEMICA], true) && $solicitud->puedeEditarAcademica())
-                <a href="{{ route('solicitudes_pago.edit', $solicitud) }}" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg shadow">Editar</a>
-            @endif
-
-            @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && $solicitud->estatus === SolicitudPagoDocente::ESTATUS_PENDIENTE)
-                <form method="POST" action="{{ route('solicitudes_pago.aprobar', $solicitud) }}">
-                    @csrf
-                    @method('PUT')
-                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">Autorizar para pago</button>
-                </form>
-            @endif
-
-            @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && in_array($solicitud->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true))
-                <a href="{{ route('solicitudes_pago.observar.form', $solicitud) }}" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg shadow">Observar / devolver</a>
-            @endif
-
-            @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && $solicitud->estatus === SolicitudPagoDocente::ESTATUS_AUTORIZADA)
-                <a href="{{ route('solicitudes_pago.form_pagar', $solicitud) }}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">Registrar pago</a>
-            @endif
-
-            @if(in_array($rolActual, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && !in_array($solicitud->estatus, [SolicitudPagoDocente::ESTATUS_PAGADA, SolicitudPagoDocente::ESTATUS_CANCELADA], true))
-                <a href="{{ route('solicitudes_pago.cancelar.form', $solicitud) }}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">Cancelar</a>
-            @endif
-
-            @if($rolActual === Rol::ADMIN && $solicitud->estatus !== SolicitudPagoDocente::ESTATUS_PAGADA)
-                <form method="POST" action="{{ route('solicitudes_pago.destroy', $solicitud) }}" onsubmit="return confirm('¿Seguro de eliminar esta solicitud? Es preferible cancelar para conservar trazabilidad.');">
-                    @csrf
-                    @method('DELETE')
-                    <button class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg shadow">Eliminar</button>
-                </form>
-            @endif
-        </div>
+        @if(in_array($rolActual,[Rol::ADMIN,Rol::CADMIN],true) && $solicitud->estatus===SolicitudPagoDocente::ESTATUS_AUTORIZADA)
+            <form method="POST" action="{{ route('solicitudes_pago.tentativa',$solicitud) }}" class="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                @csrf @method('PUT')
+                <h2 class="font-bold text-blue-900">Actualizar fecha tentativa</h2><p class="mb-3 text-xs text-blue-700">Académica recibirá una notificación automática y podrá informar al docente.</p>
+                <div class="flex flex-col gap-3 md:flex-row"><input type="date" name="fecha_tentativa_pago" required min="{{ now()->format('Y-m-d') }}" value="{{ $solicitud->fecha_tentativa_pago?->format('Y-m-d') }}" class="rounded-xl border-blue-300 px-4 py-2"><input type="text" name="observaciones_administracion" maxlength="1500" value="{{ $solicitud->observaciones_administracion }}" placeholder="Motivo o comentario opcional" class="flex-1 rounded-xl border-blue-300 px-4 py-2"><button class="rounded-xl bg-blue-700 px-5 py-2 font-semibold text-white">Actualizar y notificar</button></div>
+            </form>
+        @endif
     </div>
 </div>
 @endsection

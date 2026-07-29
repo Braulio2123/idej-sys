@@ -16,8 +16,10 @@ return new class extends Migration
                 ->constrained('alumnos')
                 ->nullOnDelete();
 
-            // Campo reservado para el futuro módulo de prospectos.
-            $table->unsignedBigInteger('prospecto_id')->nullable()->index();
+            $table->foreignId('prospecto_id')
+                ->nullable()
+                ->constrained('prospectos')
+                ->nullOnDelete();
 
             $table->foreignId('usuario_id')
                 ->nullable()
@@ -34,10 +36,14 @@ return new class extends Migration
             $table->dateTime('fecha_contacto')->nullable();
             $table->dateTime('fecha_proximo_contacto')->nullable();
             $table->dateTime('fecha_cierre')->nullable();
+            $table->foreignId('cancelado_por_id')->nullable()->constrained('usuarios')->nullOnDelete();
+            $table->timestamp('fecha_cancelacion')->nullable();
+            $table->text('motivo_cancelacion')->nullable();
 
             $table->timestamps();
 
             $table->index(['alumno_id', 'estatus']);
+            $table->index(['prospecto_id', 'estatus']);
             $table->index(['fecha_proximo_contacto', 'estatus']);
             $table->index(['tipo', 'prioridad']);
         });

@@ -14,13 +14,19 @@ class Cargo extends Model
     protected $table = 'cargos';
 
     protected $fillable = [
+        'operacion_uuid',
+        'cargo_masivo_id',
         'alumno_id',
         'concepto_id',
+        'cargo_recurrente_plan_id',
+        'periodo_recurrente',
+        'generado_automaticamente',
         'beca_id',
         'descripcion_cargo',
         'monto_original',
         'beca_porcentaje_aplicado',
         'beca_monto_aplicado',
+        'saldo_favor_aplicado',
         'monto_adeudo',
         'fecha_vencimiento',
         'estatus',
@@ -31,11 +37,18 @@ class Cargo extends Model
         'monto_original' => 'decimal:2',
         'beca_porcentaje_aplicado' => 'integer',
         'beca_monto_aplicado' => 'decimal:2',
+        'saldo_favor_aplicado' => 'decimal:2',
         'monto_adeudo' => 'decimal:2',
         'fecha_vencimiento' => 'date',
         'estatus' => 'string',
         'moratorio_aplicado' => 'boolean',
+        'generado_automaticamente' => 'boolean',
     ];
+
+    public function operacionMasiva()
+    {
+        return $this->belongsTo(CargoMasivo::class, 'cargo_masivo_id');
+    }
 
     public function alumno()
     {
@@ -45,6 +58,12 @@ class Cargo extends Model
     public function concepto()
     {
         return $this->belongsTo(ConceptoPago::class, 'concepto_id');
+    }
+
+
+    public function planRecurrente()
+    {
+        return $this->belongsTo(PlanCargoRecurrente::class, 'cargo_recurrente_plan_id');
     }
 
     public function beca()

@@ -8,6 +8,7 @@ use App\Models\HorarioAcademico;
 use App\Models\Materia;
 use App\Traits\RegistraBitacora;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class HorarioAcademicoController extends Controller
@@ -43,7 +44,7 @@ class HorarioAcademicoController extends Controller
 
         return view('horarios_academicos.index', [
             'horarios' => $horarios,
-            'grupos' => Grupo::with('programa')->orderBy('nombre')->get(),
+            'grupos' => Grupo::activos()->with('programa')->orderBy('nombre')->get(),
             'docentes' => Docente::orderBy('nombre_completo')->get(),
             'dias' => HorarioAcademico::DIAS,
         ]);
@@ -84,6 +85,11 @@ class HorarioAcademicoController extends Controller
     {
         $horarioAcademico->load(['grupo', 'materia', 'docente']);
 
+        if (! $horarioAcademico->grupo?->activo) {
+            return redirect()->route('horarios_academicos.show', $horarioAcademico)
+                ->with('error', 'El grupo está archivado. El horario se conserva únicamente como historial y no puede modificarse.');
+        }
+
         return view('horarios_academicos.edit', array_merge(
             $this->catalogos(),
             ['horario' => $horarioAcademico]
@@ -92,6 +98,13 @@ class HorarioAcademicoController extends Controller
 
     public function update(Request $request, HorarioAcademico $horarioAcademico)
     {
+        $horarioAcademico->loadMissing('grupo');
+
+        if (! $horarioAcademico->grupo?->activo) {
+            return redirect()->route('horarios_academicos.show', $horarioAcademico)
+                ->with('error', 'El grupo está archivado. El horario se conserva únicamente como historial y no puede modificarse.');
+        }
+
         $validated = $this->validar($request);
         $this->validarConflictos($validated, $horarioAcademico->id);
 
@@ -111,20 +124,15 @@ class HorarioAcademicoController extends Controller
 
     public function destroy(HorarioAcademico $horarioAcademico)
     {
-        $descripcion = "Se eliminó el horario {$horarioAcademico->dia_semana} {$horarioAcademico->horario}.";
-        $horarioAcademico->delete();
-
-        $this->bitacora('Eliminar Horario Académico', $descripcion, 'Área Académica');
-
         return redirect()
-            ->route('horarios_academicos.index')
-            ->with('success', 'Horario eliminado correctamente.');
+            ->route('horarios_academicos.show', $horarioAcademico)
+            ->with('error', 'Los horarios académicos no se eliminan porque forman parte del historial. Cámbialos a Suspendido o Finalizado.');
     }
 
     private function catalogos(): array
     {
         return [
-            'grupos' => Grupo::with(['programa', 'cicloEscolar'])->orderBy('nombre')->get(),
+            'grupos' => Grupo::activos()->with(['programa', 'cicloEscolar'])->orderBy('nombre')->get(),
             'materias' => Materia::activas()->with('programa')->orderBy('nombre')->get(),
             'docentes' => Docente::where('estatus', 'Activo')->orderBy('nombre_completo')->get(),
             'dias' => HorarioAcademico::DIAS,
@@ -136,7 +144,7 @@ class HorarioAcademicoController extends Controller
     private function validar(Request $request): array
     {
         return $request->validate([
-            'grupo_id' => 'required|exists:grupos,id',
+            'grupo_id' => ['required', Rule::exists('grupos', 'id')->where('activo', true)],
             'materia_id' => 'required|exists:materias,id',
             'docente_id' => 'required|exists:docentes,id',
             'dia_semana' => 'required|in:Lunes,Martes,Miércoles,Jueves,Viernes,Sábado,Domingo',

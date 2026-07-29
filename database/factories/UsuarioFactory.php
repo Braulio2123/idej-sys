@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Rol;
+use App\Models\Usuario;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -12,19 +13,47 @@ use Illuminate\Support\Str;
  */
 class UsuarioFactory extends Factory
 {
+    protected $model = Usuario::class;
+
+    /**
+     * The current password being used by the factory.
+     */
     protected static ?string $password;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
+        $rolId = Rol::query()->firstOrCreate(
+            ['clave' => Rol::ADMIN],
+            [
+                'nombre' => 'Administrador',
+                'descripcion' => 'Administración general del sistema interno.',
+            ]
+        )->id;
+
         return [
             'nombre' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'password' => static::$password ??= Hash::make('password'),
+            'rol_id' => $rolId,
+            'activo' => true,
+            'password_changed_at' => now(),
+            'auth_version' => 1,
             'remember_token' => Str::random(10),
-            'rol_id' => Rol::query()->firstOrCreate(
-                ['nombre' => 'Administrador IDEJ'],
-                ['clave' => Rol::ADMIN, 'descripcion' => 'Acceso total al sistema.']
-            )->id,
         ];
+    }
+
+    /**
+     * Indica que el usuario interno está desactivado.
+     */
+    public function inactivo(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'activo' => false,
+        ]);
     }
 }

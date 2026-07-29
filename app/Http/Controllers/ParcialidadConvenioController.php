@@ -22,11 +22,15 @@ class ParcialidadConvenioController extends Controller
             ->get();
 
         $alumno = $convenio->alumno; // relación definida en Convenio
+        $tienePagosAplicados = $convenio->parcialidades()
+            ->whereHas('pagos')
+            ->exists();
 
         return view('convenios.parcialidades.index', [
             'convenio'      => $convenio,
             'alumno'        => $alumno,
             'parcialidades' => $parcialidades,
+            'tienePagosAplicados' => $tienePagosAplicados,
         ]);
     }
 
@@ -35,6 +39,9 @@ class ParcialidadConvenioController extends Controller
      */
     public function create(Convenio $convenio)
     {
+        if ($respuesta = $this->bloqueoEstructural($convenio)) {
+            return $respuesta;
+        }
         $parcialidad = new ParcialidadConvenio();
         $alumno      = $convenio->alumno;
 
@@ -50,6 +57,9 @@ class ParcialidadConvenioController extends Controller
      */
     public function store(Request $request, Convenio $convenio)
     {
+        if ($respuesta = $this->bloqueoEstructural($convenio)) {
+            return $respuesta;
+        }
         $validated = $request->validate([
             'monto_parcialidad' => 'required|numeric|min:0.01',
             'fecha_vencimiento' => 'required|date',
@@ -98,6 +108,9 @@ class ParcialidadConvenioController extends Controller
      */
     public function edit(Convenio $convenio, ParcialidadConvenio $parcialidad)
     {
+        if ($respuesta = $this->bloqueoEstructural($convenio)) {
+            return $respuesta;
+        }
         $this->verificarRelacion($convenio, $parcialidad);
 
         if ($parcialidad->estatus === 'Pagado') {
@@ -123,6 +136,9 @@ class ParcialidadConvenioController extends Controller
         Convenio $convenio,
         ParcialidadConvenio $parcialidad
     ) {
+        if ($respuesta = $this->bloqueoEstructural($convenio)) {
+            return $respuesta;
+        }
         $this->verificarRelacion($convenio, $parcialidad);
 
         if ($parcialidad->estatus === 'Pagado') {
@@ -188,47 +204,29 @@ class ParcialidadConvenioController extends Controller
     }
 
     /**
-     * Eliminar una parcialidad (solo si no tiene pagos ligados).
+     * Las parcialidades generadas forman parte del convenio y no se eliminan físicamente.
      */
     public function destroy(Convenio $convenio, ParcialidadConvenio $parcialidad)
     {
         $this->verificarRelacion($convenio, $parcialidad);
 
-        // Verificar si tiene registros en pago_parcialidad
-        $tienePagos = DB::table('pago_parcialidad')
-            ->where('parcialidad_id', $parcialidad->id)
-            ->exists();
+        return redirect()->route('parcialidades.index', $convenio)
+            ->with('error', 'Las parcialidades no se eliminan porque forman parte del historial contractual. Si el calendario de pagos es incorrecto y aún no tiene pagos, cancela el convenio completo y genera uno nuevo.');
+    }
 
-        if ($tienePagos) {
-            return redirect()
-                ->route('parcialidades.index', $convenio)
-                ->with('error', 'No puedes eliminar una parcialidad que ya tiene pagos registrados.');
+    private function bloqueoEstructural(Convenio $convenio)
+    {
+        if ($convenio->estatus !== 'Activo') {
+            return redirect()->route('parcialidades.index', $convenio)
+                ->with('error', 'El convenio no está activo. Sus parcialidades se conservan únicamente como historial.');
         }
 
-        if ($parcialidad->estatus === 'Pagado') {
-            return redirect()
-                ->route('parcialidades.index', $convenio)
-                ->with('error', 'No puedes eliminar una parcialidad pagada.');
+        if ($convenio->parcialidades()->whereHas('pagos')->exists()) {
+            return redirect()->route('parcialidades.index', $convenio)
+                ->with('error', 'El convenio ya tiene pagos aplicados. No se puede modificar su calendario de parcialidades.');
         }
 
-        DB::transaction(function () use ($convenio, $parcialidad) {
-
-            $idParcialidad = $parcialidad->id;
-            $alumno        = $convenio->alumno;
-
-            $parcialidad->delete();
-
-            // 🧾 Bitácora
-            $this->bitacora(
-                'Eliminar Parcialidad de Convenio',
-                "Se eliminó la parcialidad ID {$idParcialidad} del convenio ID {$convenio->id} " .
-                "del alumno {$alumno->nombre_completo}."
-            );
-        });
-
-        return redirect()
-            ->route('parcialidades.index', $convenio)
-            ->with('success', 'Parcialidad eliminada correctamente.');
+        return null;
     }
 
     /**

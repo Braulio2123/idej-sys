@@ -12,7 +12,7 @@ class CicloEscolarSeeder extends Seeder
         CicloEscolar::insert([
             [
                 'nombre' => '2025-A',
-                'tipo_periodo' => 'Cuatrimestral',
+                'tipo_periodo' => 'Semestral',
                 'fecha_inicio' => '2025-01-15',
                 'fecha_fin' => '2025-04-30',
                 'fecha_inicio_inscripcion' => '2025-01-01',
@@ -25,7 +25,7 @@ class CicloEscolarSeeder extends Seeder
             ],
             [
                 'nombre' => '2025-B',
-                'tipo_periodo' => 'Cuatrimestral',
+                'tipo_periodo' => 'Semestral',
                 'fecha_inicio' => '2025-05-15',
                 'fecha_fin' => '2025-08-30',
                 'fecha_inicio_inscripcion' => '2025-05-01',

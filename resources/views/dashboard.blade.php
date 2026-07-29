@@ -7,6 +7,70 @@
         Dashboard — {{ $rol }}
     </h1>
 
+    <section class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.25em] text-blue-700">Inicio operativo</p>
+                <h2 class="mt-1 text-2xl font-bold text-slate-800">{{ $panelRol['titulo'] }}</h2>
+                <p class="mt-1 max-w-3xl text-sm text-slate-600">{{ $panelRol['descripcion'] }}</p>
+            </div>
+            <a href="{{ route('notificaciones.index') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                <i class='bx bx-bell'></i>
+                Ver notificaciones
+            </a>
+        </div>
+
+        <div class="mt-5 rounded-2xl border border-blue-100 bg-white p-4">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h3 class="font-semibold text-slate-800">Atajos principales</h3>
+                    <p class="text-xs text-slate-500">Botones de trabajo rápido para evitar buscar módulos al entrar.</p>
+                </div>
+                <a href="#detalle-dashboard" class="text-xs font-semibold text-blue-700 hover:underline">Ver indicadores detallados</a>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+                @foreach($panelRol['acciones'] as $accion)
+                    <a href="{{ $accion['route'] }}" class="rounded-xl bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800" title="{{ $accion['hint'] }}">
+                        {{ $accion['label'] }}
+                    </a>
+                @endforeach
+            </div>
+        </div>
+
+        <div id="detalle-dashboard" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            @foreach($panelRol['cards'] as $card)
+                <a href="{{ $card['route'] ?? '#' }}" class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $card['label'] }}</p>
+                    <p class="mt-2 text-3xl font-bold text-slate-800">{{ $card['value'] }}</p>
+                    @if(!empty($card['hint']))
+                        <p class="mt-1 text-xs text-slate-500">{{ $card['hint'] }}</p>
+                    @endif
+                </a>
+            @endforeach
+        </div>
+
+        <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 class="font-semibold text-slate-800">Acciones rápidas</h3>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach($panelRol['acciones'] as $accion)
+                        <a href="{{ $accion['route'] }}" class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700" title="{{ $accion['hint'] }}">
+                            {{ $accion['label'] }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <h3 class="font-semibold text-amber-900">Lectura rápida</h3>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                    @foreach($panelRol['alertas'] as $alerta)
+                        <li>{{ $alerta }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    </section>
+
 
     {{-- ====================== --}}
     {{-- SEGUIMIENTOS OPERATIVOS --}}
@@ -152,7 +216,7 @@
     {{-- ====================== --}}
     {{-- BECAS INSTITUCIONALES --}}
     {{-- ====================== --}}
-    @can('puede-ver-finanzas')
+    @can('puede-ver-administracion-financiera')
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="p-6 bg-white shadow rounded-xl border border-slate-100">
             <h2 class="text-gray-600">Becas activas</h2>
@@ -238,38 +302,9 @@
     @endcan
 
     {{-- ====================== --}}
-    {{-- DESCARGAR APK --}}
-    {{-- ====================== --}}
-    <div class="bg-white p-6 rounded-xl shadow">
-        <h2 class="text-xl font-semibold mb-3">Descargar IDEJ Mobile</h2>
-
-        <a href="{{ asset('apks/IDEJMobile-v1.apk') }}"
-           download
-           class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg shadow hover:bg-indigo-700 transition">
-
-            <svg xmlns="http://www.w3.org/2000/svg" 
-                 fill="none" 
-                 viewBox="0 0 24 24" 
-                 stroke-width="1.5" 
-                 stroke="currentColor" 
-                 class="w-6 h-6 mr-2">
-                <path stroke-linecap="round" stroke-linejoin="round" 
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 12l4.5 4.5m0 0L16.5 12m-4.5 4.5V3" />
-            </svg>
-
-            Descargar APK
-        </a>
-
-        <p class="text-sm text-gray-500 mt-2">
-            Última actualización: {{ now()->format('d/m/Y') }}
-        </p>
-    </div>
-
-
-    {{-- ====================== --}}
     {{-- RESUMEN ADMINISTRATIVO / FINANCIERO --}}
     {{-- ====================== --}}
-    @can('puede-ver-finanzas')
+    @can('puede-ver-administracion-financiera')
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
 
         <div class="p-6 bg-white shadow rounded-xl">

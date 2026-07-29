@@ -3,6 +3,7 @@
 @section('title', 'Detalle de horario')
 
 @section('content')
+@php $puedeGestionarCatalogos = usuarioTienePermiso('catalogos_academicos.gestionar'); @endphp
 <div class="max-w-6xl mx-auto space-y-6">
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">{{ session('success') }}</div>
@@ -16,7 +17,9 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('horarios_academicos.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">Regresar</a>
-                <a href="{{ route('horarios_academicos.edit', $horario) }}" class="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                @if($puedeGestionarCatalogos)
+                    <a href="{{ route('horarios_academicos.edit', $horario) }}" class="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Editar</a>
+                @endif
             </div>
         </div>
 

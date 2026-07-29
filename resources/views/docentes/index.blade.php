@@ -1,6 +1,9 @@
 @extends('layouts.app')
 
+@section('title', 'Docentes')
+
 @section('content')
+@php $puedeGestionarDocentes = usuarioTienePermiso('docentes.gestionar'); @endphp
 
 <div class="max-w-7xl mx-auto mt-6">
 
@@ -19,12 +22,14 @@
                 </p>
             </div>
 
+        @if($puedeGestionarDocentes)
             <a href="{{ route('docentes.create') }}"
                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700
                       text-white px-5 py-2.5 rounded-xl font-medium shadow-md transition">
                 <i class='bx bx-user-plus text-xl'></i>
                 Registrar Docente
             </a>
+        @endif
         </div>
 
         {{-- Mensaje de éxito --}}
@@ -56,12 +61,11 @@
                         class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm
                                focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">-- Todos --</option>
-                    <option value="Pendiente de Datos" {{ request('estatus') == 'Pendiente de Datos' ? 'selected' : '' }}>
-                        Pendiente de Datos
-                    </option>
-                    <option value="Activo" {{ request('estatus') == 'Activo' ? 'selected' : '' }}>
-                        Activo
-                    </option>
+                    @foreach($estatuses as $estatus)
+                        <option value="{{ $estatus }}" @selected(request('estatus') === $estatus)>
+                            {{ $estatus }}
+                        </option>
+                    @endforeach
                 </select>
             </div>
 
@@ -115,9 +119,13 @@
 
                             {{-- Estatus --}}
                             <td class="py-3 px-4">
-                                @if($docente->estatus === 'Pendiente de Datos')
+                                @if($docente->estatus === \App\Models\Docente::ESTATUS_PENDIENTE)
                                     <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-xs font-semibold">
                                         Pendiente de Datos
+                                    </span>
+                                @elseif($docente->estatus === \App\Models\Docente::ESTATUS_INACTIVO)
+                                    <span class="bg-slate-200 text-slate-700 px-3 py-1 rounded-lg text-xs font-semibold">
+                                        Inactivo
                                     </span>
                                 @else
                                     <span class="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-semibold">
@@ -137,6 +145,7 @@
                                     </a>
 
                                     {{-- Editar --}}
+                                @if($puedeGestionarDocentes)
                                     <a href="{{ route('docentes.edit', $docente) }}"
                                        class="text-amber-600 hover:text-amber-800 font-medium transition">
                                         Editar
@@ -153,6 +162,10 @@
                                             Eliminar
                                         </button>
                                     </form>
+                                @endif
+                                @if(Auth::user()?->tieneRol(\App\Models\Rol::ADMIN, \App\Models\Rol::CADMIN))
+                                    <a href="{{ route('docentes.financieros.edit', $docente) }}" class="text-amber-700 hover:underline font-semibold">Datos financieros</a>
+                                @endif
 
                                 </div>
                             </td>

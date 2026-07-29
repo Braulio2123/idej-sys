@@ -13,7 +13,7 @@ class RolMiddleware
 
     /**
      * Permite acceso solo a roles especificados por clave.
-     * Ejemplo: rol:Admin,CAdmin,Recepcion,Academica,Finanzas
+     * Ejemplo: rol:Admin,CAdmin,Recepcion,Academica
      */
     public function handle(Request $request, Closure $next, ...$roles)
     {

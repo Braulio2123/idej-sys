@@ -6,7 +6,7 @@
     use Illuminate\Support\Str;
 
     $usuarioActual = Auth::user();
-    $puedeCancelarPagos = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS) ?? false;
+    $puedeCancelarPagos = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN) ?? false;
 @endphp
 <div class="container mx-auto px-4 py-6">
     <div class="bg-white shadow-md rounded-lg p-6 mb-6">

@@ -16,7 +16,7 @@ class RequisitoDocumentalSeeder extends Seeder
             ['tipo_documento' => 'Identificación oficial', 'descripcion' => 'INE, pasaporte o identificación oficial vigente.', 'orden' => 30],
             ['tipo_documento' => 'Comprobante de domicilio', 'descripcion' => 'No mayor a tres meses.', 'orden' => 40],
             ['tipo_documento' => 'Solicitud de inscripción', 'descripcion' => 'Formato institucional firmado por el alumno.', 'orden' => 50],
-            ['tipo_documento' => 'Contrato / reglamento firmado', 'descripcion' => 'Acuse o reglamento institucional firmado.', 'orden' => 60],
+            ['tipo_documento' => 'Carta compromiso / Reglamento', 'descripcion' => 'Acuse o reglamento institucional firmado.', 'orden' => 60],
         ];
 
         foreach ($generales as $requisito) {

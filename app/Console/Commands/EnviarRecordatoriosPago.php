@@ -2,52 +2,52 @@
 
 namespace App\Console\Commands;
 
-use App\Mail\RecordatorioPago;
-use App\Models\ConfiguracionInstitucional;
-use App\Models\Alumno;
+use App\Services\RecordatorioPagoEmailService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Mail;
 
 class EnviarRecordatoriosPago extends Command
 {
-    /**
-     * Nombre del comando: php artisan app:enviar-recordatorios
-     */
-    protected $signature = 'app:enviar-recordatorios';
+    protected $signature = 'app:enviar-recordatorios
+        {--canal=email : Canal de salida. En Fase 35 solo se permite email.}
+        {--limite=100 : Cantidad máxima de alumnos a procesar por ejecución}
+        {--dry-run : Simula el proceso sin enviar correos ni registrar envíos}
+        {--solo-vencidos : Solo alumnos con cargos vencidos}
+        {--programa= : Filtrar por programa académico}
+        {--grupo= : Filtrar por grupo académico}';
 
-    /**
-     * Descripción visible en "php artisan list"
-     */
-    protected $description = "Envía correos de recordatorio a alumnos con estatus 'Con Adeudo'";
+    protected $description = 'Envía recordatorios institucionales de pago exclusivamente por correo electrónico.';
 
-    public function handle(): int
+    public function handle(RecordatorioPagoEmailService $recordatorios): int
     {
-        $this->info('🔔 Iniciando envío de recordatorios de pago...');
+        $canal = strtolower((string) $this->option('canal'));
 
-        if (! ConfiguracionInstitucional::actual()->recordatorios_pago_activos) {
-            $this->warn('Los recordatorios de pago están desactivados en Configuración Institucional.');
+        if ($canal !== 'email') {
+            $this->error('En esta fase los recordatorios externos solo se envían por correo electrónico. SMS y WhatsApp quedaron fuera del alcance.');
+            return self::FAILURE;
+        }
+
+        $limite = max(1, (int) $this->option('limite'));
+        $dryRun = (bool) $this->option('dry-run');
+        $filtros = [
+            'solo_vencidos' => (bool) $this->option('solo-vencidos'),
+            'programa_id' => $this->option('programa') ?: null,
+            'grupo_id' => $this->option('grupo') ?: null,
+        ];
+
+        $resultado = $recordatorios->procesar($limite, $dryRun, $filtros);
+
+        if (! $resultado['activo']) {
+            $this->warn($resultado['mensaje']);
             return self::SUCCESS;
         }
 
-        $alumnos = Alumno::where('estatus_financiero', 'Con Adeudo')
-            ->whereNotNull('correo')
-            ->where('correo', '!=', '')
-            ->get();
-
-        if ($alumnos->isEmpty()) {
-            $this->warn('No hay alumnos con adeudo para notificar.');
+        if ($dryRun) {
+            $this->info("Simulación finalizada. Correos que se enviarían: {$resultado['simulados']}. Omitidos: {$resultado['omitidos']}. Errores: {$resultado['errores']}.");
             return self::SUCCESS;
         }
 
-        $enviados = 0;
+        $this->info("Proceso finalizado. Correos enviados: {$resultado['enviados']}. Omitidos: {$resultado['omitidos']}. Errores: {$resultado['errores']}.");
 
-        foreach ($alumnos as $alumno) {
-            Mail::to($alumno->correo)->send(new RecordatorioPago($alumno));
-            $this->line("📨 Enviado a: {$alumno->nombre_completo} <{$alumno->correo}>");
-            $enviados++;
-        }
-
-        $this->info("✅ Proceso finalizado. Correos enviados: {$enviados}");
-        return self::SUCCESS;
+        return $resultado['errores'] > 0 ? self::FAILURE : self::SUCCESS;
     }
 }

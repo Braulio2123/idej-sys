@@ -18,6 +18,10 @@ class Pago extends Model
         'corte_caja_id',
         'metodo_pago',
         'monto_total_pagado',
+        'monto_recibido_efectivo',
+        'cambio_entregado',
+        'tratamiento_excedente',
+        'es_pago_anticipado',
         'saldo_a_favor_generado',
         'estatus',
         'fecha_pago',
@@ -29,6 +33,10 @@ class Pago extends Model
         'operacion_uuid',
         'referencia_bancaria',
         'archivo_comprobante',
+        'archivo_comprobante_original',
+        'archivo_comprobante_mime',
+        'archivo_comprobante_tamano',
+        'archivo_comprobante_sha256',
         'banco_emisor',
         'cuenta_origen',
         'numero_autorizacion',
@@ -42,12 +50,16 @@ class Pago extends Model
 
     protected $casts = [
         'monto_total_pagado' => 'decimal:2',
+        'monto_recibido_efectivo' => 'decimal:2',
+        'cambio_entregado' => 'decimal:2',
+        'es_pago_anticipado' => 'boolean',
         'saldo_a_favor_generado' => 'decimal:2',
         'fecha_pago' => 'date',
         'fecha_cancelacion' => 'datetime',
         'fecha_transferencia' => 'datetime',
         'recibo_emitido_at' => 'datetime',
         'recibo_version' => 'integer',
+        'archivo_comprobante_tamano' => 'integer',
     ];
 
     public function alumno()

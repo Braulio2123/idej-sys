@@ -27,6 +27,7 @@ class ProfileTest extends TestCase
 
         $response = $this
             ->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
             ->patch('/profile', [
                 'nombre' => 'Usuario Actualizado',
                 'email' => 'actualizado@example.com',
@@ -52,7 +53,7 @@ class ProfileTest extends TestCase
                 'password' => 'password',
             ]);
 
-        $response->assertNotFound();
+        $response->assertStatus(405);
         $this->assertNotNull($user->fresh());
     }
 }

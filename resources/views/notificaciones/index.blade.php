@@ -12,14 +12,34 @@
             </p>
         </div>
 
-        <form action="{{ route('notificaciones.leer-todas') }}" method="POST">
-            @csrf
-            @method('PATCH')
-            <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                <i class='bx bx-check-double text-lg'></i>
-                Marcar todas como leídas
-            </button>
-        </form>
+        <div class="flex flex-wrap items-center gap-2">
+            <form action="{{ route('notificaciones.probar') }}" method="POST" data-keep-text="true">
+                @csrf
+                <button type="submit" class="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                    <i class='bx bx-bell-plus text-lg'></i>
+                    Probar notificación
+                </button>
+            </form>
+
+            @if(auth()->user()?->tieneRol(\App\Models\Rol::ADMIN, \App\Models\Rol::SISTEMAS))
+                <form action="{{ route('notificaciones.sincronizar-operativas') }}" method="POST" data-confirm="¿Sincronizar alertas operativas ahora?">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100">
+                        <i class='bx bx-refresh text-lg'></i>
+                        Sincronizar alertas
+                    </button>
+                </form>
+            @endif
+
+            <form action="{{ route('notificaciones.leer-todas') }}" method="POST">
+                @csrf
+                @method('PATCH')
+                <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                    <i class='bx bx-check-double text-lg'></i>
+                    Marcar todas como leídas
+                </button>
+            </form>
+        </div>
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
@@ -100,7 +120,7 @@
 
                     <div class="flex flex-wrap gap-2 lg:justify-end">
                         @if($notificacion->url)
-                            <a href="{{ $notificacion->url }}" class="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
+                            <a href="{{ $notificacion->urlSegura() }}" class="inline-flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
                                 Abrir
                                 <i class='bx bx-link-external'></i>
                             </a>

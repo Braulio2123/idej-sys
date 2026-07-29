@@ -9,6 +9,7 @@ use App\Models\Grupo;
 use App\Traits\RegistraBitacora;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class CalendarioAcademicoController extends Controller
 {
@@ -34,8 +35,8 @@ class CalendarioAcademicoController extends Controller
 
         return view('calendarios_academicos.index', [
             'calendarios' => $calendarios,
-            'grupos' => Grupo::with('programa')->orderBy('nombre')->get(),
-            'estatuses' => $this->estatuses(),
+            'grupos' => Grupo::activos()->with('programa')->orderBy('nombre')->get(),
+            'estatuses' => CalendarioAcademico::estatuses(),
         ]);
     }
 
@@ -51,6 +52,7 @@ class CalendarioAcademicoController extends Controller
         $validated = $this->validar($request);
         $validated['creado_por_id'] = Auth::id();
 
+        $validated['estatus'] = $this->estatusAutomatico($validated);
         $calendario = CalendarioAcademico::create($validated);
 
         $this->bitacora('Crear calendario académico', "Se creó el calendario {$calendario->nombre}.", 'Área Académica', $calendario);
@@ -67,6 +69,7 @@ class CalendarioAcademicoController extends Controller
             'materiasCalendario.materia',
             'materiasCalendario.docente',
             'materiasCalendario.sesiones',
+            'canceladoPor',
         ]);
 
         $sesiones = CalendarioSesion::with(['calendarioMateria.materia', 'calendarioMateria.docente'])
@@ -93,6 +96,18 @@ class CalendarioAcademicoController extends Controller
 
     public function edit(CalendarioAcademico $calendarioAcademico)
     {
+        $calendarioAcademico->loadMissing('grupo');
+
+        if (! $calendarioAcademico->grupo?->activo) {
+            return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+                ->with('error', 'El grupo está archivado. El calendario se conserva únicamente como historial y no puede editarse.');
+        }
+
+        if (in_array($calendarioAcademico->estatus, [CalendarioAcademico::ESTATUS_CANCELADO, CalendarioAcademico::ESTATUS_FINALIZADO], true)) {
+            return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+                ->with('error', 'Un calendario cancelado o finalizado se conserva como historial y ya no puede editarse.');
+        }
+
         return view('calendarios_academicos.edit', array_merge($this->catalogos(), [
             'calendario' => $calendarioAcademico,
         ]));
@@ -100,12 +115,21 @@ class CalendarioAcademicoController extends Controller
 
     public function update(Request $request, CalendarioAcademico $calendarioAcademico)
     {
+        $calendarioAcademico->loadMissing('grupo');
+
+        if (! $calendarioAcademico->grupo?->activo) {
+            return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+                ->with('error', 'El grupo está archivado. El calendario se conserva únicamente como historial y no puede editarse.');
+        }
+
+        if (in_array($calendarioAcademico->estatus, [CalendarioAcademico::ESTATUS_CANCELADO, CalendarioAcademico::ESTATUS_FINALIZADO], true)) {
+            return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+                ->with('error', 'Un calendario cancelado o finalizado se conserva como historial y ya no puede editarse.');
+        }
+
         $validated = $this->validar($request);
 
-        if ($validated['estatus'] === CalendarioAcademico::ESTATUS_APROBADO && !$calendarioAcademico->fecha_aprobacion) {
-            $validated['aprobado_por_id'] = Auth::id();
-            $validated['fecha_aprobacion'] = now();
-        }
+        $validated['estatus'] = $this->estatusAutomatico($validated);
 
         $calendarioAcademico->update($validated);
 
@@ -114,52 +138,116 @@ class CalendarioAcademicoController extends Controller
         return redirect()->route('calendarios_academicos.show', $calendarioAcademico)->with('success', 'Calendario académico actualizado correctamente.');
     }
 
-    public function destroy(CalendarioAcademico $calendarioAcademico)
+    public function destroy(Request $request, CalendarioAcademico $calendarioAcademico)
     {
-        $descripcion = "Se eliminó el calendario académico {$calendarioAcademico->nombre}.";
-        $calendarioAcademico->delete();
+        if ($calendarioAcademico->estatus === CalendarioAcademico::ESTATUS_FINALIZADO) {
+            return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+                ->with('info', 'Un calendario finalizado forma parte del historial académico y no puede cancelarse de forma retroactiva.');
+        }
 
-        $this->bitacora('Eliminar calendario académico', $descripcion, 'Área Académica');
+        if ($calendarioAcademico->estatus === CalendarioAcademico::ESTATUS_CANCELADO) {
+            return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+                ->with('info', 'El calendario ya estaba cancelado.');
+        }
 
-        return redirect()->route('calendarios_academicos.index')->with('success', 'Calendario eliminado correctamente.');
+        $validated = $request->validate([
+            'motivo_cancelacion' => ['required', 'string', 'min:10', 'max:3000'],
+        ], [
+            'motivo_cancelacion.required' => 'Explica por qué se cancela el calendario.',
+            'motivo_cancelacion.min' => 'El motivo debe describir claramente la cancelación.',
+        ]);
+
+        $calendarioAcademico->update([
+            'estatus' => CalendarioAcademico::ESTATUS_CANCELADO,
+            'cancelado_por_id' => Auth::id(),
+            'fecha_cancelacion' => now(),
+            'motivo_cancelacion' => $validated['motivo_cancelacion'],
+        ]);
+
+        $this->bitacora(
+            'Cancelar calendario académico',
+            "Se canceló el calendario {$calendarioAcademico->nombre} sin eliminar materias ni sesiones. Motivo: {$validated['motivo_cancelacion']}",
+            'Área Académica',
+            $calendarioAcademico
+        );
+
+        return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+            ->with('success', 'Calendario cancelado. Las materias y sesiones se conservaron como historial.');
     }
 
     private function catalogos(): array
     {
         return [
-            'grupos' => Grupo::with(['programa', 'cicloEscolar'])->orderBy('nombre')->get(),
+            'grupos' => Grupo::activos()->with(['programa', 'cicloEscolar'])->orderBy('nombre')->get(),
             'ciclos' => CicloEscolar::orderByDesc('created_at')->get(),
             'modalidades' => [CalendarioAcademico::MODALIDAD_PRESENCIAL, CalendarioAcademico::MODALIDAD_VIRTUAL, CalendarioAcademico::MODALIDAD_MIXTA],
             'tiposCalendario' => CalendarioAcademico::tiposCalendario(),
-            'estatuses' => $this->estatuses(),
+            'estatuses' => CalendarioAcademico::estatuses(),
         ];
     }
 
     private function validar(Request $request): array
     {
-        return $request->validate([
-            'grupo_id' => 'required|exists:grupos,id',
+        $validated = $request->validate([
+            'grupo_id' => ['required', Rule::exists('grupos', 'id')->where('activo', true)],
             'ciclo_escolar_id' => 'nullable|exists:ciclos_escolares,id',
             'nombre' => 'required|string|max:255',
             'periodo' => 'nullable|string|max:50',
             'modalidad' => 'required|in:Presencial,Virtual,Mixta',
             'tipo_calendario' => 'required|in:'.implode(',', CalendarioAcademico::tiposCalendario()),
-            'estatus' => 'required|in:Borrador,Planeado,Aprobado,En curso,Finalizado,Cancelado',
+            'estatus' => ['required', Rule::in(CalendarioAcademico::estatuses())],
             'fecha_inicio' => 'nullable|date',
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
             'observaciones' => 'nullable|string|max:3000',
         ]);
+
+        $ciclo = ! blank($validated['ciclo_escolar_id'] ?? null) ? CicloEscolar::find($validated['ciclo_escolar_id']) : null;
+
+        if (blank($validated['periodo'] ?? null) && $ciclo) {
+            $validated['periodo'] = $ciclo->nombre;
+        }
+
+        if ($ciclo && ! empty($validated['fecha_inicio'])) {
+            $inicio = \Carbon\Carbon::parse($validated['fecha_inicio']);
+            $fin = ! empty($validated['fecha_fin']) ? \Carbon\Carbon::parse($validated['fecha_fin']) : null;
+
+            if ($ciclo->fecha_inicio_clases && $inicio->lt($ciclo->fecha_inicio_clases)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'fecha_inicio' => 'La fecha de inicio del calendario no puede estar dentro del periodo de inscripción ni antes del inicio de clases del ciclo escolar.',
+                ]);
+            }
+
+            if ($ciclo->fecha_fin_clases && $fin && $fin->gt($ciclo->fecha_fin_clases)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'fecha_fin' => 'La fecha de fin del calendario no puede exceder la fecha final de clases del ciclo escolar.',
+                ]);
+            }
+        }
+
+        return $validated;
     }
 
-    private function estatuses(): array
+    private function estatusAutomatico(array $validated): string
     {
-        return [
-            CalendarioAcademico::ESTATUS_BORRADOR,
-            CalendarioAcademico::ESTATUS_PLANEADO,
-            CalendarioAcademico::ESTATUS_APROBADO,
-            CalendarioAcademico::ESTATUS_EN_CURSO,
-            CalendarioAcademico::ESTATUS_FINALIZADO,
-            CalendarioAcademico::ESTATUS_CANCELADO,
-        ];
+        if (($validated['estatus'] ?? null) === CalendarioAcademico::ESTATUS_CANCELADO) {
+            return CalendarioAcademico::ESTATUS_CANCELADO;
+        }
+
+        $hoy = now()->toDateString();
+        $inicio = $validated['fecha_inicio'] ?? null;
+        $fin = $validated['fecha_fin'] ?? null;
+
+        if ($inicio && $hoy < $inicio) {
+            return CalendarioAcademico::ESTATUS_AGENDADO;
+        }
+        if ($fin && $hoy > $fin) {
+            return CalendarioAcademico::ESTATUS_FINALIZADO;
+        }
+        if ($inicio && $fin && $hoy >= $inicio && $hoy <= $fin) {
+            return CalendarioAcademico::ESTATUS_EN_CURSO;
+        }
+
+        return CalendarioAcademico::ESTATUS_AGENDADO;
     }
+
 }

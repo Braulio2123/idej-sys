@@ -16,10 +16,7 @@ return new class extends Migration
                 ->constrained('usuarios')
                 ->nullOnDelete();
 
-            // Campo heredado: se conserva para compatibilidad con instalaciones previas.
             $table->enum('tipo', ['Visita', 'Llamada', 'Recepcion de Documento'])->default('Visita');
-
-            // Campos reales de auditoría.
             $table->string('accion', 120);
             $table->string('modulo', 80)->nullable();
             $table->text('descripcion')->nullable();
@@ -38,6 +35,7 @@ return new class extends Migration
             $table->dateTime('fecha_evento')->nullable();
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['accion', 'modulo']);
             $table->index(['modelo_type', 'modelo_id']);

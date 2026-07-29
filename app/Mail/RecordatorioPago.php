@@ -2,63 +2,36 @@
 
 namespace App\Mail;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 use App\Models\Alumno;
-
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 
 class RecordatorioPago extends Mailable
 {
     use Queueable, SerializesModels;
 
     public Alumno $alumno;
+    public Collection $cargos;
+    public float $totalAdeudo;
 
-    public function __construct(Alumno $alumno)
+    public function __construct(Alumno $alumno, ?Collection $cargos = null)
     {
         $this->alumno = $alumno;
-    }
-    /**
-     * Get the message envelope.
-     */
-
-    
-    public function envelope(): Envelope
-    {
-        return new Envelope(
-            subject: 'Recordatorio Pago',
-        );
+        $this->cargos = $cargos ?? $alumno->cargos;
+        $this->totalAdeudo = (float) $this->cargos->sum('monto_adeudo');
     }
 
     public function build(): self
-{
-    return $this->subject('Recordatorio de Pago - IDEJ')
-        ->view('emails.recordatorio-pago') 
-        ->with([
-            'alumno' => $this->alumno,
-        ]);
-}
-
-    /**
-     * Get the message content definition.
-     */
-    public function content(): Content
     {
-        return new Content(
-            view: 'view.name',
-        );
-    }
-
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
-    public function attachments(): array
-    {
-        return [];
+        return $this->subject('Recordatorio de pago - IDEJ')
+            ->view('emails.recordatorio-pago')
+            ->with([
+                'alumno' => $this->alumno,
+                'cargos' => $this->cargos,
+                'totalAdeudo' => $this->totalAdeudo,
+                'primerVencimiento' => $this->cargos->sortBy('fecha_vencimiento')->first()?->fecha_vencimiento,
+            ]);
     }
 }

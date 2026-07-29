@@ -23,11 +23,12 @@ class DatabaseSeeder extends Seeder
             DiaNoLaboralSeeder::class,
             RequisitoDocumentalSeeder::class,
 
-            // 3. Alumnos y finanzas base
+            // 3. Alumnos y administración financiera base
             AlumnoSeeder::class,
             ConceptoPagoSeeder::class,
             BecaSeeder::class,
             CargoMasivoSeeder::class,
+            PlanCargoRecurrenteSeeder::class,
 
             // 4. Demo integral para probar módulos reales del sistema
             DatosDemoIntegralSeeder::class,

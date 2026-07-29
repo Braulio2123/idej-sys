@@ -29,7 +29,16 @@ class ProspectoController extends Controller
                     $q->where('nombre_completo', 'like', "%{$search}%")
                         ->orWhere('correo', 'like', "%{$search}%")
                         ->orWhere('telefono', 'like', "%{$search}%")
-                        ->orWhere('whatsapp', 'like', "%{$search}%");
+                        ->orWhere('whatsapp', 'like', "%{$search}%")
+                        ->orWhere('medio_contacto', 'like', "%{$search}%")
+                        ->orWhereHas('programa', function ($programaQuery) use ($search) {
+                            $programaQuery->where('nombre', 'like', "%{$search}%")
+                                ->orWhere('nivel', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('asesor', function ($asesorQuery) use ($search) {
+                            $asesorQuery->where('nombre', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($request->estatus, fn ($query, $estatus) => $query->where('estatus', $estatus))
@@ -84,7 +93,7 @@ class ProspectoController extends Controller
 
     public function show(Prospecto $prospecto)
     {
-        $prospecto->load(['programa', 'asesor', 'alumno', 'seguimientos.usuario']);
+        $prospecto->load(['programa', 'asesor', 'alumno', 'seguimientos.usuario', 'archivadoPor']);
 
         $seguimientos = $prospecto->seguimientos()
             ->with('usuario')
@@ -93,7 +102,7 @@ class ProspectoController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $grupos = Grupo::with(['programa', 'cicloEscolar'])
+        $grupos = Grupo::activos()->with(['programa', 'cicloEscolar'])
             ->orderBy('nombre')
             ->get();
 
@@ -109,6 +118,11 @@ class ProspectoController extends Controller
 
     public function edit(Prospecto $prospecto)
     {
+        if ($prospecto->archivado_at || $prospecto->estatus === Prospecto::ESTATUS_DESCARTADO) {
+            return redirect()->route('prospectos.show', $prospecto)
+                ->with('error', 'El prospecto está archivado y solo puede consultarse.');
+        }
+
         if ($prospecto->estaConvertido()) {
             return redirect()
                 ->route('prospectos.show', $prospecto)
@@ -120,6 +134,11 @@ class ProspectoController extends Controller
 
     public function update(Request $request, Prospecto $prospecto)
     {
+        if ($prospecto->archivado_at || $prospecto->estatus === Prospecto::ESTATUS_DESCARTADO) {
+            return redirect()->route('prospectos.show', $prospecto)
+                ->with('error', 'El prospecto está archivado y solo puede consultarse.');
+        }
+
         if ($prospecto->estaConvertido()) {
             return redirect()
                 ->route('prospectos.show', $prospecto)
@@ -141,30 +160,48 @@ class ProspectoController extends Controller
             ->with('success', 'Prospecto actualizado correctamente.');
     }
 
-    public function destroy(Prospecto $prospecto)
+    public function destroy(Request $request, Prospecto $prospecto)
     {
         if ($prospecto->estaConvertido()) {
-            return back()->with('error', 'No se puede eliminar un prospecto convertido a alumno.');
+            return back()->with('error', 'No se puede archivar un prospecto convertido a alumno. Su trazabilidad debe conservarse.');
         }
 
-        $nombre = $prospecto->nombre_completo;
-        $id = $prospecto->id;
+        if ($prospecto->archivado_at) {
+            return back()->with('info', 'El prospecto ya estaba archivado.');
+        }
 
-        $prospecto->delete();
+        $validated = $request->validate([
+            'motivo_descarte' => ['required', 'string', 'min:10', 'max:3000'],
+        ], [
+            'motivo_descarte.required' => 'Explica por qué se descarta y archiva el prospecto.',
+            'motivo_descarte.min' => 'El motivo debe describir claramente la decisión.',
+        ]);
+
+        $prospecto->update([
+            'estatus' => Prospecto::ESTATUS_DESCARTADO,
+            'motivo_descarte' => $validated['motivo_descarte'],
+            'fecha_proximo_contacto' => null,
+            'archivado_at' => now(),
+            'archivado_por_id' => Auth::id(),
+        ]);
 
         $this->bitacora(
-            'Eliminar Prospecto',
-            "Se eliminó el prospecto {$nombre} (ID: {$id}).",
-            'Prospectos'
+            'Archivar Prospecto',
+            "Se descartó y archivó el prospecto {$prospecto->nombre_completo} (ID: {$prospecto->id}) sin eliminar sus seguimientos. Motivo: {$validated['motivo_descarte']}",
+            'Prospectos',
+            $prospecto
         );
 
-        return redirect()
-            ->route('prospectos.index')
-            ->with('success', 'Prospecto eliminado correctamente.');
+        return redirect()->route('prospectos.show', $prospecto)
+            ->with('success', 'Prospecto archivado. El historial de seguimiento se conserva.');
     }
 
     public function storeSeguimiento(Request $request, Prospecto $prospecto)
     {
+        if ($prospecto->archivado_at || $prospecto->estatus === Prospecto::ESTATUS_DESCARTADO) {
+            return back()->with('error', 'El prospecto está archivado y no acepta nuevos seguimientos.');
+        }
+
         if ($prospecto->estaConvertido()) {
             return back()->with('error', 'Este prospecto ya fue convertido a alumno. Registra seguimientos desde el expediente del alumno.');
         }
@@ -209,6 +246,11 @@ class ProspectoController extends Controller
 
     public function convertirAlumno(Request $request, Prospecto $prospecto)
     {
+        if ($prospecto->archivado_at || $prospecto->estatus === Prospecto::ESTATUS_DESCARTADO) {
+            return redirect()->route('prospectos.show', $prospecto)
+                ->with('error', 'Un prospecto archivado o descartado no puede convertirse. Reactívalo mediante un flujo administrativo antes de continuar.');
+        }
+
         if ($prospecto->estaConvertido()) {
             return redirect()
                 ->route('alumnos.show', $prospecto->alumno)
@@ -217,10 +259,33 @@ class ProspectoController extends Controller
 
         $validated = $request->validate([
             'matricula' => ['required', 'string', 'max:50', 'unique:alumnos,matricula'],
-            'grupo_id' => ['nullable', 'exists:grupos,id'],
+            'grupo_id' => ['nullable', Rule::exists('grupos', 'id')->where('activo', true)],
             'correo' => ['nullable', 'email', 'max:255', 'unique:alumnos,correo'],
             'telefono' => ['nullable', 'string', 'max:30'],
+        ], [
+            'matricula.required' => 'Captura la matrícula del nuevo alumno.',
+            'matricula.unique' => 'La matrícula capturada ya pertenece a otro alumno.',
+            'correo.unique' => 'El correo capturado ya pertenece a otro alumno. Revisa si el alumno ya fue creado previamente.',
+            'grupo_id.exists' => 'El grupo seleccionado ya no está disponible. Actualiza la página e intenta nuevamente.',
         ]);
+
+        if (! empty($validated['grupo_id'])) {
+            $grupoInscripcion = Grupo::with(['programa', 'cicloEscolar'])->find($validated['grupo_id']);
+            $nivel = $grupoInscripcion?->programa?->nivel;
+            $ciclo = $grupoInscripcion?->cicloEscolar;
+
+            if (in_array($nivel, ['Licenciatura', 'Maestría', 'Maestria', 'Doctorado'], true) && $ciclo) {
+                $hoy = now()->toDateString();
+                $inicio = optional($ciclo->fecha_inicio_inscripcion)->toDateString();
+                $fin = optional($ciclo->fecha_fin_inscripcion)->toDateString();
+
+                if ($inicio && $fin && ($hoy < $inicio || $hoy > $fin)) {
+                    return back()
+                        ->withInput()
+                        ->with('error', 'El periodo de inscripción para este ciclo escolar no está abierto. No es posible convertir este prospecto en alumno de Educación Programática fuera del periodo autorizado.');
+                }
+            }
+        }
 
         $alumno = DB::transaction(function () use ($validated, $prospecto) {
             $grupo = ! empty($validated['grupo_id'])

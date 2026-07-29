@@ -77,7 +77,7 @@ class ReporteEjecutivoController extends Controller
             fputcsv($out, []);
 
             fputcsv($out, ['Sección', 'Indicador', 'Valor']);
-            foreach ($this->csvFilas($finanzas, 'Finanzas') as $fila) {
+            foreach ($this->csvFilas($finanzas, 'Administración financiera') as $fila) {
                 fputcsv($out, $fila);
             }
             foreach ($this->csvFilas($alumnos, 'Alumnos') as $fila) {

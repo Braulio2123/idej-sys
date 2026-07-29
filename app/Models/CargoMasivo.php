@@ -12,6 +12,7 @@ class CargoMasivo extends Model
     protected $table = 'cargos_masivos';
 
     protected $fillable = [
+        'operacion_uuid',
         'concepto_id',
         'monto',
         'fecha_vencimiento',
@@ -22,6 +23,11 @@ class CargoMasivo extends Model
         'total_alumnos',
         'usuario_id',
     ];
+
+    public function cargos()
+    {
+        return $this->hasMany(Cargo::class, 'cargo_masivo_id');
+    }
 
     /**
      * Concepto de pago asociado.

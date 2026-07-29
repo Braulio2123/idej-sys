@@ -58,7 +58,7 @@ class RequisitoDocumentalController extends Controller
         $requisito = new RequisitoDocumental([
             'activo' => true,
             'obligatorio' => true,
-            'orden' => 0,
+            'orden' => RequisitoDocumental::siguienteOrden(),
         ]);
 
         return view('requisitos_documentales.create', [
@@ -72,6 +72,7 @@ class RequisitoDocumentalController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validar($request);
+        $validated['orden'] = RequisitoDocumental::siguienteOrden($validated['programa_id'] ?? null, $validated['nivel'] ?? null);
         $requisito = RequisitoDocumental::create($validated);
 
         $this->bitacora(
@@ -146,7 +147,6 @@ class RequisitoDocumentalController extends Controller
             'descripcion' => ['nullable', 'string', 'max:5000'],
             'obligatorio' => ['nullable', 'boolean'],
             'activo' => ['nullable', 'boolean'],
-            'orden' => ['nullable', 'integer', 'min:0', 'max:999'],
         ]);
 
         if (! empty($validated['programa_id'])) {
@@ -155,7 +155,9 @@ class RequisitoDocumentalController extends Controller
 
         $validated['obligatorio'] = $request->boolean('obligatorio');
         $validated['activo'] = $request->boolean('activo', true);
-        $validated['orden'] = (int) ($validated['orden'] ?? 0);
+        if ($requisito) {
+            $validated['orden'] = $requisito->orden;
+        }
 
         return $validated;
     }

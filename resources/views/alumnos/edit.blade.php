@@ -1,6 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    use App\Models\Rol;
+    $usuarioActual = auth()->user();
+    $puedeEliminarAlumno = $usuarioActual?->tieneRol(Rol::ADMIN) ?? false;
+    $esRecepcion = $usuarioActual?->rolClave() === Rol::RECEPCION;
+@endphp
 <div class="max-w-3xl mx-auto bg-white shadow-md rounded-lg p-6 mt-6">
     <h1 class="text-2xl font-bold text-gray-800 mb-6">Editar Alumno</h1>
 
@@ -35,6 +41,11 @@
             </div>
         </div>
 
+        @if($esRecepcion)
+            <div class="bg-blue-50 border border-blue-200 text-blue-900 rounded-lg p-4 text-sm">
+                Recepción puede actualizar solamente nombre, correo y teléfono. Los cambios de grupo, condición y estado académico corresponden a Coordinación Administrativa.
+            </div>
+        @else
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label class="block text-gray-700 font-semibold">Condición del Alumno</label>
@@ -85,12 +96,27 @@
                 <option value="Baja Temporal" @selected($alumno->estatus_academico == 'Baja Temporal')>Baja Temporal</option>
                 <option value="Suspendido"    @selected($alumno->estatus_academico == 'Suspendido')>Suspendido</option>
             </select>
+            <p class="text-xs text-gray-500 mt-1">Baja temporal o suspendido conserva el expediente y bloquea cargos/convenios nuevos; los pagos de adeudos existentes siguen disponibles.</p>
         </div>
+
+        @endif
 
         <div class="flex justify-end">
             <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">Actualizar</button>
         </div>
     </form>
+    @if($puedeEliminarAlumno)
+        <div class="mt-8 border-t border-red-200 pt-6">
+            <h2 class="text-lg font-bold text-red-700">Zona administrativa</h2>
+            <p class="text-sm text-gray-600 mt-1">La eliminación física solo aplica a alumnos capturados por error y sin historial. Si ya tiene pagos, documentos, convenios, becas o seguimientos, el sistema bloqueará la eliminación y se debe usar el estatus académico.</p>
+            <form action="{{ route('alumnos.destroy', $alumno) }}" method="POST" class="mt-4 space-y-3" data-confirm="¿Eliminar físicamente este registro? Solo procede si fue capturado por error y no tiene historial.">
+                @csrf
+                @method('DELETE')
+                <textarea name="motivo_eliminacion" required minlength="10" maxlength="2000" rows="3" class="w-full rounded border-red-300" placeholder="Describe el error de captura que justifica la eliminación física"></textarea>
+                <button type="submit" class="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700">Eliminar solo si no tiene historial</button>
+            </form>
+        </div>
+    @endif
 </div>
 
 @endsection

@@ -27,8 +27,7 @@ return new class extends Migration
                 'Coordinación Administrativa IDEJ' => ['CAdmin', 'Gestión administrativa, financiera y operativa.'],
                 'Coordinación Académica IDEJ' => ['Academica', 'Gestión académica, docentes, grupos y solicitudes.'],
                 'Recepción IDEJ' => ['Recepcion', 'Atención a alumnos, cargos, pagos y convenios operativos.'],
-                'Relaciones Públicas IDEJ' => ['RRPP', 'Seguimiento comercial y consulta de alumnos.'],
-                'Finanzas IDEJ' => ['Finanzas', 'Gestión de pagos, reportes financieros y solicitudes aprobadas.'],
+                'Relaciones Públicas IDEJ' => ['RRPP', 'Captación, prospectos y consulta de oferta académica.'],
             ];
 
             foreach ($map as $nombre => [$clave, $descripcion]) {

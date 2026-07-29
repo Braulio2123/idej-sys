@@ -1,6 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    use App\Models\Rol;
+    $esRecepcion = auth()->user()?->rolClave() === Rol::RECEPCION;
+@endphp
 <div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
 
     {{-- TITULO --}}
@@ -54,6 +58,11 @@
                 value="{{ old('telefono') }}">
         </div>
 
+        @if($esRecepcion)
+            <div class="bg-blue-50 border border-blue-200 text-blue-900 rounded-lg p-4 text-sm">
+                Recepción registra únicamente los datos básicos. Coordinación Administrativa validará el grupo, la condición y el estado administrativo-financiero.
+            </div>
+        @else
         {{-- ESTATUS FINANCIERO --}}
         <div>
             <label class="block font-semibold text-gray-700 mb-1">Estatus Financiero</label>
@@ -101,6 +110,8 @@
                 @endforeach
             </select>
         </div>
+
+        @endif
 
         {{-- BOTÓN --}}
         <div class="pt-4">

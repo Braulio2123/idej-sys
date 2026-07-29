@@ -3,15 +3,18 @@
 @section('title', 'Horarios académicos')
 
 @section('content')
+@php $puedeGestionarCatalogos = usuarioTienePermiso('catalogos_academicos.gestionar'); @endphp
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold text-slate-800">Horarios académicos</h1>
             <p class="text-sm text-slate-500">Asignación formal de materia, docente, grupo, aula y horario.</p>
         </div>
+        @if($puedeGestionarCatalogos)
         <a href="{{ route('horarios_academicos.create') }}" class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">
             + Nuevo horario
         </a>
+        @endif
     </div>
 
     @if(session('success'))
@@ -81,12 +84,14 @@
                             </td>
                             <td class="px-4 py-3 text-right whitespace-nowrap">
                                 <a href="{{ route('horarios_academicos.show', $horario) }}" class="text-indigo-700 hover:underline font-semibold">Ver</a>
-                                <a href="{{ route('horarios_academicos.edit', $horario) }}" class="text-blue-700 hover:underline font-semibold ml-3">Editar</a>
-                                <form action="{{ route('horarios_academicos.destroy', $horario) }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar este horario?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="text-red-600 hover:underline font-semibold ml-3">Eliminar</button>
-                                </form>
+                                @if($horario->grupo?->activo)
+                                    @if($puedeGestionarCatalogos)
+                                        <a href="{{ route('horarios_academicos.edit', $horario) }}" class="text-blue-700 hover:underline font-semibold ml-3">Editar</a>
+                                    @endif
+                                @else
+                                    <span class="ml-3 text-xs font-semibold text-slate-400">Grupo archivado</span>
+                                @endif
+                                <span class="ml-3 text-xs text-slate-500">No eliminable</span>
                             </td>
                         </tr>
                     @empty

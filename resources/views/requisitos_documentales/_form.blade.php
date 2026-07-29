@@ -22,7 +22,7 @@
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Programa específico</label>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Educación Programática específica</label>
         <select name="programa_id" class="w-full rounded-xl border-slate-300 focus:border-cyan-500 focus:ring-cyan-500">
             <option value="">General o por nivel</option>
             @foreach($programas as $programa)
@@ -31,7 +31,7 @@
                 </option>
             @endforeach
         </select>
-        <p class="text-xs text-slate-500 mt-1">Si eliges un programa, el nivel se ignora.</p>
+        <p class="text-xs text-slate-500 mt-1">Si eliges Educación Programática específica, el nivel se ignora.</p>
     </div>
 
     <div>
@@ -45,8 +45,10 @@
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Orden</label>
-        <input type="number" name="orden" min="0" max="999" value="{{ old('orden', $requisito->orden ?? 0) }}" class="w-full rounded-xl border-slate-300 focus:border-cyan-500 focus:ring-cyan-500">
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Orden automático</label>
+        <div class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            El sistema asigna el orden de 10 en 10 según se registren los requisitos.
+        </div>
     </div>
 
     <div class="md:col-span-2">

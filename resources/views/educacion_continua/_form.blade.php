@@ -72,14 +72,22 @@
         <input type="number" min="1" name="cupo_maximo" value="{{ old('cupo_maximo', $curso->cupo_maximo) }}" class="w-full rounded-xl border-slate-300">
     </div>
 
-    <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Costo</label>
-        <input type="number" step="0.01" min="0" name="costo" value="{{ old('costo', $curso->costo) }}" class="w-full rounded-xl border-slate-300">
-    </div>
+    @if($puedeEditarCostos ?? false)
+        <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1">Costo</label>
+            <input type="number" step="0.01" min="0" name="costo" value="{{ old('costo', $curso->costo) }}" class="w-full rounded-xl border-slate-300">
+            <p class="text-xs text-slate-500 mt-1">Dato comercial para Coordinación Administrativa, Recepción o RRPP.</p>
+        </div>
+    @else
+        <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <p class="text-sm font-semibold text-blue-950">Costo administrativo</p>
+            <p class="text-sm text-blue-800 mt-1">Coordinación Académica no captura el costo en este flujo. Coordinación Administrativa, Recepción o RRPP lo definirán cuando corresponda.</p>
+        </div>
+    @endif
 </div>
 
 <div class="mt-5">
-    <label class="block text-sm font-semibold text-slate-700 mb-2">Equipo requerido del curso</label>
+    <label class="block text-sm font-semibold text-slate-700 mb-2">Equipo general requerido del curso</label>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         @foreach($equipos as $equipo)
             <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
@@ -94,7 +102,7 @@
     <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
         <div>
             <h2 class="text-xl font-bold text-slate-900">Planeador rápido de sesiones</h2>
-            <p class="text-sm text-slate-600 mt-1">Selecciona días de la semana y horarios. El sistema calcula las fechas necesarias hasta cubrir las horas del curso antes de guardar.</p>
+            <p class="text-sm text-slate-600 mt-1">Selecciona días de la semana y horarios. El sistema calcula las fechas necesarias hasta cubrir las horas del curso. Si después se registra un día no laboral, se avisará qué sesiones quedaron afectadas para reagendarlas manualmente.</p>
         </div>
         <label class="inline-flex items-center gap-2 rounded-xl bg-white border border-indigo-200 px-4 py-2 text-sm font-semibold text-indigo-800">
             <input type="checkbox" name="planeador_generar_sesiones" id="generarSesionesCheckbox" value="1" @checked(old('planeador_generar_sesiones'))>
@@ -177,10 +185,17 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">Aula / liga para las sesiones</label>
-                    <input type="text" name="planeador_aula_liga" value="{{ old('planeador_aula_liga') }}" class="w-full rounded-xl border-slate-300 bg-white" placeholder="Ej. Aula 3, Zoom, Auditorio...">
-                </div>
+                @if($puedeAsignarAula ?? false)
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Aula / liga para las sesiones</label>
+                        <input type="text" name="planeador_aula_liga" value="{{ old('planeador_aula_liga') }}" class="w-full rounded-xl border-slate-300 bg-white" placeholder="Ej. Aula 3, Zoom, Auditorio...">
+                    </div>
+                @else
+                    <div class="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                        <p class="text-sm font-semibold text-blue-950">Aula / liga pendiente</p>
+                        <p class="text-xs text-blue-800 mt-1">Sistemas asignará aula, liga o equipo después de la planeación académica.</p>
+                    </div>
+                @endif
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1">Modalidad de sesiones</label>
                     <select name="planeador_modalidad" class="w-full rounded-xl border-slate-300 bg-white">
@@ -206,7 +221,7 @@
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-2">Equipo requerido por sesión</label>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Equipo específico por sesión <span class="font-normal text-slate-500">(opcional si difiere del equipo general)</span></label>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                     @foreach($equipos as $equipo)
                         <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">

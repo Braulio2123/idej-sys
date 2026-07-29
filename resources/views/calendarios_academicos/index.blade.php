@@ -3,13 +3,16 @@
 @section('title', 'Calendarios académicos')
 
 @section('content')
+@php $puedeGestionarCalendarios = usuarioTienePermiso('calendarios.gestionar'); @endphp
 <div class="max-w-7xl mx-auto space-y-6">
     <div class="bg-white rounded-2xl shadow border border-slate-100 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold text-slate-800">Calendarios académicos</h1>
             <p class="text-sm text-slate-500 mt-1">Planeación por fechas fijas: materias, docentes, sesiones, aulas y días no laborales.</p>
         </div>
+        @if($puedeGestionarCalendarios)
         <a href="{{ route('calendarios_academicos.create') }}" class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">+ Nuevo calendario</a>
+        @endif
     </div>
 
     <form method="GET" class="bg-white rounded-2xl shadow border border-slate-100 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -52,7 +55,9 @@
                 </div>
                 <div class="mt-4 flex justify-end gap-3 text-sm font-semibold">
                     <a href="{{ route('calendarios_academicos.show', $calendario) }}" class="text-indigo-700 hover:underline">Ver</a>
-                    <a href="{{ route('calendarios_academicos.edit', $calendario) }}" class="text-blue-700 hover:underline">Editar</a>
+                    @if($puedeGestionarCalendarios)
+                        <a href="{{ route('calendarios_academicos.edit', $calendario) }}" class="text-blue-700 hover:underline">Editar</a>
+                    @endif
                 </div>
             </div>
         @empty

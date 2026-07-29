@@ -1,11 +1,13 @@
 @extends('layouts.app')
 
+@section('title', 'Cargos Masivos')
+
 @section('content')
 <div class="container mx-auto px-4 py-6">
 
     {{-- ENCABEZADO --}}
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">💼 Cargos Masivos</h1>
+        <h1 class="text-2xl font-bold text-gray-800">Cargos masivos</h1>
     </div>
 
     {{-- FLASH --}}
@@ -26,6 +28,11 @@
     @endif
 
 
+
+    <div class="bg-blue-50 border border-blue-200 text-blue-900 rounded-xl p-4 mb-6 text-sm leading-relaxed">
+        <strong>Uso operativo:</strong> este módulo sirve para generar el mismo cargo a varios alumnos seleccionados, por ejemplo una colegiatura mensual. Captura el concepto, monto y fecha de vencimiento una sola vez; el sistema aplicará becas vigentes cuando corresponda. Para programación automática mensual usa el módulo de Cargos recurrentes. Los recordatorios automáticos se enviarán únicamente por correo electrónico.
+    </div>
+
     <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-4 mb-6 text-sm">
         <strong>Becas institucionales:</strong> al generar cargos masivos, el sistema aplicará automáticamente la beca vigente de cada alumno solo si el concepto seleccionado es becable. El monto base se conserva como monto original.
     </div>
@@ -34,7 +41,7 @@
     {{-- FILTROS --}}
     {{-- ===================================================== --}}
     <div class="bg-white shadow-md rounded-lg p-6 mb-8">
-        <h2 class="text-lg font-semibold text-gray-700 mb-4">🎛️ Filtros de selección</h2>
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">Filtros de selección</h2>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
@@ -109,10 +116,11 @@
     {{-- RESULTADOS + FORM --}}
     {{-- ===================================================== --}}
     <div id="resultados" class="hidden bg-white shadow-md rounded-lg p-6 mb-10">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">📋 Alumnos encontrados</h2>
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Alumnos encontrados</h2>
 
         <form id="formCargoMasivo" method="POST" action="{{ route('cargos.masivo.store') }}">
             @csrf
+            <input type="hidden" name="operacion_uuid" value="{{ old('operacion_uuid', (string) \Illuminate\Support\Str::uuid()) }}">
 
             <input type="hidden" id="hidden_programa_id" name="programa_id">
             <input type="hidden" id="hidden_grupo_id" name="grupo_id">
@@ -121,7 +129,11 @@
             <div id="tablaAlumnos" class="mb-6"></div>
 
             <div id="formularioCargo" class="hidden border-t pt-6 mt-4">
-                <h3 class="text-lg font-semibold mb-4 text-gray-700">💵 Datos del Cargo Masivo</h3>
+                <h3 class="text-lg font-semibold mb-4 text-gray-700">Datos del cargo masivo</h3>
+
+                <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                    Solo se procesarán alumnos activos. La beca vigente y el saldo a favor de cada alumno se aplicarán dentro de una transacción y quedarán registrados en cada cargo.
+                </div>
 
                 {{-- CONCEPTO --}}
                 <div class="mb-4">
@@ -137,7 +149,7 @@
                 {{-- MONTO --}}
                 <div class="mb-4">
                     <label class="block text-sm font-semibold mb-1">Monto (opcional)</label>
-                    <input type="number" step="0.01" name="monto"
+                    <input type="number" step="0.01" min="0.01" max="99999999.99" name="monto"
                            class="w-full border rounded px-3 py-2 text-sm">
                 </div>
 
@@ -156,8 +168,8 @@
                            placeholder="Ej. Colegiatura noviembre 2025">
                 </div>
 
-                <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">
-                    💰 Aplicar cargos masivos
+                <button type="submit" id="btn-aplicar-cargos" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+                    Aplicar cargos masivos
                 </button>
             </div>
         </form>
@@ -168,7 +180,7 @@
     {{-- HISTORIAL --}}
     {{-- ===================================================== --}}
     <div class="bg-white shadow-md rounded-lg p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">🕓 Historial de operaciones masivas</h2>
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Historial de operaciones masivas</h2>
 
         @if($historial->isEmpty())
             <p class="text-gray-500 text-sm">Aún no se han registrado cargos masivos.</p>
@@ -177,7 +189,7 @@
                 <table class="min-w-full border border-gray-300 text-sm">
                     <thead class="bg-gray-100 text-gray-700">
                         <tr>
-                            <th class="py-2 px-3 border-b text-left">ID</th>
+                            <th class="py-2 px-3 border-b text-left">Folio</th>
                             <th class="py-2 px-3 border-b text-left">Concepto</th>
                             <th class="py-2 px-3 border-b text-left">Monto</th>
                             <th class="py-2 px-3 border-b text-left">Alumnos</th>
@@ -195,7 +207,7 @@
                             <td class="py-2 px-3 border-b">${{ number_format($h->monto, 2) }}</td>
                             <td class="py-2 px-3 border-b">{{ $h->total_alumnos }}</td>
                             <td class="py-2 px-3 border-b">{{ $h->usuario->nombre ?? 'N/A' }}</td>
-                            <td class="py-2 px-3 border-b">{{ $h->created_at->format('d/m/Y') }}</td>
+                            <td class="py-2 px-3 border-b">{{ $h->created_at?->timezone(config('app.timezone'))->format('d/m/Y H:i') }}</td>
                             <td class="py-2 px-3 border-b text-center">
                                 <a href="{{ route('cargos.masivo.show', $h->id) }}"
                                    class="text-indigo-600 hover:underline">
@@ -257,6 +269,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!confirm(`¿Aplicar cargos a ${seleccionados} alumno(s)?`)) {
             e.preventDefault();
+            return;
+        }
+
+        const boton = document.getElementById('btn-aplicar-cargos');
+        if (boton) {
+            boton.disabled = true;
+            boton.textContent = 'Procesando cargos…';
         }
     });
 
@@ -315,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <th class="px-3 py-2 border-b text-left">Matrícula</th>
                             <th class="px-3 py-2 border-b text-left">Nombre</th>
                             <th class="px-3 py-2 border-b text-left">Grupo</th>
-                            <th class="px-3 py-2 border-b text-left">Programa</th>
+                            <th class="px-3 py-2 border-b text-left">Educación Programática</th>
                             <th class="px-3 py-2 border-b text-left">Estatus financiero</th>
                         </tr>
                     </thead>

@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Gestión de Alumnos')
+
 @php
     use App\Models\Rol;
     $puedeModificarAlumnos = in_array(auth()->user()?->rolClave(), [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN], true);
@@ -41,6 +43,21 @@
               action="{{ route('alumnos.index') }}"
               id="filtrosForm"
               class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+
+            <div class="md:col-span-5">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Buscar alumno</label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" name="search" value="{{ request('search') }}"
+                           placeholder="Nombre, apellido, matrícula, correo, programa o grupo"
+                           class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm">
+                    <button type="submit" class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900">
+                        Buscar
+                    </button>
+                    <a href="{{ route('alumnos.index') }}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 text-center">
+                        Limpiar
+                    </a>
+                </div>
+            </div>
 
             {{-- Estatus financiero --}}
             <div>
@@ -114,7 +131,7 @@
                     <tr>
                         <th class="py-3 px-4 text-left">Matrícula</th>
                         <th class="py-3 px-4 text-left">Nombre</th>
-                        <th class="py-3 px-4 text-left">Programa</th>
+                        <th class="py-3 px-4 text-left">Educación Programática</th>
                         <th class="py-3 px-4 text-left">Condición</th>
                         <th class="py-3 px-4 text-left">Financiero</th>
                         <th class="py-3 px-4 text-left">Académico</th>

@@ -91,7 +91,7 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
                     <tr>
-                        <th class="py-3 px-4 text-left">Fecha</th>
+                        <th class="py-3 px-4 text-left">Fecha y hora ({{ config('app.timezone') }})</th>
                         <th class="py-3 px-4 text-left">Usuario</th>
                         <th class="py-3 px-4 text-left">Módulo</th>
                         <th class="py-3 px-4 text-left">Acción</th>
@@ -105,7 +105,7 @@
                     @forelse($bitacoras as $b)
                         <tr class="hover:bg-slate-50/70 transition">
                             <td class="py-3 px-4 text-slate-500 whitespace-nowrap">
-                                {{ ($b->fecha_evento ?? $b->created_at)?->format('d/m/Y H:i') }}
+                                {{ ($b->fecha_evento ?? $b->created_at)?->timezone(config('app.timezone'))->format('d/m/Y H:i:s') }}
                             </td>
 
                             <td class="py-3 px-4 font-medium text-slate-800">

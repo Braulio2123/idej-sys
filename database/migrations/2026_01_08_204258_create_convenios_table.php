@@ -13,7 +13,7 @@ return new class extends Migration
 
             $table->foreignId('alumno_id')
                 ->constrained('alumnos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('cargo_original_id')
                 ->constrained('cargos')
@@ -23,7 +23,10 @@ return new class extends Migration
             $table->decimal('total_reestructurado', 10, 2);
             $table->unsignedInteger('numero_parcialidades');
 
-            $table->enum('estatus', ['Activo', 'Finalizado'])->default('Activo');
+            $table->enum('estatus', ['Activo', 'Finalizado', 'Cancelado'])->default('Activo');
+            $table->foreignId('cancelado_por_id')->nullable()->constrained('usuarios')->nullOnDelete();
+            $table->timestamp('fecha_cancelacion')->nullable();
+            $table->text('motivo_cancelacion')->nullable();
 
             $table->timestamps();
         });

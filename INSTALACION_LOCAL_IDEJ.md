@@ -117,3 +117,19 @@ npm run build
 ## Importante
 
 No ejecutes `composer update` salvo que quieras actualizar dependencias de forma deliberada. Para instalar el proyecto, usa `composer install`.
+
+## Base MySQL para pruebas
+
+Crea una base vacía independiente llamada `idej_sys_testing`. `phpunit.xml` está configurado para utilizarla con MySQL. No apuntes PHPUnit a `idej_sys`, porque las pruebas pueden ejecutar `RefreshDatabase`.
+
+```sql
+CREATE DATABASE idej_sys_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Después ejecuta:
+
+```bash
+php artisan optimize:clear
+php artisan test
+```
+

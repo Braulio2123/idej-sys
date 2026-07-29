@@ -13,11 +13,11 @@ return new class extends Migration
 
             $table->foreignId('cargo_id')
                 ->constrained('cargos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('convenio_id')
                 ->constrained('convenios')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->decimal('monto_original', 10, 2);
             $table->decimal('monto_adeudo_original', 10, 2);
@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique('cargo_id');
+            $table->unique(['cargo_id', 'convenio_id'], 'cargo_convenio_unico');
             $table->index('convenio_id');
         });
     }

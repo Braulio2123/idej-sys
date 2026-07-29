@@ -9,6 +9,8 @@ class ParcialidadConvenio extends Model
 {
     use HasFactory;
 
+    public const ESTATUS_CANCELADA = 'Cancelada';
+
     protected $table = 'parcialidades_convenio';
 
     protected $fillable = [

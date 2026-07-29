@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('nombre')->unique();
 
-            $table->enum('tipo_periodo', ['Cuatrimestral', 'Semestral', 'Anual', 'Otro'])
-                ->default('Cuatrimestral');
+            $table->enum('tipo_periodo', ['Semestral', 'Anual', 'Otro'])
+                ->default('Semestral');
 
             // Fechas “base” del ciclo (las dejo nullable por el historial de "fix_old_fields"
             // y porque a veces se capturan después).

@@ -111,6 +111,45 @@ class CursoEducacionContinua extends Model
         return $this->belongsTo(Usuario::class, 'creado_por_id');
     }
 
+
+    public function getEstatusOperativoAttribute(): string
+    {
+        if ($this->estatus === self::ESTATUS_CANCELADO) {
+            return self::ESTATUS_CANCELADO;
+        }
+
+        $hoy = now()->toDateString();
+        $inicio = $this->fecha_inicio?->toDateString();
+        $fin = $this->fecha_fin?->toDateString();
+
+        if ($inicio && $hoy < $inicio) {
+            return self::ESTATUS_ABIERTO;
+        }
+
+        if ($fin && $hoy > $fin) {
+            return self::ESTATUS_FINALIZADO;
+        }
+
+        if ($inicio && $hoy >= $inicio && (!$fin || $hoy <= $fin)) {
+            return self::ESTATUS_EN_CURSO;
+        }
+
+        return self::ESTATUS_PLANEADO;
+    }
+
+    public static function estatusAutomatico(?string $fechaInicio, ?string $fechaFin, ?string $estatusActual = null): string
+    {
+        if ($estatusActual === self::ESTATUS_CANCELADO) {
+            return self::ESTATUS_CANCELADO;
+        }
+
+        $hoy = now()->toDateString();
+        if ($fechaInicio && $hoy < $fechaInicio) return self::ESTATUS_ABIERTO;
+        if ($fechaFin && $hoy > $fechaFin) return self::ESTATUS_FINALIZADO;
+        if ($fechaInicio && $hoy >= $fechaInicio && (!$fechaFin || $hoy <= $fechaFin)) return self::ESTATUS_EN_CURSO;
+        return self::ESTATUS_PLANEADO;
+    }
+
     public function scopeOperativos($query)
     {
         return $query->whereNotIn('estatus', [self::ESTATUS_FINALIZADO, self::ESTATUS_CANCELADO]);

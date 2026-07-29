@@ -7,6 +7,7 @@ use App\Models\Cargo;
 use App\Models\Convenio;
 use App\Models\ParcialidadConvenio;
 use App\Traits\RegistraBitacora;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,12 @@ class ConvenioController extends Controller
      */
     public function create(Alumno $alumno)
     {
+        if ($alumno->estatus_academico !== 'Activo') {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('error', 'El alumno no está activo académicamente. No se pueden crear convenios nuevos hasta reactivarlo.');
+        }
+
         if ($alumno->becaVigente()) {
             return redirect()
                 ->route('alumnos.show', $alumno)
@@ -47,6 +54,12 @@ class ConvenioController extends Controller
      */
     public function store(Request $request, Alumno $alumno)
     {
+        if ($alumno->estatus_academico !== 'Activo') {
+            return redirect()
+                ->route('alumnos.show', $alumno)
+                ->with('error', 'El alumno no está activo académicamente. No se pueden crear convenios nuevos hasta reactivarlo.');
+        }
+
         $validated = $request->validate([
             'cargos' => ['required', 'array', 'min:1'],
             'cargos.*' => ['integer', 'distinct'],
@@ -156,6 +169,11 @@ class ConvenioController extends Controller
     {
         $this->verificarRelacion($alumno, $convenio);
 
+        if ($convenio->estatus !== 'Activo' || $convenio->parcialidades()->whereHas('pagos')->exists()) {
+            return redirect()->route('alumnos.convenios.show', [$alumno, $convenio])
+                ->with('error', 'El convenio ya tiene historial aplicado o no está activo; su información contractual no puede modificarse.');
+        }
+
         $convenio->load(['cargos.concepto', 'parcialidades']);
 
         return view('convenios.edit', compact('alumno', 'convenio'));
@@ -168,6 +186,11 @@ class ConvenioController extends Controller
     public function update(Request $request, Alumno $alumno, Convenio $convenio)
     {
         $this->verificarRelacion($alumno, $convenio);
+
+        if ($convenio->estatus !== 'Activo' || $convenio->parcialidades()->whereHas('pagos')->exists()) {
+            return redirect()->route('alumnos.convenios.show', [$alumno, $convenio])
+                ->with('error', 'El convenio ya tiene historial aplicado o no está activo; su información contractual no puede modificarse.');
+        }
 
         $validated = $request->validate([
             'descripcion' => ['required', 'string', 'max:255'],
@@ -188,72 +211,132 @@ class ConvenioController extends Controller
     }
 
     /**
-     * Eliminar convenio y reactivar todos los cargos que lo originaron.
+     * Cancelar un convenio sin eliminar su historial contractual.
      */
-    public function destroy(Alumno $alumno, Convenio $convenio)
+    public function destroy(Request $request, Alumno $alumno, Convenio $convenio)
     {
         $this->verificarRelacion($alumno, $convenio);
 
         if ($convenio->estatus === 'Finalizado') {
-            return redirect()
-                ->route('alumnos.show', $alumno)
-                ->with('info', 'Este convenio ya ha sido completado y no puede eliminarse.');
+            return redirect()->route('alumnos.convenios.show', [$alumno, $convenio])
+                ->with('info', 'Un convenio finalizado forma parte del historial y no puede cancelarse.');
         }
 
+        if ($convenio->estatus === 'Cancelado') {
+            return redirect()->route('alumnos.convenios.show', [$alumno, $convenio])
+                ->with('info', 'El convenio ya estaba cancelado.');
+        }
+
+        $validated = $request->validate([
+            'motivo_cancelacion' => ['required', 'string', 'min:10', 'max:3000'],
+        ], [
+            'motivo_cancelacion.required' => 'Explica por qué se cancela el convenio.',
+            'motivo_cancelacion.min' => 'El motivo debe describir claramente la cancelación.',
+        ]);
+
         $tienePagos = $convenio->parcialidades()
-            ->whereIn('estatus', ['Pagado', 'Parcialmente Pagado'])
+            ->whereHas('pagos')
             ->exists();
 
         if ($tienePagos) {
-            return redirect()
-                ->route('alumnos.show', $alumno)
-                ->with('error', 'No se puede eliminar un convenio con pagos registrados.');
+            return redirect()->route('alumnos.convenios.show', [$alumno, $convenio])
+                ->with('error', 'No se puede cancelar este convenio porque ya tiene pagos aplicados. Debe realizarse un ajuste administrativo documentado.');
         }
 
-        DB::transaction(function () use ($alumno, $convenio) {
-            $convenio->load('cargos');
+        DB::transaction(function () use ($alumno, $convenio, $validated) {
+            $convenioBloqueado = Convenio::whereKey($convenio->id)->lockForUpdate()->firstOrFail();
+            $convenioBloqueado->load('cargos');
 
-            foreach ($convenio->cargos as $cargo) {
-                $cargo->update([
-                    'estatus' => $cargo->pivot->estatus_original ?: 'Pendiente',
-                    'monto_adeudo' => $cargo->pivot->monto_adeudo_original,
+            if ($convenioBloqueado->estatus !== 'Activo') {
+                throw ValidationException::withMessages([
+                    'motivo_cancelacion' => 'El convenio cambió de estado durante la operación. Actualiza la página.',
                 ]);
             }
 
-            // Compatibilidad con convenios creados antes de la tabla pivote.
-            if ($convenio->cargos->isEmpty() && $convenio->cargoOriginal) {
-                $convenio->cargoOriginal->update(['estatus' => 'Pendiente']);
+            if ($convenioBloqueado->parcialidades()->whereHas('pagos')->exists()) {
+                throw ValidationException::withMessages([
+                    'motivo_cancelacion' => 'Se registró un pago mientras se preparaba la cancelación. El convenio se conserva activo y debe revisarse mediante un ajuste administrativo documentado.',
+                ]);
             }
 
-            $convenioId = $convenio->id;
-            $convenio->parcialidades()->delete();
-            $convenio->cargos()->detach();
-            $convenio->delete();
+            foreach ($convenioBloqueado->cargos as $cargo) {
+                $cargoBloqueado = Cargo::whereKey($cargo->id)->lockForUpdate()->first();
+                if ($cargoBloqueado && $cargoBloqueado->estatus === 'En Convenio') {
+                    $cargoBloqueado->update([
+                        'estatus' => $cargo->pivot->estatus_original ?: 'Pendiente',
+                        'monto_adeudo' => $cargo->pivot->monto_adeudo_original,
+                    ]);
+                }
+            }
+
+            if ($convenioBloqueado->cargos->isEmpty() && $convenioBloqueado->cargoOriginal) {
+                $cargoOriginal = Cargo::whereKey($convenioBloqueado->cargoOriginal->id)->lockForUpdate()->first();
+                if ($cargoOriginal && $cargoOriginal->estatus === 'En Convenio') {
+                    $cargoOriginal->update(['estatus' => 'Pendiente']);
+                }
+            }
+
+            $convenioBloqueado->parcialidades()
+                ->whereIn('estatus', ['Pendiente', 'Parcialmente Pagado'])
+                ->update(['estatus' => ParcialidadConvenio::ESTATUS_CANCELADA]);
+
+            $convenioBloqueado->update([
+                'estatus' => 'Cancelado',
+                'cancelado_por_id' => auth()->id(),
+                'fecha_cancelacion' => now(),
+                'motivo_cancelacion' => $validated['motivo_cancelacion'],
+            ]);
 
             $this->recalcularEstadoAlumno($alumno);
 
             $this->bitacora(
-                'Eliminar Convenio',
-                "Se eliminó el convenio ID {$convenioId} del alumno {$alumno->nombre_completo} y se reactivaron sus cargos relacionados."
+                'Cancelar Convenio',
+                "Se canceló el convenio ID {$convenioBloqueado->id} del alumno {$alumno->nombre_completo} sin eliminar parcialidades ni cargos relacionados. Motivo: {$validated['motivo_cancelacion']}",
+                'Convenios',
+                $convenioBloqueado,
+                $alumno->id
             );
         }, 3);
 
-        return redirect()
-            ->route('alumnos.show', $alumno)
-            ->with('success', 'Convenio eliminado correctamente y cargos reactivados.');
+        return redirect()->route('alumnos.convenios.show', [$alumno, $convenio])
+            ->with('success', 'Convenio cancelado. Los cargos fueron reactivados y el historial contractual se conservó.');
     }
 
     public function show($alumno_id, $convenio_id)
     {
         $alumno = Alumno::findOrFail($alumno_id);
         $convenio = $alumno->convenios()
-            ->with(['parcialidades', 'cargos.concepto'])
+            ->with(['parcialidades', 'cargos.concepto', 'canceladoPor'])
             ->findOrFail($convenio_id);
 
         return view('convenios.show', [
             'convenio' => $convenio,
             'alumno' => $alumno,
+            'tienePagosAplicados' => $convenio->parcialidades()->whereHas('pagos')->exists(),
         ]);
+    }
+
+
+    public function pdf(Alumno $alumno, Convenio $convenio)
+    {
+        $this->verificarRelacion($alumno, $convenio);
+
+        $convenio->load(['parcialidades', 'cargos.concepto']);
+
+        $this->bitacora(
+            'Generar Formato de Convenio',
+            "Se generó formato PDF del convenio #{$convenio->id} del alumno {$alumno->nombre_completo}.",
+            'Convenios',
+            $convenio,
+            $alumno->id
+        );
+
+        $pdf = Pdf::loadView('convenios.pdf', [
+            'alumno' => $alumno,
+            'convenio' => $convenio,
+        ])->setPaper('letter', 'portrait');
+
+        return $pdf->stream('convenio_'.str_replace(['/', '\\', ' '], '_', $alumno->matricula ?: $alumno->id).'_'.$convenio->id.'.pdf');
     }
 
     private function verificarRelacion(Alumno $alumno, Convenio $convenio): void

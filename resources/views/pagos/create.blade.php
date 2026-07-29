@@ -161,8 +161,15 @@
                         </div>
                     </div>
 
+                    <div class="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                        <label class="flex items-start gap-2 text-sm text-blue-900">
+                            <input type="checkbox" name="es_pago_anticipado" value="1" id="es_pago_anticipado" class="mt-1 rounded border-blue-300" @checked(old('es_pago_anticipado'))>
+                            <span><strong>Registrar como anticipo / saldo a favor.</strong><br>Úsalo cuando el alumno paga meses futuros, semestre completo o carrera completa aunque todavía no existan cargos generados.</span>
+                        </label>
+                    </div>
+
                     <p class="text-xs text-gray-500 mt-3">
-                        Si el pago supera el adeudo seleccionado, el excedente se registrará como saldo a favor del alumno.
+                        Si el pago registrado supera el adeudo seleccionado, el excedente queda como saldo a favor. En efectivo, el cambio entregado no se registra como ingreso.
                     </p>
                 </section>
 
@@ -183,20 +190,42 @@
 
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Monto total pagado</label>
-                            <input type="number" step="0.01" min="0.01" name="monto_total_pagado" id="monto_total_pagado"
+                            <input type="number" step="0.01" min="0.01" max="99999999.99" name="monto_total_pagado" id="monto_total_pagado"
                                    class="w-full border rounded p-2" value="{{ old('monto_total_pagado') }}" required>
                         </div>
 
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Fecha de pago</label>
-                            <input type="date" name="fecha_pago" class="w-full border rounded p-2"
+                            <input type="date" name="fecha_pago" max="{{ now()->toDateString() }}" class="w-full border rounded p-2"
                                    value="{{ old('fecha_pago', now()->toDateString()) }}">
                         </div>
 
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                            <strong>Folio institucional automático.</strong>
+                            El sistema lo asignará después de registrar el pago para evitar folios repetidos o alterados manualmente.
+                        </div>
+                    </div>
+                </section>
+
+                {{-- Efectivo --}}
+                <section id="datos_efectivo" class="hidden border rounded-xl p-4 bg-emerald-50">
+                    <h4 class="font-bold text-gray-800 mb-3">Datos de efectivo</h4>
+
+                    <div class="space-y-3">
                         <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Folio del recibo</label>
-                            <input type="text" name="folio_recibo" class="w-full border rounded p-2"
-                                   value="{{ old('folio_recibo') }}" placeholder="Ej: 000123">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Efectivo recibido por caja</label>
+                            <input type="number" step="0.01" min="0.01" max="99999999.99" name="monto_recibido_efectivo" id="monto_recibido_efectivo" value="{{ old('monto_recibido_efectivo') }}" placeholder="Ej. 1000.00" class="w-full border rounded p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tratamiento de diferencia en efectivo</label>
+                            <select name="tratamiento_excedente" id="tratamiento_excedente" class="w-full border rounded p-2">
+                                <option value="cambio" @selected(old('tratamiento_excedente', 'cambio') === 'cambio')>Entregar cambio</option>
+                                <option value="saldo_favor" @selected(old('tratamiento_excedente') === 'saldo_favor')>Registrar excedente como saldo a favor</option>
+                            </select>
+                        </div>
+                        <div class="rounded-lg bg-white border border-emerald-100 p-3 text-sm text-emerald-900">
+                            <p><strong>Cambio estimado:</strong> <span id="cambio-estimado">$0.00</span></p>
+                            <p class="text-xs text-emerald-700 mt-1">Para saldo a favor, registra como monto pagado el total que se quedará en IDEJ. Para entregar cambio, el monto pagado debe ser solo lo que se aplicará al alumno.</p>
                         </div>
                     </div>
                 </section>
@@ -212,7 +241,7 @@
                         <input type="text" name="clave_rastreo" value="{{ old('clave_rastreo') }}" placeholder="Clave de rastreo" class="w-full border rounded p-2">
                         <input type="text" name="concepto_transferencia" value="{{ old('concepto_transferencia') }}" placeholder="Concepto" class="w-full border rounded p-2">
                         <input type="text" name="referencia_transferencia" value="{{ old('referencia_transferencia') }}" placeholder="Referencia bancaria" class="w-full border rounded p-2">
-                        <input type="datetime-local" name="fecha_transferencia" value="{{ old('fecha_transferencia') }}" class="w-full border rounded p-2">
+                        <input type="datetime-local" name="fecha_transferencia" max="{{ now()->format('Y-m-d\TH:i') }}" value="{{ old('fecha_transferencia') }}" class="w-full border rounded p-2">
                         <input type="text" name="banco_destino" value="{{ old('banco_destino') }}" placeholder="Banco destino" class="w-full border rounded p-2">
 
                         <div>
@@ -259,6 +288,9 @@
         const metodoPago = document.getElementById('metodo_pago');
         const transferencia = document.getElementById('datos_transferencia');
         const tarjeta = document.getElementById('campos_tarjeta');
+        const efectivo = document.getElementById('datos_efectivo');
+        const montoRecibido = document.getElementById('monto_recibido_efectivo');
+        const cambioEstimado = document.getElementById('cambio-estimado');
         const checkboxes = document.querySelectorAll('.seleccion-adeudo');
         const totalSeleccionado = document.getElementById('total-seleccionado');
         const montoInput = document.getElementById('monto_total_pagado');
@@ -270,11 +302,23 @@
             }).format(valor);
         }
 
+
+        function actualizarCambioEfectivo() {
+            const pagado = parseFloat(montoInput.value || '0');
+            const recibido = parseFloat(montoRecibido?.value || '0');
+            const cambio = Math.max(0, recibido - pagado);
+            if (cambioEstimado) {
+                cambioEstimado.textContent = formatoMoneda(cambio);
+            }
+        }
+
         function actualizarCamposPago() {
             const valor = metodoPago.value;
 
+            efectivo.classList.toggle('hidden', valor !== 'Efectivo');
             transferencia.classList.toggle('hidden', valor !== 'Transferencia');
             tarjeta.classList.toggle('hidden', valor !== 'Tarjeta');
+            actualizarCambioEfectivo();
         }
 
         function actualizarTotalSeleccionado() {
@@ -292,9 +336,13 @@
             if (!montoInput.value || parseFloat(montoInput.value) === 0) {
                 montoInput.value = total > 0 ? total.toFixed(2) : '';
             }
+
+            actualizarCambioEfectivo();
         }
 
         metodoPago.addEventListener('change', actualizarCamposPago);
+        montoInput.addEventListener('input', actualizarCambioEfectivo);
+        montoRecibido?.addEventListener('input', actualizarCambioEfectivo);
         checkboxes.forEach((checkbox) => checkbox.addEventListener('change', actualizarTotalSeleccionado));
 
         actualizarCamposPago();

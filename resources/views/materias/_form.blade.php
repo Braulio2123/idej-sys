@@ -43,7 +43,7 @@
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1">Semestre / cuatrimestre</label>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">Semestre</label>
         <input type="number" min="1" max="12" name="semestre_o_cuatrimestre" value="{{ old('semestre_o_cuatrimestre', $materia->semestre_o_cuatrimestre ?? '') }}"
                class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
     </div>

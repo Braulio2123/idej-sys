@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Editar Ciclo Escolar')
+
 @section('content')
 <div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
 
@@ -18,7 +20,6 @@
         <div class="mb-3">
             <label class="font-semibold">Tipo de periodo</label>
             <select name="tipo_periodo" class="w-full border p-2 rounded">
-                <option value="Cuatrimestral" @selected($ciclo->tipo_periodo=='Cuatrimestral')>Cuatrimestral</option>
                 <option value="Semestral" @selected($ciclo->tipo_periodo=='Semestral')>Semestral</option>
                 <option value="Anual" @selected($ciclo->tipo_periodo=='Anual')>Anual</option>
                 <option value="Otro" @selected($ciclo->tipo_periodo=='Otro')>Otro</option>
@@ -64,6 +65,7 @@
                        class="mr-2">
                 Marcar como ciclo activo
             </label>
+            <p class="mt-2 text-xs text-slate-500">Solo debe existir un ciclo activo. Si activas este ciclo, los demás se desactivarán automáticamente. Si lo desmarcas, el sistema no lo usará como ciclo vigente.</p>
         </div>
 
         <button class="bg-indigo-600 text-white px-4 py-2 rounded mt-4">

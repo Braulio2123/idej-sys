@@ -3,7 +3,28 @@
 @section('title', 'Detalle de calendario académico')
 
 @section('content')
+@php $puedeGestionarCalendarios = usuarioTienePermiso('calendarios.gestionar'); @endphp
+@php
+    $calendarioCancelado = $calendario->estatus === \App\Models\CalendarioAcademico::ESTATUS_CANCELADO;
+    $calendarioFinalizado = $calendario->estatus === \App\Models\CalendarioAcademico::ESTATUS_FINALIZADO;
+    $grupoArchivado = ! ($calendario->grupo?->activo ?? false);
+    $calendarioSoloConsulta = ! $puedeGestionarCalendarios || $calendarioCancelado || $calendarioFinalizado || $grupoArchivado;
+@endphp
 <div class="max-w-7xl mx-auto space-y-6">
+    @if(session('success'))
+        <div class="rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{{ session('error') }}</div>
+    @endif
+    @if(session('info'))
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-800">{{ session('info') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+            <ul class="list-disc pl-5 text-sm">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+        </div>
+    @endif
     <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
@@ -17,10 +38,40 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('calendarios_academicos.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">Regresar</a>
-                <a href="{{ route('calendarios_academicos.edit', $calendario) }}" class="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Editar</a>
-                <a href="{{ route('calendarios_academicos.materias.create', $calendario) }}" class="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700">+ Agregar materia y fechas</a>
+                @unless($calendarioSoloConsulta)
+                    <a href="{{ route('calendarios_academicos.edit', $calendario) }}" class="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Editar</a>
+                    <a href="{{ route('calendarios_academicos.materias.create', $calendario) }}" class="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700">+ Agregar materia y fechas</a>
+                @endunless
             </div>
         </div>
+
+        @if($calendarioCancelado)
+            <div class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+                <p class="font-bold">Calendario cancelado</p>
+                <p class="text-sm mt-1">{{ $calendario->motivo_cancelacion ?: 'Sin motivo capturado.' }}</p>
+                <p class="text-xs mt-2">Cancelado {{ $calendario->fecha_cancelacion?->format('d/m/Y H:i') ?? 'sin fecha' }} por {{ $calendario->canceladoPor->nombre ?? 'usuario no disponible' }}. Las materias y sesiones permanecen en modo consulta.</p>
+            </div>
+        @elseif($calendarioFinalizado)
+            <div class="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
+                <p class="font-bold">Calendario finalizado</p>
+                <p class="text-sm mt-1">La planeación y sus sesiones se conservan en modo consulta para proteger el historial académico.</p>
+            </div>
+        @elseif($grupoArchivado)
+            <div class="mt-5 rounded-xl border border-slate-300 bg-slate-100 p-4 text-slate-700">
+                <p class="font-bold">Grupo archivado</p>
+                <p class="text-sm mt-1">Este calendario permanece en modo consulta porque el grupo ya fue archivado.</p>
+            </div>
+        @else
+            <details class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
+                <summary class="cursor-pointer font-semibold text-red-700">Cancelar calendario y conservar historial</summary>
+                <form method="POST" action="{{ route('calendarios_academicos.destroy', $calendario) }}" class="mt-3 space-y-3" data-confirm="¿Cancelar este calendario? Las materias y sesiones se conservarán, pero ya no podrán modificarse.">
+                    @csrf
+                    @method('DELETE')
+                    <textarea name="motivo_cancelacion" required minlength="10" maxlength="3000" rows="3" class="w-full rounded-xl border-red-300" placeholder="Explica el motivo institucional de la cancelación"></textarea>
+                    <button class="rounded-xl bg-red-600 px-4 py-2 text-white hover:bg-red-700">Confirmar cancelación</button>
+                </form>
+            </details>
+        @endif
 
         <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mt-6">
             <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Estatus</p><p class="font-semibold text-slate-800">{{ $calendario->estatus }}</p></div>
@@ -59,12 +110,12 @@
                             <td class="px-4 py-3 text-center">{{ $materiaCalendario->estatus }}</td>
                             <td class="px-4 py-3 text-right">
                                 <div class="flex justify-end gap-3">
-                                    <a href="{{ route('calendarios_academicos.materias.edit', [$calendario, $materiaCalendario]) }}" class="text-blue-600 font-semibold hover:underline">Editar</a>
-                                    <form method="POST" action="{{ route('calendarios_academicos.materias.destroy', [$calendario, $materiaCalendario]) }}" onsubmit="return confirm('¿Eliminar esta materia y sus sesiones?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="text-red-600 font-semibold hover:underline">Eliminar</button>
-                                    </form>
+                                    @unless($calendarioSoloConsulta)
+                                        <a href="{{ route('calendarios_academicos.materias.edit', [$calendario, $materiaCalendario]) }}" class="text-blue-600 font-semibold hover:underline">Editar</a>
+                                        <span class="text-slate-400 text-xs">La eliminación de materias con sesiones se revisará como cancelación en una fase posterior.</span>
+                                    @else
+                                        <span class="text-slate-400">Solo consulta</span>
+                                    @endunless
                                 </div>
                             </td>
                         </tr>
@@ -149,7 +200,7 @@
                             </td>
                             <td class="px-4 py-3 text-right">
                                 <div class="flex justify-end gap-2">
-                                    @if($sesion->estatus !== 'Cancelada')
+                                    @if(!$calendarioSoloConsulta && $sesion->estatus !== 'Cancelada')
                                         <a href="{{ route('calendarios_academicos.sesiones.reprogramar', [$calendario, $sesion]) }}" class="text-indigo-600 font-semibold hover:underline">Reprogramar</a>
                                         <a href="{{ route('calendarios_academicos.sesiones.cancelar', [$calendario, $sesion]) }}" class="text-red-600 font-semibold hover:underline">Cancelar</a>
                                     @else

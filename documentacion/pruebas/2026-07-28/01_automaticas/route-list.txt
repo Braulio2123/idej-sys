@@ -1,0 +1,255 @@
+
+  ANY             / ............................................................. Illuminate\Routing › RedirectController
+  GET|HEAD        academica/grupos ....................................... academica.grupos.index › GrupoController@index
+  GET|HEAD        academica/grupos/{grupo} ................................. academica.grupos.show › GrupoController@show
+  GET|HEAD        agenda-operativa ............................. agenda-operativa.index › AgendaOperativaController@index
+  GET|HEAD        alumnos ........................................................ alumnos.index › AlumnoController@index
+  POST            alumnos ........................................................ alumnos.store › AlumnoController@store
+  GET|HEAD        alumnos/create ............................................... alumnos.create › AlumnoController@create
+  GET|HEAD        alumnos/{alumno} ................................................. alumnos.show › AlumnoController@show
+  PUT             alumnos/{alumno} ............................................. alumnos.update › AlumnoController@update
+  DELETE          alumnos/{alumno} ........................................... alumnos.destroy › AlumnoController@destroy
+  GET|HEAD        alumnos/{alumno}/becas ............................... alumnos.becas.index › BecaController@alumnoIndex
+  POST            alumnos/{alumno}/becas ..................................... alumnos.becas.store › BecaController@store
+  GET|HEAD        alumnos/{alumno}/becas/create ............................ alumnos.becas.create › BecaController@create
+  GET|HEAD        alumnos/{alumno}/becas/{beca}/cancelar alumnos.becas.cancelar.confirmar › BecaController@confirmarCanc…
+  PUT             alumnos/{alumno}/becas/{beca}/cancelar ............... alumnos.becas.cancelar › BecaController@cancelar
+  POST            alumnos/{alumno}/cargos .................................. alumnos.cargos.store › CargoController@store
+  GET|HEAD        alumnos/{alumno}/cargos ........................... alumnos.cargos.index › AlumnoController@cargosIndex
+  GET|HEAD        alumnos/{alumno}/cargos/create ......................... alumnos.cargos.create › CargoController@create
+  POST            alumnos/{alumno}/convenios ......................... alumnos.convenios.store › ConvenioController@store
+  GET|HEAD        alumnos/{alumno}/convenios .................. alumnos.convenios.index › AlumnoController@conveniosIndex
+  GET|HEAD        alumnos/{alumno}/convenios/create ................ alumnos.convenios.create › ConvenioController@create
+  GET|HEAD        alumnos/{alumno}/convenios/{convenio} ................ alumnos.convenios.show › ConvenioController@show
+  PUT|PATCH       alumnos/{alumno}/convenios/{convenio} ............ alumnos.convenios.update › ConvenioController@update
+  DELETE          alumnos/{alumno}/convenios/{convenio} .......... alumnos.convenios.destroy › ConvenioController@destroy
+  GET|HEAD        alumnos/{alumno}/convenios/{convenio}/edit ........... alumnos.convenios.edit › ConvenioController@edit
+  GET|HEAD        alumnos/{alumno}/convenios/{convenio}/pdf .............. alumnos.convenios.pdf › ConvenioController@pdf
+  GET|HEAD        alumnos/{alumno}/documentos ................ alumnos.documentos.index › DocumentoAlumnoController@index
+  POST            alumnos/{alumno}/documentos ................ alumnos.documentos.store › DocumentoAlumnoController@store
+  POST            alumnos/{alumno}/documentos/generar-checklist alumnos.documentos.generar-checklist › DocumentoAlumnoCo…
+  PUT             alumnos/{alumno}/documentos/{documento} .. alumnos.documentos.update › DocumentoAlumnoController@update
+  DELETE          alumnos/{alumno}/documentos/{documento} alumnos.documentos.destroy › DocumentoAlumnoController@destroy
+  GET|HEAD        alumnos/{alumno}/documentos/{documento}/descargar alumnos.documentos.download › DocumentoAlumnoControl…
+  GET|HEAD        alumnos/{alumno}/edit ............................................ alumnos.edit › AlumnoController@edit
+  POST            alumnos/{alumno}/pagos ..................................... alumnos.pagos.store › PagoController@store
+  GET|HEAD        alumnos/{alumno}/pagos .............................. alumnos.pagos.index › AlumnoController@pagosIndex
+  GET|HEAD        alumnos/{alumno}/pagos/create ............................ alumnos.pagos.create › PagoController@create
+  GET|HEAD        alumnos/{alumno}/pagos/{pago}/ajuste-cancelacion alumnos.pagos.ajuste-cancelacion.confirmar › PagoCont…
+  PUT             alumnos/{alumno}/pagos/{pago}/ajuste-cancelacion alumnos.pagos.ajuste-cancelacion › PagoController@aju…
+  GET|HEAD        alumnos/{alumno}/pagos/{pago}/cancelar alumnos.pagos.cancelar.confirmar › PagoController@confirmarCanc…
+  PUT             alumnos/{alumno}/pagos/{pago}/cancelar ............... alumnos.pagos.cancelar › PagoController@cancelar
+  GET|HEAD        alumnos/{alumno}/pagos/{pago}/comprobante alumnos.pagos.comprobante › PagoController@descargarComproba…
+  GET|HEAD        alumnos/{alumno}/pagos/{pago}/recibo ..................... alumnos.pagos.recibo › PagoController@recibo
+  GET|HEAD        alumnos/{alumno}/seguimientos ................ alumnos.seguimientos.index › SeguimientoController@index
+  POST            alumnos/{alumno}/seguimientos ................ alumnos.seguimientos.store › SeguimientoController@store
+  PUT             alumnos/{alumno}/seguimientos/{seguimiento} alumnos.seguimientos.update › SeguimientoController@update
+  DELETE          alumnos/{alumno}/seguimientos/{seguimiento} alumnos.seguimientos.destroy › SeguimientoController@destr…
+  GET|HEAD        becas .............................................................. becas.index › BecaController@index
+  POST            becas/sincronizar ...................................... becas.sincronizar › BecaController@sincronizar
+  GET|HEAD        bitacoras .................................................. bitacoras.index › BitacoraController@index
+  GET|HEAD        bitacoras/export/pdf .............................. bitacoras.export.pdf › BitacoraController@exportPdf
+  GET|HEAD        bitacoras/{bitacora} ......................................... bitacoras.show › BitacoraController@show
+  DELETE          bitacoras/{bitacora} ................................... bitacoras.destroy › BitacoraController@destroy
+  GET|HEAD        calendarios-academicos ............. calendarios_academicos.index › CalendarioAcademicoController@index
+  POST            calendarios-academicos ............. calendarios_academicos.store › CalendarioAcademicoController@store
+  GET|HEAD        calendarios-academicos/create .... calendarios_academicos.create › CalendarioAcademicoController@create
+  DELETE          calendarios-academicos/{calendarioAcademico} calendarios_academicos.destroy › CalendarioAcademicoContr…
+  GET|HEAD        calendarios-academicos/{calendarioAcademico} calendarios_academicos.show › CalendarioAcademicoControll…
+  PUT|PATCH       calendarios-academicos/{calendarioAcademico} calendarios_academicos.update › CalendarioAcademicoContro…
+  GET|HEAD        calendarios-academicos/{calendarioAcademico}/edit calendarios_academicos.edit › CalendarioAcademicoCon…
+  POST            calendarios-academicos/{calendarioAcademico}/materias calendarios_academicos.materias.store › Calendar…
+  GET|HEAD        calendarios-academicos/{calendarioAcademico}/materias/create calendarios_academicos.materias.create › …
+  PUT             calendarios-academicos/{calendarioAcademico}/materias/{calendarioMateria} calendarios_academicos.mater…
+  DELETE          calendarios-academicos/{calendarioAcademico}/materias/{calendarioMateria} calendarios_academicos.mater…
+  GET|HEAD        calendarios-academicos/{calendarioAcademico}/materias/{calendarioMateria}/edit calendarios_academicos.…
+  GET|HEAD        calendarios-academicos/{calendarioAcademico}/sesiones/{calendarioSesion}/cancelar calendarios_academic…
+  POST            calendarios-academicos/{calendarioAcademico}/sesiones/{calendarioSesion}/cancelar calendarios_academic…
+  GET|HEAD        calendarios-academicos/{calendarioAcademico}/sesiones/{calendarioSesion}/reprogramar calendarios_acade…
+  POST            calendarios-academicos/{calendarioAcademico}/sesiones/{calendarioSesion}/reprogramar calendarios_acade…
+  GET|HEAD        cargos/masivo ....................................... cargos.masivo.index › CargoMasivoController@index
+  POST            cargos/masivo ....................................... cargos.masivo.store › CargoMasivoController@store
+  POST            cargos/masivo/filtrar .................... cargos.masivo.filtrar › CargoMasivoController@filtrarAlumnos
+  GET|HEAD        cargos/masivo/{id} .................................... cargos.masivo.show › CargoMasivoController@show
+  GET|HEAD        cargos/recurrentes ..................... cargos.recurrentes.index › PlanCargoRecurrenteController@index
+  POST            cargos/recurrentes ..................... cargos.recurrentes.store › PlanCargoRecurrenteController@store
+  GET|HEAD        cargos/recurrentes/create ............ cargos.recurrentes.create › PlanCargoRecurrenteController@create
+  PUT|PATCH       cargos/recurrentes/{recurrente} ...... cargos.recurrentes.update › PlanCargoRecurrenteController@update
+  DELETE          cargos/recurrentes/{recurrente} .... cargos.recurrentes.destroy › PlanCargoRecurrenteController@destroy
+  GET|HEAD        cargos/recurrentes/{recurrente}/edit ..... cargos.recurrentes.edit › PlanCargoRecurrenteController@edit
+  POST            cargos/recurrentes/{recurrente}/ejecutar cargos.recurrentes.ejecutar › PlanCargoRecurrenteController@e…
+  GET|HEAD        centro-control-operativo ................ centro-control.index › CentroControlOperativoController@index
+  GET|HEAD        ciclos_escolares ................................ ciclos_escolares.index › CicloEscolarController@index
+  POST            ciclos_escolares ................................ ciclos_escolares.store › CicloEscolarController@store
+  GET|HEAD        ciclos_escolares/create ....................... ciclos_escolares.create › CicloEscolarController@create
+  DELETE          ciclos_escolares/{ciclo_escolar} ............ ciclos_escolares.destroy › CicloEscolarController@destroy
+  PUT|PATCH       ciclos_escolares/{ciclo_escolar} .............. ciclos_escolares.update › CicloEscolarController@update
+  GET|HEAD        ciclos_escolares/{ciclo_escolar}/edit ............. ciclos_escolares.edit › CicloEscolarController@edit
+  GET|HEAD        cobranza/correos ............................... cobranza.correos.index › CobranzaEmailController@index
+  POST            cobranza/correos/enviar ...................... cobranza.correos.enviar › CobranzaEmailController@enviar
+  GET|HEAD        conceptos .............................................. conceptos.index › ConceptoPagoController@index
+  POST            conceptos .............................................. conceptos.store › ConceptoPagoController@store
+  GET|HEAD        conceptos/create ..................................... conceptos.create › ConceptoPagoController@create
+  PUT|PATCH       conceptos/{concepto} ................................. conceptos.update › ConceptoPagoController@update
+  DELETE          conceptos/{concepto} ............................... conceptos.destroy › ConceptoPagoController@destroy
+  GET|HEAD        conceptos/{concepto}/edit ................................ conceptos.edit › ConceptoPagoController@edit
+  GET|HEAD        configuracion/institucional configuracion.institucional.edit › ConfiguracionInstitucionalController@ed…
+  PUT             configuracion/institucional configuracion.institucional.update › ConfiguracionInstitucionalController@…
+  GET|HEAD        confirm-password ........................... password.confirm › Auth\ConfirmablePasswordController@show
+  POST            confirm-password ............................................. Auth\ConfirmablePasswordController@store
+  GET|HEAD        convenios/{convenio}/parcialidades .......... parcialidades.index › ParcialidadConvenioController@index
+  POST            convenios/{convenio}/parcialidades .......... parcialidades.store › ParcialidadConvenioController@store
+  GET|HEAD        convenios/{convenio}/parcialidades/create . parcialidades.create › ParcialidadConvenioController@create
+  PUT             convenios/{convenio}/parcialidades/{parcialidad} parcialidades.update › ParcialidadConvenioController@…
+  DELETE          convenios/{convenio}/parcialidades/{parcialidad} parcialidades.destroy › ParcialidadConvenioController…
+  GET|HEAD        convenios/{convenio}/parcialidades/{parcialidad}/edit parcialidades.edit › ParcialidadConvenioControll…
+  GET|HEAD        cortes-caja ............................................. cortes-caja.index › CorteCajaController@index
+  POST            cortes-caja ............................................. cortes-caja.store › CorteCajaController@store
+  GET|HEAD        cortes-caja/create .................................... cortes-caja.create › CorteCajaController@create
+  GET|HEAD        cortes-caja/{corteCaja} ................................... cortes-caja.show › CorteCajaController@show
+  PUT             cortes-caja/{corteCaja}/cerrar ........................ cortes-caja.cerrar › CorteCajaController@cerrar
+  GET|HEAD        cortes-caja/{corteCaja}/cierre ........................ cortes-caja.cierre › CorteCajaController@cierre
+  POST            cortes-caja/{corteCaja}/movimientos cortes-caja.movimientos.store › CorteCajaController@registrarMovim…
+  PUT             cortes-caja/{corteCaja}/movimientos/{movimientoCaja}/cancelar cortes-caja.movimientos.cancelar › Corte…
+  GET|HEAD        cortes-caja/{corteCaja}/movimientos/{movimientoCaja}/comprobante cortes-caja.movimientos.comprobante  …
+  GET|HEAD        cortes-caja/{corteCaja}/pdf ................................. cortes-caja.pdf › CorteCajaController@pdf
+  GET|HEAD        dashboard ....................................................... dashboard › DashboardController@index
+  GET|HEAD        dias-no-laborales .............................. dias_no_laborales.index › DiaNoLaboralController@index
+  POST            dias-no-laborales .............................. dias_no_laborales.store › DiaNoLaboralController@store
+  POST            dias-no-laborales/cargar-oficiales dias_no_laborales.cargar-oficiales › DiaNoLaboralController@cargarO…
+  PUT|PATCH       dias-no-laborales/{diaNoLaboral} ............. dias_no_laborales.update › DiaNoLaboralController@update
+  DELETE          dias-no-laborales/{diaNoLaboral} ........... dias_no_laborales.destroy › DiaNoLaboralController@destroy
+  GET|HEAD        docentes ..................................................... docentes.index › DocenteController@index
+  POST            docentes ..................................................... docentes.store › DocenteController@store
+  GET|HEAD        docentes/create ............................................ docentes.create › DocenteController@create
+  DELETE          docentes/{docente} ....................................... docentes.destroy › DocenteController@destroy
+  GET|HEAD        docentes/{docente} ............................................. docentes.show › DocenteController@show
+  PUT|PATCH       docentes/{docente} ......................................... docentes.update › DocenteController@update
+  GET|HEAD        docentes/{docente}/documentos/{tipo} docentes.documentos.download › DocenteController@descargarDocumen…
+  GET|HEAD        docentes/{docente}/edit ........................................ docentes.edit › DocenteController@edit
+  GET|HEAD        educacion-continua .................. educacion_continua.index › CursoEducacionContinuaController@index
+  POST            educacion-continua .................. educacion_continua.store › CursoEducacionContinuaController@store
+  GET|HEAD        educacion-continua/create ......... educacion_continua.create › CursoEducacionContinuaController@create
+  GET|HEAD        educacion-continua/{educacionContinua} educacion_continua.show › CursoEducacionContinuaController@show
+  DELETE          educacion-continua/{educacionContinua} educacion_continua.destroy › CursoEducacionContinuaController@d…
+  PUT|PATCH       educacion-continua/{educacionContinua} educacion_continua.update › CursoEducacionContinuaController@up…
+  GET|HEAD        educacion-continua/{educacionContinua}/edit educacion_continua.edit › CursoEducacionContinuaController…
+  POST            educacion-continua/{educacionContinua}/inscritos educacion_continua.inscritos.store › CursoEducacionCo…
+  PUT             educacion-continua/{educacionContinua}/inscritos/{inscrito} educacion_continua.inscritos.update › Curs…
+  DELETE          educacion-continua/{educacionContinua}/inscritos/{inscrito} educacion_continua.inscritos.destroy › Cur…
+  POST            educacion-continua/{educacionContinua}/sesiones educacion_continua.sesiones.store › CursoEducacionCont…
+  PUT             educacion-continua/{educacionContinua}/sesiones/{sesion} educacion_continua.sesiones.update › CursoEdu…
+  DELETE          educacion-continua/{educacionContinua}/sesiones/{sesion} educacion_continua.sesiones.destroy › CursoEd…
+  GET|HEAD        educacion-continua/{educacionContinua}/sesiones/{sesion}/asistencia educacion_continua.sesiones.asiste…
+  POST            educacion-continua/{educacionContinua}/sesiones/{sesion}/asistencia educacion_continua.sesiones.asiste…
+  GET|HEAD        forgot-password ............................ password.request › Auth\PasswordResetLinkController@create
+  POST            forgot-password ............................... password.email › Auth\PasswordResetLinkController@store
+  GET|HEAD        grupos ........................................................... grupos.index › GrupoController@index
+  POST            grupos ........................................................... grupos.store › GrupoController@store
+  GET|HEAD        grupos/create .................................................. grupos.create › GrupoController@create
+  DELETE          grupos/{grupo} ............................................... grupos.destroy › GrupoController@destroy
+  GET|HEAD        grupos/{grupo} ..................................................... grupos.show › GrupoController@show
+  PUT|PATCH       grupos/{grupo} ................................................. grupos.update › GrupoController@update
+  GET|HEAD        grupos/{grupo}/edit ................................................ grupos.edit › GrupoController@edit
+  GET|HEAD        horarios_academicos ...................... horarios_academicos.index › HorarioAcademicoController@index
+  POST            horarios_academicos ...................... horarios_academicos.store › HorarioAcademicoController@store
+  GET|HEAD        horarios_academicos/create ............. horarios_academicos.create › HorarioAcademicoController@create
+  GET|HEAD        horarios_academicos/{horarioAcademico} ..... horarios_academicos.show › HorarioAcademicoController@show
+  PUT|PATCH       horarios_academicos/{horarioAcademico} . horarios_academicos.update › HorarioAcademicoController@update
+  DELETE          horarios_academicos/{horarioAcademico} horarios_academicos.destroy › HorarioAcademicoController@destroy
+  GET|HEAD        horarios_academicos/{horarioAcademico}/edit horarios_academicos.edit › HorarioAcademicoController@edit
+  GET|HEAD        login .............................................. login › Auth\AuthenticatedSessionController@create
+  POST            login ....................................................... Auth\AuthenticatedSessionController@store
+  POST            logout ........................................... logout › Auth\AuthenticatedSessionController@destroy
+  GET|HEAD        materias ..................................................... materias.index › MateriaController@index
+  POST            materias ..................................................... materias.store › MateriaController@store
+  GET|HEAD        materias/create ............................................ materias.create › MateriaController@create
+  PUT|PATCH       materias/{materia} ......................................... materias.update › MateriaController@update
+  DELETE          materias/{materia} ....................................... materias.destroy › MateriaController@destroy
+  GET|HEAD        materias/{materia}/edit ........................................ materias.edit › MateriaController@edit
+  GET|HEAD        notificaciones ............................. notificaciones.index › NotificacionInternaController@index
+  PATCH           notificaciones/leer-todas . notificaciones.leer-todas › NotificacionInternaController@marcarTodasLeidas
+  POST            notificaciones/probar .................... notificaciones.probar › NotificacionInternaController@probar
+  GET|HEAD        notificaciones/resumen-json ....... notificaciones.resumen-json › NotificacionInternaController@resumen
+  POST            notificaciones/sincronizar-operativas notificaciones.sincronizar-operativas › NotificacionInternaContr…
+  DELETE          notificaciones/{notificacion} ........ notificaciones.archivar › NotificacionInternaController@archivar
+  PATCH           notificaciones/{notificacion}/leer .... notificaciones.leer › NotificacionInternaController@marcarLeida
+  PATCH           notificaciones/{notificacion}/no-leida notificaciones.no-leida › NotificacionInternaController@marcarN…
+  PUT             password ............................................. password.update › Auth\PasswordController@update
+  GET|HEAD        portal-alumno ........................ portal.alumno.dashboard › PortalAlumno\DashboardController@index
+  GET|HEAD        portal-alumno/avisos ........................ portal.alumno.avisos › PortalAlumno\AvisoController@index
+  GET|HEAD        portal-alumno/calificaciones . portal.alumno.calificaciones › PortalAlumno\CalificacionController@index
+  GET|HEAD        portal-alumno/finanzas .................. portal.alumno.finanzas › PortalAlumno\FinanzaController@index
+  GET|HEAD        portal-alumno/horario .................... portal.alumno.horario › PortalAlumno\HorarioController@index
+  GET|HEAD        portal-alumno/login ................... portal.alumno.login › PortalAlumno\AuthController@showLoginForm
+  POST            portal-alumno/login .................... portal.alumno.login.submit › PortalAlumno\AuthController@login
+  POST            portal-alumno/logout ........................ portal.alumno.logout › PortalAlumno\AuthController@logout
+  GET|HEAD        portal-alumno/materias .................. portal.alumno.materias › PortalAlumno\MateriaController@index
+  GET|HEAD        portal-alumno/perfil ....................... portal.alumno.perfil › PortalAlumno\PerfilController@index
+  GET|HEAD        portal-alumno/ubicacion .............. portal.alumno.ubicacion › PortalAlumno\UbicacionController@index
+  GET|HEAD        profile ......................................................... profile.edit › ProfileController@edit
+  PATCH           profile ..................................................... profile.update › ProfileController@update
+  DELETE          profile/sessions/others ...... profile.sessions.destroy-others › ProfileController@destroyOtherSessions
+  GET|HEAD        programas .................................................. programas.index › ProgramaController@index
+  POST            programas .................................................. programas.store › ProgramaController@store
+  GET|HEAD        programas/create ......................................... programas.create › ProgramaController@create
+  PUT|PATCH       programas/{programa} ..................................... programas.update › ProgramaController@update
+  DELETE          programas/{programa} ................................... programas.destroy › ProgramaController@destroy
+  GET|HEAD        programas/{programa}/edit .................................... programas.edit › ProgramaController@edit
+  GET|HEAD        prospectos ............................................... prospectos.index › ProspectoController@index
+  POST            prospectos ............................................... prospectos.store › ProspectoController@store
+  GET|HEAD        prospectos/create ...................................... prospectos.create › ProspectoController@create
+  PUT             prospectos/{prospecto} ................................. prospectos.update › ProspectoController@update
+  DELETE          prospectos/{prospecto} ............................... prospectos.destroy › ProspectoController@destroy
+  GET|HEAD        prospectos/{prospecto} ..................................... prospectos.show › ProspectoController@show
+  POST            prospectos/{prospecto}/convertir ........... prospectos.convertir › ProspectoController@convertirAlumno
+  GET|HEAD        prospectos/{prospecto}/edit ................................ prospectos.edit › ProspectoController@edit
+  POST            prospectos/{prospecto}/seguimientos prospectos.seguimientos.store › ProspectoController@storeSeguimien…
+  GET|HEAD        reportes ..................................................... reportes.index › ReporteController@index
+  GET|HEAD        reportes-ejecutivos ............................. reportes.ejecutivo › ReporteEjecutivoController@index
+  GET|HEAD        reportes-ejecutivos/export-csv ... reportes.ejecutivo.export-csv › ReporteEjecutivoController@exportCsv
+  GET|HEAD        reportes/export-excel ........................... reportes.export-excel › ReporteController@exportExcel
+  GET|HEAD        reportes/export-pdf ................................. reportes.export-pdf › ReporteController@exportPdf
+  GET|HEAD        requisitos_documentales ........... requisitos_documentales.index › RequisitoDocumentalController@index
+  POST            requisitos_documentales ........... requisitos_documentales.store › RequisitoDocumentalController@store
+  GET|HEAD        requisitos_documentales/create .. requisitos_documentales.create › RequisitoDocumentalController@create
+  PUT|PATCH       requisitos_documentales/{requisitoDocumental} requisitos_documentales.update › RequisitoDocumentalCont…
+  DELETE          requisitos_documentales/{requisitoDocumental} requisitos_documentales.destroy › RequisitoDocumentalCon…
+  GET|HEAD        requisitos_documentales/{requisitoDocumental}/edit requisitos_documentales.edit › RequisitoDocumentalC…
+  POST            reset-password ...................................... password.store › Auth\NewPasswordController@store
+  GET|HEAD        reset-password/{token} ............................. password.reset › Auth\NewPasswordController@create
+  GET|HEAD        seguridad/permisos ........................ seguridad.permisos.index › SeguridadPermisoController@index
+  GET|HEAD        sistema/mantenimiento ..................... sistema.mantenimiento.index › MantenimientoController@index
+  POST            sistema/mantenimiento/backup-archivos sistema.mantenimiento.backup-archivos › MantenimientoController@…
+  POST            sistema/mantenimiento/backup-base-datos sistema.mantenimiento.backup-db › MantenimientoController@desc…
+  POST            sistema/mantenimiento/limpiar-cache sistema.mantenimiento.limpiar-cache › MantenimientoController@limp…
+  POST            sistema/mantenimiento/limpiar-logs sistema.mantenimiento.limpiar-logs › MantenimientoController@limpia…
+  POST            sistema/mantenimiento/storage-link sistema.mantenimiento.storage-link › MantenimientoController@crearS…
+  GET|HEAD        solicitudes_pago ........................ solicitudes_pago.index › SolicitudPagoDocenteController@index
+  POST            solicitudes_pago ........................ solicitudes_pago.store › SolicitudPagoDocenteController@store
+  GET|HEAD        solicitudes_pago/create ............... solicitudes_pago.create › SolicitudPagoDocenteController@create
+  PUT             solicitudes_pago/{solicitud_pago} ..... solicitudes_pago.update › SolicitudPagoDocenteController@update
+  DELETE          solicitudes_pago/{solicitud_pago} ... solicitudes_pago.destroy › SolicitudPagoDocenteController@destroy
+  GET|HEAD        solicitudes_pago/{solicitud_pago} ......... solicitudes_pago.show › SolicitudPagoDocenteController@show
+  GET|HEAD        solicitudes_pago/{solicitud_pago}/acuse-pago solicitudes_pago.acuse_pago › SolicitudPagoDocenteControl…
+  PUT             solicitudes_pago/{solicitud_pago}/aprobar solicitudes_pago.aprobar › SolicitudPagoDocenteController@ap…
+  GET|HEAD        solicitudes_pago/{solicitud_pago}/cancelar solicitudes_pago.cancelar.form › SolicitudPagoDocenteContro…
+  PUT             solicitudes_pago/{solicitud_pago}/cancelar solicitudes_pago.cancelar › SolicitudPagoDocenteController@…
+  GET|HEAD        solicitudes_pago/{solicitud_pago}/comprobante solicitudes_pago.comprobante › SolicitudPagoDocenteContr…
+  GET|HEAD        solicitudes_pago/{solicitud_pago}/edit .... solicitudes_pago.edit › SolicitudPagoDocenteController@edit
+  GET|HEAD        solicitudes_pago/{solicitud_pago}/observar solicitudes_pago.observar.form › SolicitudPagoDocenteContro…
+  PUT             solicitudes_pago/{solicitud_pago}/observar solicitudes_pago.observar › SolicitudPagoDocenteController@…
+  GET|HEAD        solicitudes_pago/{solicitud_pago}/pagar solicitudes_pago.form_pagar › SolicitudPagoDocenteController@f…
+  PUT             solicitudes_pago/{solicitud_pago}/pagar . solicitudes_pago.pagar › SolicitudPagoDocenteController@pagar
+  GET|HEAD        up .................................................................................................... 
+  GET|HEAD        usuarios ..................................................... usuarios.index › UsuarioController@index
+  POST            usuarios ..................................................... usuarios.store › UsuarioController@store
+  GET|HEAD        usuarios/create ............................................ usuarios.create › UsuarioController@create
+  PUT             usuarios/{usuario} ......................................... usuarios.update › UsuarioController@update
+  DELETE          usuarios/{usuario} ....................................... usuarios.destroy › UsuarioController@destroy
+  GET|HEAD        usuarios/{usuario}/edit ........................................ usuarios.edit › UsuarioController@edit
+  PATCH           usuarios/{usuario}/password-temporal usuarios.password-temporal › UsuarioController@generarPasswordTem…
+  PATCH           usuarios/{usuario}/reactivar ......................... usuarios.reactivar › UsuarioController@reactivar
+
+                                                                                                     Showing [251] routes
+

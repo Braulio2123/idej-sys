@@ -18,12 +18,21 @@ class Convenio extends Model
         'total_reestructurado',
         'numero_parcialidades',
         'estatus',
+        'cancelado_por_id',
+        'fecha_cancelacion',
+        'motivo_cancelacion',
     ];
 
     protected $casts = [
         'total_reestructurado' => 'decimal:2',
         'numero_parcialidades' => 'integer',
+        'fecha_cancelacion' => 'datetime',
     ];
+
+    public function canceladoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'cancelado_por_id');
+    }
 
     public function alumno()
     {
@@ -53,6 +62,10 @@ class Convenio extends Model
 
     public function estaPagado(): bool
     {
+        if ($this->estatus === 'Cancelado') {
+            return false;
+        }
+
         return ! $this->parcialidades()
             ->whereIn('estatus', ['Pendiente', 'Parcialmente Pagado'])
             ->exists();

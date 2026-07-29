@@ -3,15 +3,18 @@
 @section('title', 'Materias')
 
 @section('content')
+@php $puedeGestionarCatalogos = usuarioTienePermiso('catalogos_academicos.gestionar'); @endphp
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold text-slate-800">Materias</h1>
             <p class="text-sm text-slate-500">Catálogo académico para asignar clases a grupos y docentes.</p>
         </div>
+        @if($puedeGestionarCatalogos)
         <a href="{{ route('materias.create') }}" class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700">
             + Nueva materia
         </a>
+        @endif
     </div>
 
     @if(session('success'))
@@ -25,7 +28,7 @@
         <input type="text" name="buscar" value="{{ request('buscar') }}" placeholder="Buscar por materia o clave"
                class="rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
         <select name="programa_id" class="rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
-            <option value="">Todos los programas</option>
+            <option value="">Toda la Educación Programática</option>
             @foreach($programas as $programa)
                 <option value="{{ $programa->id }}" @selected((string) request('programa_id') === (string) $programa->id)>{{ $programa->nombre }}</option>
             @endforeach
@@ -44,7 +47,7 @@
                 <thead class="bg-indigo-600 text-white text-xs uppercase">
                     <tr>
                         <th class="px-4 py-3 text-left">Materia</th>
-                        <th class="px-4 py-3 text-left">Programa</th>
+                        <th class="px-4 py-3 text-left">Educación Programática</th>
                         <th class="px-4 py-3 text-center">Nivel/periodo</th>
                         <th class="px-4 py-3 text-center">Horas</th>
                         <th class="px-4 py-3 text-center">Estatus</th>
@@ -61,7 +64,7 @@
                             <td class="px-4 py-3 text-slate-600">{{ $materia->programa->nombre ?? 'General' }}</td>
                             <td class="px-4 py-3 text-center text-slate-600">
                                 {{ $materia->nivel ?: '—' }}<br>
-                                <span class="text-xs">{{ $materia->semestre_o_cuatrimestre ? 'Periodo '.$materia->semestre_o_cuatrimestre : 'Sin periodo' }}</span>
+                                <span class="text-xs">{{ $materia->semestre_o_cuatrimestre ? 'Semestre '.$materia->semestre_o_cuatrimestre : 'Sin periodo' }}</span>
                             </td>
                             <td class="px-4 py-3 text-center text-slate-600">T: {{ $materia->horas_teoricas }} · P: {{ $materia->horas_practicas }}</td>
                             <td class="px-4 py-3 text-center">
@@ -70,12 +73,15 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right whitespace-nowrap">
-                                <a href="{{ route('materias.edit', $materia) }}" class="text-blue-700 hover:underline font-semibold">Editar</a>
-                                <form action="{{ route('materias.destroy', $materia) }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar esta materia?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="text-red-600 hover:underline font-semibold ml-3">Eliminar</button>
-                                </form>
+                                @if($puedeGestionarCatalogos)
+                                    <a href="{{ route('materias.edit', $materia) }}" class="text-blue-700 hover:underline font-semibold">Editar</a>
+                                    <form action="{{ route('materias.destroy', $materia) }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar esta materia?')">
+                                        @csrf @method('DELETE')
+                                        <button class="text-red-600 hover:underline font-semibold ml-3">Eliminar</button>
+                                    </form>
+                                @else
+                                    <span class="text-xs text-slate-500">Solo consulta</span>
+                                @endif
                             </td>
                         </tr>
                     @empty

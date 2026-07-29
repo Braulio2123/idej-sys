@@ -390,7 +390,7 @@ class CentroControlOperativoController extends Controller
     {
         $query = SolicitudPagoDocente::query()
             ->with(['docente', 'calendarioMateria.calendario', 'curso', 'cursoSesion'])
-            ->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA, SolicitudPagoDocente::ESTATUS_PAGADA])
+            ->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA, SolicitudPagoDocente::ESTATUS_RECHAZADA, SolicitudPagoDocente::ESTATUS_PAGADA])
             ->where(function ($q) use ($inicio, $fin) {
                 $q->whereBetween('fecha_solicitud', [$inicio->toDateString(), $fin->toDateString()])
                     ->orWhereBetween('fecha_limite_pago', [$inicio->toDateString(), $fin->toDateString()])
@@ -423,13 +423,13 @@ class CentroControlOperativoController extends Controller
                         'subtitulo' => $solicitud->materia_actividad ?: $solicitud->concepto_pago,
                         'grupo_curso' => $solicitud->programa_grupo ?: $solicitud->periodo,
                         'docente' => $solicitud->docente?->nombre_completo ?? 'Docente no disponible',
-                        'lugar' => 'Administración/Finanzas',
+                        'lugar' => 'Coordinación Administrativa',
                         'modalidad' => $solicitud->modalidad ?: 'No aplica',
                         'estatus' => $solicitud->estatus,
                         'url' => route('solicitudes_pago.show', $solicitud),
                     ]],
                     'acciones' => $vencida && $autorizada
-                        ? ['Registrar pago', 'Verificar comprobante', 'Avisar a Finanzas']
+                        ? ['Registrar pago', 'Verificar comprobante', 'Avisar a Coordinación Administrativa']
                         : ['Revisar solicitud', 'Atender observación o autorización', 'Dar seguimiento'],
                 ];
             });

@@ -10,10 +10,11 @@ return new class extends Migration
     {
         Schema::create('cargos_masivos', function (Blueprint $table) {
             $table->id();
+            $table->uuid('operacion_uuid')->nullable()->unique();
 
             $table->foreignId('concepto_id')
                 ->constrained('conceptos_pagos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->decimal('monto', 10, 2)->nullable();
             $table->date('fecha_vencimiento');
@@ -38,7 +39,7 @@ return new class extends Migration
 
             $table->foreignId('usuario_id')
                 ->constrained('usuarios')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->timestamps();
         });

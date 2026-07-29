@@ -2,108 +2,122 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Grupo;
 use App\Models\Programa;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Traits\RegistraBitacora;
 
 class ProgramaController extends Controller
 {
     use RegistraBitacora;
 
-    /**
-     * Mostrar listado de programas académicos.
-     * NO aplica bitácora.
-     */
     public function index()
     {
         $programas = Programa::orderBy('nombre')->paginate(15);
         return view('programas.index', compact('programas'));
     }
 
-    /**
-     * Formulario crear programa.
-     * NO aplica bitácora.
-     */
     public function create()
     {
-        $programa = new Programa();
+        $programa = new Programa(['activo' => true]);
         return view('programas.create', compact('programa'));
     }
 
-    /**
-     * Guardar nuevo programa.
-     * SÍ aplica bitácora.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'clave' => 'nullable|string|max:30',
             'nombre' => 'required|string|max:255|unique:programas,nombre',
-            'nivel' => 'nullable|string|max:80',
+            'nivel' => ['required', Rule::in(['Licenciatura', 'Maestría', 'Doctorado'])],
+            'modalidad' => 'nullable|string|max:50',
+            'duracion_periodos' => 'required|integer|min:1|max:20',
+            'descripcion' => 'nullable|string|max:3000',
+            'activo' => 'nullable|boolean',
+        ], [
+            'nivel.required' => 'Selecciona el nivel de Educación Programática.',
+            'duracion_periodos.required' => 'Captura la duración en semestres.',
         ]);
+
+        $validated['activo'] = $request->boolean('activo', true);
 
         $programa = Programa::create($validated);
 
-        // BITÁCORA
         $this->bitacora(
-            'Crear Programa',
-            "Se creó el programa académico: {$programa->nombre}"
+            'Registrar Educación Programática',
+            "Se registró Educación Programática: {$programa->nombre}."
         );
 
         return redirect()
             ->route('programas.index')
-            ->with('success', 'Programa académico creado correctamente.');
+            ->with('success', 'Educación Programática registrada correctamente.');
     }
 
-    /**
-     * Formulario editar programa.
-     * NO aplica bitácora.
-     */
     public function edit(Programa $programa)
     {
         return view('programas.edit', compact('programa'));
     }
 
-    /**
-     * Actualizar programa.
-     * SÍ aplica bitácora.
-     */
     public function update(Request $request, Programa $programa)
     {
         $validated = $request->validate([
+            'clave' => 'nullable|string|max:30',
             'nombre' => 'required|string|max:255|unique:programas,nombre,' . $programa->id,
-            'nivel' => 'nullable|string|max:80',
+            'nivel' => ['required', Rule::in(['Licenciatura', 'Maestría', 'Doctorado'])],
+            'modalidad' => 'nullable|string|max:50',
+            'duracion_periodos' => 'required|integer|min:1|max:20',
+            'descripcion' => 'nullable|string|max:3000',
+            'activo' => 'nullable|boolean',
+        ], [
+            'nivel.required' => 'Selecciona el nivel de Educación Programática.',
+            'duracion_periodos.required' => 'Captura la duración en semestres.',
         ]);
+
+        $validated['activo'] = $request->boolean('activo');
 
         $programa->update($validated);
 
-        // BITÁCORA
         $this->bitacora(
-            'Actualizar Programa',
-            "Se actualizó el programa académico: {$programa->nombre}"
+            'Actualizar Educación Programática',
+            "Se actualizó Educación Programática: {$programa->nombre}."
         );
 
         return redirect()
             ->route('programas.index')
-            ->with('success', 'Programa académico actualizado correctamente.');
+            ->with('success', 'Educación Programática actualizada correctamente.');
     }
 
-    /**
-     * Eliminar programa.
-     * SÍ aplica bitácora.
-     */
     public function destroy(Programa $programa)
     {
         $nombre = $programa->nombre;
+
+        $tieneHistorial = $programa->materias()->exists()
+            || $programa->prospectos()->exists()
+            || $programa->requisitosDocumentales()->exists()
+            || Grupo::where('programa_id', $programa->id)->exists();
+
+        if ($tieneHistorial) {
+            $programa->forceFill(['activo' => false])->save();
+
+            $this->bitacora(
+                'Inactivar Educación Programática',
+                "Se inactivó Educación Programática {$nombre} porque ya tiene historial relacionado."
+            );
+
+            return redirect()
+                ->route('programas.index')
+                ->with('success', 'La Educación Programática se inactivó para conservar su historial institucional.');
+        }
+
         $programa->delete();
 
-        // BITÁCORA
         $this->bitacora(
-            'Eliminar Programa',
-            "Se eliminó el programa académico: {$nombre}"
+            'Eliminar Educación Programática',
+            "Se eliminó Educación Programática: {$nombre}."
         );
 
         return redirect()
             ->route('programas.index')
-            ->with('success', 'Programa académico eliminado correctamente.');
+            ->with('success', 'Educación Programática eliminada correctamente.');
     }
 }

@@ -56,12 +56,6 @@ class UsuarioSeeder extends Seeder
                 'password' => Hash::make('rrpp123'),
                 'rol_id' => $rolIds[Rol::RRPP] ?? null,
             ],
-            [
-                'nombre' => 'Finanzas IDEJ',
-                'email' => 'finanzas@idej.test',
-                'password' => Hash::make('finanzas123'),
-                'rol_id' => $rolIds[Rol::FINANZAS] ?? null,
-            ],
         ];
 
         foreach ($usuarios as $usuario) {

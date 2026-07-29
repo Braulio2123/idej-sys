@@ -11,7 +11,7 @@
                 Editar solicitud {{ $solicitud->folio ?? '#'.$solicitud->id }}
             </h1>
             <p class="text-sm text-slate-500 mt-1">
-                Solo puede corregirse mientras esté pendiente u observada. Si estaba observada, al guardar vuelve a revisión administrativa.
+                Solo puede corregirse mientras esté pendiente u observada. Al reenviar, cualquier valoración anterior se invalida para que CAdmin revise nuevamente las fechas impartidas.
             </p>
         </div>
 

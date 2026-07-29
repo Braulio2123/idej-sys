@@ -170,7 +170,9 @@ class AgendaOperativaController extends Controller
                     'observaciones' => $sesion->observaciones,
                     'url' => $calendario ? route('calendarios_academicos.show', $calendario) : null,
                 ];
-            });
+            })
+            ->values()
+            ->toBase();
     }
 
     private function eventosEducacionContinua(Carbon $inicio, Carbon $fin): Collection
@@ -207,7 +209,9 @@ class AgendaOperativaController extends Controller
                     'observaciones' => $sesion->observaciones,
                     'url' => $curso ? route('educacion_continua.show', $curso) : null,
                 ];
-            });
+            })
+            ->values()
+            ->toBase();
     }
 
     private function equipoSugeridoParaClasePrincipal(?string $modalidad, ?string $aula): array

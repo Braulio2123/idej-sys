@@ -29,6 +29,7 @@ return new class extends Migration
             $table->index(['usuario_id', 'leida_at', 'archivada_at'], 'notificaciones_usuario_estado_index');
             $table->index(['rol_clave', 'leida_at', 'archivada_at'], 'notificaciones_rol_estado_index');
             $table->index(['referencia_tipo', 'referencia_id'], 'notificaciones_referencia_index');
+            $table->index(['created_at', 'archivada_at', 'leida_at'], 'idx_notificaciones_feed_estado');
         });
     }
 

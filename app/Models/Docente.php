@@ -14,6 +14,10 @@ class Docente extends Model
 
     protected $table = 'docentes';
 
+    public const ESTATUS_PENDIENTE = 'Pendiente de Datos';
+    public const ESTATUS_ACTIVO = 'Activo';
+    public const ESTATUS_INACTIVO = 'Inactivo';
+
     protected $fillable = [
         'nombre_completo',
         'email',
@@ -23,6 +27,16 @@ class Docente extends Model
         'creado_por_id',
         'rfc',
         'numero_cuenta',
+        'banco',
+        'curriculum_path',
+        'curriculum_original',
+        'curriculum_sha256',
+        'titulo_cedula_path',
+        'titulo_cedula_original',
+        'titulo_cedula_sha256',
+        'constancia_fiscal_path',
+        'constancia_fiscal_original',
+        'constancia_fiscal_sha256',
         'estatus'
     ];
 
@@ -39,7 +53,7 @@ class Docente extends Model
     {
         return Attribute::make(
             get: fn ($value) => $value ? decrypt($value) : null,
-            set: fn ($value) => $value ? encrypt($value) : null,
+            set: fn ($value) => $value ? encrypt(mb_strtoupper(trim($value))) : null,
         );
     }
 
@@ -106,6 +120,15 @@ class Docente extends Model
         return $this->nombre_completo;
     }
 
+    public static function estatuses(): array
+    {
+        return [
+            self::ESTATUS_PENDIENTE,
+            self::ESTATUS_ACTIVO,
+            self::ESTATUS_INACTIVO,
+        ];
+    }
+
 
     /**
      * ================================
@@ -114,22 +137,26 @@ class Docente extends Model
      */
     public function calcularEstatus()
     {
+        if ($this->estatus === self::ESTATUS_INACTIVO) {
+            return self::ESTATUS_INACTIVO;
+        }
+
         $campos = [
             'nombre_completo',
             'email',
             'telefono',
-            'domicilio',
             'area_especialidad',
             'rfc',
             'numero_cuenta',
+            'banco',
         ];
 
         foreach ($campos as $campo) {
             if (empty($this->$campo)) {
-                return 'Pendiente de Datos';
+                return self::ESTATUS_PENDIENTE;
             }
         }
 
-        return 'Activo';
+        return self::ESTATUS_ACTIVO;
     }
 }
