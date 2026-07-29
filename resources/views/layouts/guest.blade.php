@@ -51,5 +51,7 @@
         </p>
     </div>
 
+    @include('partials.idempotent-forms')
+
 </body>
 </html>

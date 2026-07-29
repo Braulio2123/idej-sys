@@ -10,12 +10,17 @@
     use App\Models\Beca;
 
     $usuarioActual = Auth::user();
-    $puedeOperarFinanzas = $usuarioActual?->tieneRol(Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS) ?? false;
-    $puedeCancelarPagos = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS) ?? false;
-    $puedeEditarAlumno = $usuarioActual?->tieneRol(Rol::RECEPCION, Rol::CADMIN) ?? false;
-    $puedeRegistrarSeguimiento = $usuarioActual?->tieneRol(Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS, Rol::RRPP, Rol::ACADEMICA) ?? false;
-    $puedeGestionarDocumentos = $usuarioActual?->tieneRol(Rol::RECEPCION, Rol::CADMIN, Rol::RRPP, Rol::ACADEMICA) ?? false;
-    $puedeGestionarBecas = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS) ?? false;
+    $puedeCrearCargo = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN) ?? false;
+    $puedeRegistrarPago = usuarioTienePermiso('pagos.registrar');
+    $puedeGestionarConvenios = usuarioTienePermiso('convenios.gestionar');
+    $puedeVerDetalleFinanciero = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::DIRECCION) ?? false;
+    $puedeCancelarPagos = usuarioTienePermiso('pagos.cancelar');
+    $puedeEditarAlumno = usuarioTienePermiso('alumnos.gestionar');
+    $puedeRegistrarSeguimiento = usuarioTienePermiso('seguimientos.gestionar');
+    $puedeGenerarChecklistDocumental = usuarioTienePermiso('documentos.gestionar');
+    $puedeVerDocumentos = usuarioTienePermiso('documentos.ver');
+    $puedeVerBecas = usuarioTienePermiso('becas.ver');
+    $puedeGestionarBecas = usuarioTienePermiso('becas.gestionar');
 
     $becaActiva = $alumno->becaVigente();
     $becasActivas = $alumno->becas->where('estatus', Beca::ESTATUS_ACTIVA)->count();
@@ -85,20 +90,14 @@
                     </a>
                 @endif
 
-                @if($puedeOperarFinanzas)
-                    @if($alumno->estatus_academico === 'Activo')
-                        <a href="{{ route('alumnos.cargos.create', $alumno) }}" class="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
-                            + Cargo
-                        </a>
-                    @endif
-                    <a href="{{ route('alumnos.pagos.create', $alumno) }}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
-                        + Pago
-                    </a>
-                    @if($alumno->estatus_academico === 'Activo' && in_array($alumno->estatus_financiero, ['Con Adeudo', 'En Convenio'], true))
-                        <a href="{{ route('alumnos.convenios.create', $alumno) }}" class="bg-amber-400 hover:bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
-                            + Convenio
-                        </a>
-                    @endif
+                @if($puedeCrearCargo && $alumno->estatus_academico === 'Activo')
+                    <a href="{{ route('alumnos.cargos.create', $alumno) }}" class="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">+ Cargo</a>
+                @endif
+                @if($puedeRegistrarPago)
+                    <a href="{{ route('alumnos.pagos.create', $alumno) }}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">+ Pago</a>
+                @endif
+                @if($puedeGestionarConvenios && $alumno->estatus_academico === 'Activo' && in_array($alumno->estatus_financiero, ['Con Adeudo', 'En Convenio'], true))
+                    <a href="{{ route('alumnos.convenios.create', $alumno) }}" class="bg-amber-400 hover:bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">+ Convenio</a>
                 @endif
 
                 @if($puedeRegistrarSeguimiento)
@@ -108,7 +107,7 @@
                 @endif
 
 
-                @if($puedeGestionarDocumentos)
+                @if($puedeGenerarChecklistDocumental)
                     <form action="{{ route('alumnos.documentos.generar-checklist', $alumno) }}" method="POST" onsubmit="return confirm('¿Generar checklist documental desde el catálogo? No se duplicarán documentos existentes.');">
                         @csrf
                         <button class="bg-cyan-500 hover:bg-cyan-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
@@ -117,13 +116,13 @@
                     </form>
                 @endif
 
-                <a href="{{ route('alumnos.documentos.index', $alumno) }}" class="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">
-                    Expediente documental
-                </a>
+                @if($puedeVerDocumentos)
+                    <a href="{{ route('alumnos.documentos.index', $alumno) }}" class="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">Expediente documental</a>
+                @endif
 
-                <a href="{{ route('alumnos.becas.index', $alumno) }}" class="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">
-                    Becas
-                </a>
+                @if($puedeVerBecas)
+                    <a href="{{ route('alumnos.becas.index', $alumno) }}" class="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">Becas</a>
+                @endif
 
                 @if($puedeGestionarBecas)
                     <a href="{{ route('alumnos.becas.create', $alumno) }}" class="bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold shadow transition">
@@ -147,21 +146,28 @@
             </p>
         </div>
 
+        @if($puedeVerDetalleFinanciero)
         <div class="bg-white rounded-2xl border border-slate-100 shadow p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">Adeudo actual</p>
             <p class="mt-2 text-2xl font-bold text-red-700">${{ number_format($totalAdeudo, 2) }}</p>
         </div>
+        @endif
 
+        @if($puedeVerDetalleFinanciero)
         <div class="bg-white rounded-2xl border border-slate-100 shadow p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">Pagado histórico</p>
             <p class="mt-2 text-2xl font-bold text-green-700">${{ number_format($totalPagado, 2) }}</p>
         </div>
+        @endif
 
+        @if($puedeVerDetalleFinanciero)
         <div class="bg-white rounded-2xl border border-slate-100 shadow p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">Saldo a favor</p>
             <p class="mt-2 text-2xl font-bold text-blue-700">${{ number_format($alumno->saldo_a_favor, 2) }}</p>
         </div>
+        @endif
 
+        @if($puedeVerDetalleFinanciero)
         <div class="bg-white rounded-2xl border border-slate-100 shadow p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">Beca vigente</p>
             <p class="mt-2 text-2xl font-bold {{ $becaActiva ? 'text-emerald-700' : 'text-slate-500' }}">
@@ -173,6 +179,7 @@
                 <p class="text-xs text-slate-500 mt-1">Histórico: ${{ number_format($descuentoBecasHistorico, 2) }}</p>
             @endif
         </div>
+        @endif
 
         <div class="bg-white rounded-2xl border border-slate-100 shadow p-5">
             <p class="text-xs uppercase tracking-wide text-slate-500">Seguimientos abiertos</p>
@@ -292,9 +299,13 @@
             <div class="border border-slate-100 rounded-xl p-4">
                 <h3 class="font-bold text-slate-800 mb-3">Datos financieros</h3>
                 <p><strong>Estatus:</strong> {{ $alumno->estatus_financiero }}</p>
-                <p><strong>Beca:</strong> {{ $alumno->beca_porcentaje > 0 ? $alumno->beca_porcentaje . '%' : 'No aplica' }}</p>
-                <p><strong>Convenios activos:</strong> {{ $conveniosActivos }}</p>
-                <p><strong>Saldo a favor:</strong> ${{ number_format($alumno->saldo_a_favor, 2) }}</p>
+                @if($puedeVerDetalleFinanciero)
+                    <p><strong>Beca:</strong> {{ $alumno->beca_porcentaje > 0 ? $alumno->beca_porcentaje . '%' : 'No aplica' }}</p>
+                    <p><strong>Convenios activos:</strong> {{ $conveniosActivos }}</p>
+                    <p><strong>Saldo a favor:</strong> ${{ number_format($alumno->saldo_a_favor, 2) }}</p>
+                @else
+                    <p class="text-xs text-slate-500 mt-2">Importes restringidos para tu área.</p>
+                @endif
             </div>
         </div>
     </div>
@@ -351,6 +362,7 @@
                                 <tr class="border-b hover:bg-slate-50">
                                     <td class="px-4 py-3">
                                         <p class="font-semibold text-slate-800">{{ $documento->tipo_documento }}</p>
+                                        <p class="mt-0.5 text-[11px] font-semibold text-indigo-700">Clasificación: {{ $documento->clasificacion() }}</p>
                                         @if($documento->requisitoDocumental)
                                             <p class="text-[11px] text-cyan-700 font-semibold mt-0.5">{{ $documento->requisitoDocumental->obligatorio ? 'Requisito obligatorio' : 'Requisito opcional' }}</p>
                                         @endif
@@ -369,7 +381,7 @@
                                         </span>
                                     </td>
                                     <td class="px-4 py-3">
-                                        @if($documento->archivo_path)
+                                        @if($documento->puedeDescargar($usuarioActual))
                                             <a href="{{ route('alumnos.documentos.download', [$alumno, $documento]) }}" class="text-cyan-700 hover:underline font-semibold">
                                                 Descargar
                                             </a>
@@ -476,6 +488,7 @@
         </div>
     </div>
 
+    @if($puedeVerDetalleFinanciero)
     {{-- Cargos --}}
     <div class="bg-white shadow rounded-2xl border border-slate-100 mb-6 overflow-hidden">
         <button @click="openCargos = !openCargos" class="w-full bg-indigo-600 text-white px-6 py-3 text-lg font-semibold flex justify-between">
@@ -659,5 +672,6 @@
             @endif
         </div>
     </div>
+    @endif
 </div>
 @endsection

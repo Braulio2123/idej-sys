@@ -164,7 +164,7 @@
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 class="mb-4 font-semibold text-slate-900">Finanzas</h3>
+            <h3 class="mb-4 font-semibold text-slate-900">Administración financiera</h3>
             <div class="grid grid-cols-2 gap-3 text-sm">
                 <div class="rounded-xl bg-slate-50 p-3"><p class="text-slate-500">Cargos generados</p><p class="font-bold text-slate-900">{{ $money($finanzas['cargos_generados_periodo']) }}</p></div>
                 <div class="rounded-xl bg-slate-50 p-3"><p class="text-slate-500">Recuperación</p><p class="font-bold text-slate-900">{{ $finanzas['porcentaje_recuperacion'] }}%</p></div>

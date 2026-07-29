@@ -13,11 +13,11 @@ return new class extends Migration
 
             $table->foreignId('cargo_id')
                 ->constrained('cargos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('pago_id')
                 ->constrained('pagos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->decimal('monto_aplicado', 10, 2);
 

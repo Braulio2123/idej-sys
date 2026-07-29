@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CalendarioAcademico;
 use App\Models\CicloEscolar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -124,6 +125,14 @@ class CicloEscolarController extends Controller
     public function destroy(CicloEscolar $ciclo_escolar)
     {
         $nombre = $ciclo_escolar->nombre;
+
+        if ($ciclo_escolar->grupos()->exists() || CalendarioAcademico::where('ciclo_escolar_id', $ciclo_escolar->id)->exists()) {
+            $ciclo_escolar->update(['activo' => false]);
+            $this->bitacora('Inactivar Ciclo Escolar', "Se inactivó el ciclo escolar '{$nombre}' para conservar su historial.");
+
+            return redirect()->route('ciclos_escolares.index')
+                ->with('success', 'El ciclo escolar se inactivó porque tiene historial relacionado.');
+        }
 
         $ciclo_escolar->delete();
 

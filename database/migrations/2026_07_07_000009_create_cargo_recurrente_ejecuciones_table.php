@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('cargo_recurrente_ejecuciones', function (Blueprint $table) {
             $table->id();
             $table->foreignId('plan_cargo_recurrente_id')->constrained('planes_cargos_recurrentes')->cascadeOnDelete();
-            $table->foreignId('alumno_id')->constrained('alumnos')->cascadeOnDelete();
+            $table->foreignId('alumno_id')->constrained('alumnos')->restrictOnDelete();
             $table->foreignId('cargo_id')->nullable()->constrained('cargos')->nullOnDelete();
             $table->char('periodo', 7);
             $table->date('fecha_vencimiento');

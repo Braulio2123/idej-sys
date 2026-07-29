@@ -60,7 +60,7 @@ class SincronizarNotificacionesOperativas extends Command
                 ]);
             }
 
-            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], [
+            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN], [
                 'tipo' => 'caja_abierta_antigua_supervision',
                 'modulo' => 'Caja',
                 'titulo' => 'Caja abierta pendiente de supervisión',
@@ -82,11 +82,11 @@ class SincronizarNotificacionesOperativas extends Command
             ->get();
 
         foreach ($pendientes as $solicitud) {
-            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], [
+            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN], [
                 'tipo' => 'solicitud_docente_pendiente_revision',
                 'modulo' => 'Solicitudes docentes',
-                'titulo' => 'Solicitud docente pendiente de revisión',
-                'mensaje' => $this->resumenSolicitud($solicitud).' sigue pendiente desde '.($solicitud->fecha_solicitud?->format('d/m/Y') ?? 'fecha no registrada').'.',
+                'titulo' => 'Solicitud docente pendiente de valoración',
+                'mensaje' => $this->resumenSolicitud($solicitud).' sigue pendiente de valoración desde '.($solicitud->fecha_solicitud?->format('d/m/Y') ?? 'fecha no registrada').'.',
                 'url' => route('solicitudes_pago.show', $solicitud, false),
                 'severidad' => NotificacionInterna::SEVERIDAD_MEDIA,
                 'referencia_tipo' => SolicitudPagoDocente::class,
@@ -126,16 +126,37 @@ class SincronizarNotificacionesOperativas extends Command
             ->get();
 
         foreach ($autorizadasVencidas as $solicitud) {
-            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], [
-                'tipo' => 'solicitud_docente_autorizada_vencida',
+            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN], [
+                'tipo' => 'solicitud_docente_programada_vencida',
                 'modulo' => 'Solicitudes docentes',
-                'titulo' => 'Solicitud docente autorizada vencida sin pago',
+                'titulo' => 'Solicitud docente programada vencida sin pago',
                 'mensaje' => $this->resumenSolicitud($solicitud).' tenía fecha límite '.($solicitud->fecha_limite_pago?->format('d/m/Y') ?? 'fecha no registrada').'.',
                 'url' => route('solicitudes_pago.show', $solicitud, false),
                 'severidad' => NotificacionInterna::SEVERIDAD_ALTA,
                 'referencia_tipo' => SolicitudPagoDocente::class,
                 'referencia_id' => $solicitud->id,
                 'metadata' => ['fecha_limite_pago' => (string) $solicitud->fecha_limite_pago],
+            ]);
+        }
+
+        $tentativasVencidas = SolicitudPagoDocente::query()
+            ->where('estatus', SolicitudPagoDocente::ESTATUS_AUTORIZADA)
+            ->whereNotNull('fecha_tentativa_pago')
+            ->whereDate('fecha_tentativa_pago', '<', today())
+            ->get();
+
+        foreach ($tentativasVencidas as $solicitud) {
+            $tentativa = $solicitud->fecha_tentativa_pago?->format('d/m/Y') ?? 'fecha no registrada';
+            $this->notificarRoles([Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA], [
+                'tipo' => 'solicitud_docente_tentativa_vencida',
+                'modulo' => 'Solicitudes docentes',
+                'titulo' => 'Tentativa de pago docente pendiente de actualización',
+                'mensaje' => $this->resumenSolicitud($solicitud)." tenía tentativa {$tentativa} y aún no aparece como pagada. CAdmin debe pagar o actualizar la fecha para que Académica pueda informar al docente.",
+                'url' => route('solicitudes_pago.show', $solicitud, false),
+                'severidad' => NotificacionInterna::SEVERIDAD_ALTA,
+                'referencia_tipo' => SolicitudPagoDocente::class,
+                'referencia_id' => $solicitud->id,
+                'metadata' => ['fecha_tentativa_pago' => (string) $solicitud->fecha_tentativa_pago],
             ]);
         }
     }

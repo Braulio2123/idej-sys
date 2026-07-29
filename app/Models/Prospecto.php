@@ -41,12 +41,15 @@ class Prospecto extends Model
         'motivo_descarte',
         'alumno_id',
         'fecha_conversion',
+        'archivado_at',
+        'archivado_por_id',
     ];
 
     protected $casts = [
         'fecha_contacto' => 'datetime',
         'fecha_proximo_contacto' => 'datetime',
         'fecha_conversion' => 'datetime',
+        'archivado_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -86,6 +89,11 @@ class Prospecto extends Model
             'Campaña',
             'Otro',
         ];
+    }
+
+    public function archivadoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'archivado_por_id');
     }
 
     public function programa()

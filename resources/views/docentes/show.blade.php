@@ -1,6 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    use App\Models\Rol;
+    $usuarioActual = Auth::user();
+    $puedeGestionarDocentes = usuarioTienePermiso('docentes.gestionar');
+    $puedeGestionarDatosFinancieros = Auth::user()?->tieneRol(\App\Models\Rol::ADMIN, \App\Models\Rol::CADMIN) ?? false;
+    $puedeVerDatosFiscales = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN) ?? false;
+@endphp
 
 <div class="max-w-5xl mx-auto mt-6">
 
@@ -29,13 +36,12 @@
                     Regresar
                 </a>
 
-                {{-- Botón editar --}}
-                <a href="{{ route('docentes.edit', $docente) }}"
-                   class="inline-flex items-center gap-2 text-sm bg-amber-600 hover:bg-amber-700
-                          text-white px-4 py-2 rounded-xl transition shadow-sm">
-                    <i class='bx bx-edit-alt text-lg'></i>
-                    Editar
-                </a>
+                @if($puedeGestionarDocentes)
+                    <a href="{{ route('docentes.edit', $docente) }}" class="inline-flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl transition shadow-sm"><i class='bx bx-edit-alt text-lg'></i>Editar datos académicos</a>
+                @endif
+                @if($puedeGestionarDatosFinancieros)
+                    <a href="{{ route('docentes.financieros.edit', $docente) }}" class="inline-flex items-center gap-2 text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl transition shadow-sm"><i class='bx bx-money text-lg'></i>Datos financieros</a>
+                @endif
 
             </div>
         </div>
@@ -68,27 +74,49 @@
                 <p class="text-lg text-slate-700">{{ $docente->telefono ?? '—' }}</p>
             </div>
 
-            {{-- RFC --}}
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p class="text-xs text-slate-500">RFC</p>
-                <p class="text-lg text-slate-700">{{ $docente->rfc ?? '—' }}</p>
-            </div>
+            @if($puedeVerDatosFiscales)
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+                    <p class="text-xs text-amber-700">RFC</p>
+                    <p class="text-lg text-slate-700">{{ $docente->rfc ?? '—' }}</p>
+                </div>
 
-            {{-- Datos bancarios --}}
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
-                <p class="text-xs text-slate-500">Número de cuenta</p>
-                <p class="text-lg text-slate-700">{{ $docente->numero_cuenta ?? '—' }}</p>
-                <p class="text-xs text-slate-500 mt-2">Banco</p>
-                <p class="text-lg text-slate-700">{{ $docente->banco ?? '—' }}</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+                    <p class="text-xs text-amber-700">Número de cuenta</p>
+                    <p class="text-lg text-slate-700">{{ $docente->numero_cuenta ?? '—' }}</p>
+                    <p class="text-xs text-amber-700 mt-2">Banco</p>
+                    <p class="text-lg text-slate-700">{{ $docente->banco ?? '—' }}</p>
+                </div>
+            @endif
+
+            <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Documentos privados</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @if(Auth::user()?->tieneRol(\App\Models\Rol::ADMIN, \App\Models\Rol::ACADEMICA) && $docente->curriculum_path)
+                        <a href="{{ route('docentes.documentos.download', [$docente, 'curriculum']) }}" class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">Curriculum</a>
+                    @endif
+                    @if(Auth::user()?->tieneRol(\App\Models\Rol::ADMIN, \App\Models\Rol::ACADEMICA) && $docente->titulo_cedula_path)
+                        <a href="{{ route('docentes.documentos.download', [$docente, 'titulo_cedula']) }}" class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">Título y cédula</a>
+                    @endif
+                    @if($puedeVerDatosFiscales && $docente->constancia_fiscal_path)
+                        <a href="{{ route('docentes.documentos.download', [$docente, 'constancia_fiscal']) }}" class="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700">Constancia fiscal</a>
+                    @endif
+                    @if(! $docente->curriculum_path && ! $docente->titulo_cedula_path && (! $puedeVerDatosFiscales || ! $docente->constancia_fiscal_path))
+                        <span class="text-sm text-slate-500">No hay documentos disponibles para tu rol.</span>
+                    @endif
+                </div>
             </div>
 
             {{-- Estatus --}}
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
                 <p class="text-xs text-slate-500">Estatus</p>
 
-                @if($docente->estatus === 'Pendiente de Datos')
+                @if($docente->estatus === \App\Models\Docente::ESTATUS_PENDIENTE)
                     <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-xs font-semibold">
                         Pendiente de Datos
+                    </span>
+                @elseif($docente->estatus === \App\Models\Docente::ESTATUS_INACTIVO)
+                    <span class="bg-slate-200 text-slate-700 px-3 py-1 rounded-lg text-xs font-semibold">
+                        Inactivo
                     </span>
                 @else
                     <span class="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-semibold">

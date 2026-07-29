@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Builder;
 
 class DocumentoAlumno extends Model
 {
@@ -19,6 +19,12 @@ class DocumentoAlumno extends Model
     public const ESTATUS_ACEPTADO = 'Aceptado';
     public const ESTATUS_RECHAZADO = 'Rechazado';
 
+    public const CLASIFICACION_IDENTIDAD = 'Identidad';
+    public const CLASIFICACION_ACADEMICA = 'Académica';
+    public const CLASIFICACION_FINANCIERA = 'Financiera';
+    public const CLASIFICACION_ADMISION = 'Admisión';
+    public const CLASIFICACION_RESTRINGIDA = 'Restringida';
+
     protected $fillable = [
         'alumno_id',
         'requisito_documental_id',
@@ -30,6 +36,8 @@ class DocumentoAlumno extends Model
         'mime_type',
         'extension',
         'tamano_bytes',
+        'archivo_sha256',
+        'archivo_verificado_at',
         'estatus',
         'fecha_documento',
         'fecha_entrega',
@@ -43,6 +51,7 @@ class DocumentoAlumno extends Model
         'fecha_entrega' => 'datetime',
         'fecha_revision' => 'datetime',
         'tamano_bytes' => 'integer',
+        'archivo_verificado_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -75,6 +84,132 @@ class DocumentoAlumno extends Model
             self::ESTATUS_ACEPTADO,
             self::ESTATUS_RECHAZADO,
         ];
+    }
+
+    public static function clasificacionParaTipo(?string $tipo): string
+    {
+        return match (mb_strtolower(trim((string) $tipo))) {
+            'acta de nacimiento', 'curp', 'identificación oficial', 'comprobante de domicilio', 'fotografía' => self::CLASIFICACION_IDENTIDAD,
+            'certificado de estudios', 'título profesional', 'cédula profesional' => self::CLASIFICACION_ACADEMICA,
+            'comprobante de pago' => self::CLASIFICACION_FINANCIERA,
+            'solicitud de inscripción', 'contrato / reglamento firmado' => self::CLASIFICACION_ADMISION,
+            default => self::CLASIFICACION_RESTRINGIDA,
+        };
+    }
+
+    public function clasificacion(): string
+    {
+        return self::clasificacionParaTipo($this->tipo_documento);
+    }
+
+    public static function clasificacionesVisiblesPara(?Usuario $usuario): array
+    {
+        $rol = $usuario?->rolClave();
+
+        return match ($rol) {
+            Rol::ADMIN, Rol::CADMIN => [
+                self::CLASIFICACION_IDENTIDAD,
+                self::CLASIFICACION_ACADEMICA,
+                self::CLASIFICACION_FINANCIERA,
+                self::CLASIFICACION_ADMISION,
+                self::CLASIFICACION_RESTRINGIDA,
+            ],
+            Rol::RECEPCION => [
+                self::CLASIFICACION_IDENTIDAD,
+                self::CLASIFICACION_ACADEMICA,
+                self::CLASIFICACION_FINANCIERA,
+                self::CLASIFICACION_ADMISION,
+            ],
+            Rol::ACADEMICA => [self::CLASIFICACION_ACADEMICA, self::CLASIFICACION_ADMISION],
+            Rol::DIRECCION => [
+                self::CLASIFICACION_ACADEMICA,
+                self::CLASIFICACION_FINANCIERA,
+                self::CLASIFICACION_ADMISION,
+            ],
+            default => [],
+        };
+    }
+
+    public static function tiposVisiblesPara(?Usuario $usuario): array
+    {
+        $clasificaciones = self::clasificacionesVisiblesPara($usuario);
+
+        return array_values(array_filter(
+            self::tiposDisponibles(),
+            fn (string $tipo) => in_array(self::clasificacionParaTipo($tipo), $clasificaciones, true)
+        ));
+    }
+
+    public function puedeVer(?Usuario $usuario): bool
+    {
+        return in_array($this->clasificacion(), self::clasificacionesVisiblesPara($usuario), true);
+    }
+
+    public function puedeDescargar(?Usuario $usuario): bool
+    {
+        return ($usuario?->tienePermiso('documentos.descargar') ?? false)
+            && $this->puedeVer($usuario)
+            && filled($this->archivo_path);
+    }
+
+    public function puedeGestionar(?Usuario $usuario): bool
+    {
+        $rol = $usuario?->rolClave();
+        $clasificacion = $this->clasificacion();
+
+        return match ($rol) {
+            Rol::ADMIN, Rol::CADMIN => true,
+            Rol::RECEPCION => $clasificacion !== self::CLASIFICACION_RESTRINGIDA,
+            Rol::ACADEMICA => in_array($clasificacion, [self::CLASIFICACION_ACADEMICA, self::CLASIFICACION_ADMISION], true),
+            default => false,
+        };
+    }
+
+    public static function usuarioPuedeGestionarTipo(?Usuario $usuario, string $tipo): bool
+    {
+        $documento = new self(['tipo_documento' => $tipo]);
+
+        return $documento->puedeGestionar($usuario);
+    }
+
+    public static function usuarioPuedeRevisarTipo(?Usuario $usuario, string $tipo): bool
+    {
+        $documento = new self(['tipo_documento' => $tipo]);
+
+        return $documento->puedeRevisar($usuario);
+    }
+
+    public function puedeRevisar(?Usuario $usuario): bool
+    {
+        $rol = $usuario?->rolClave();
+        $clasificacion = $this->clasificacion();
+
+        return match ($rol) {
+            Rol::ADMIN, Rol::CADMIN => true,
+            Rol::RECEPCION => in_array($clasificacion, [self::CLASIFICACION_IDENTIDAD, self::CLASIFICACION_ADMISION], true),
+            Rol::ACADEMICA => in_array($clasificacion, [self::CLASIFICACION_ACADEMICA, self::CLASIFICACION_ADMISION], true),
+            default => false,
+        };
+    }
+
+    public function scopeVisiblesPara(Builder $query, ?Usuario $usuario): Builder
+    {
+        $tipos = self::tiposVisiblesPara($usuario);
+        $puedeVerRestringidos = in_array(self::CLASIFICACION_RESTRINGIDA, self::clasificacionesVisiblesPara($usuario), true);
+
+        if ($tipos === [] && ! $puedeVerRestringidos) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $subquery) use ($tipos, $puedeVerRestringidos) {
+            if ($tipos !== []) {
+                $subquery->whereIn('tipo_documento', $tipos);
+            }
+
+            if ($puedeVerRestringidos) {
+                $subquery->orWhereNotIn('tipo_documento', self::tiposDisponibles());
+            }
+        });
     }
 
     public function alumno()

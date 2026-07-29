@@ -27,9 +27,13 @@ class ConfirmablePasswordController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'max:255'],
+        ]);
+
         if (! Auth::guard('web')->validate([
             'email' => $request->user()->email,
-            'password' => $request->password,
+            'password' => $validated['password'],
         ])) {
             $this->bitacora(
                 'Confirmación de contraseña fallida',

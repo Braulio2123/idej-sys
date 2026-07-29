@@ -34,7 +34,6 @@ class ProfileUpdateRequest extends FormRequest
 
         return $usuario
             && method_exists($usuario, 'esAdmin')
-            && method_exists($usuario, 'esSistemas')
-            && ($usuario->esAdmin() || $usuario->esSistemas());
+            && $usuario->esAdmin();
     }
 }

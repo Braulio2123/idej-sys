@@ -3,6 +3,12 @@
 @section('title', $curso->nombre)
 
 @section('content')
+@php
+    use App\Models\Rol;
+    $usuarioActual = Auth::user();
+    $puedeGestionarEducacionContinua = $usuarioActual?->tienePermiso('educacion_continua.gestionar') ?? false;
+    $esSistemas = $usuarioActual?->rolClave() === Rol::SISTEMAS;
+@endphp
 <div class="space-y-6">
     <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -12,7 +18,9 @@
                 <p class="text-sm text-slate-400 mt-1">{{ optional($curso->fecha_inicio)->format('d/m/Y') ?? 'Sin inicio' }} - {{ optional($curso->fecha_fin)->format('d/m/Y') ?? 'Sin fin' }} · Responsable: {{ $curso->responsable->nombre ?? 'Sin responsable' }}</p>
             </div>
             <div class="flex gap-2">
-                <a href="{{ route('educacion_continua.edit', $curso) }}" class="px-4 py-2 rounded-xl bg-amber-500 text-white font-semibold">Editar</a>
+                @if($puedeGestionarEducacionContinua)
+                    <a href="{{ route('educacion_continua.edit', $curso) }}" class="px-4 py-2 rounded-xl bg-amber-500 text-white font-semibold">Editar</a>
+                @endif
                 <a href="{{ route('educacion_continua.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold">Volver</a>
             </div>
         </div>
@@ -22,7 +30,7 @@
     @if(session('error')) <div class="p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">{{ session('error') }}</div> @endif
     @if($errors->any()) <div class="p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">{{ $errors->first() }}</div> @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+    <div class="grid grid-cols-1 {{ $puedeVerParticipantes ? 'md:grid-cols-4' : 'md:grid-cols-3' }} gap-5">
         <div class="bg-white rounded-2xl shadow border border-slate-100 p-5">
             <p class="text-sm text-slate-500">Horas requeridas</p>
             <p class="text-3xl font-bold text-indigo-700">{{ number_format($curso->horas_totales, 2) }}h</p>
@@ -35,10 +43,12 @@
             <p class="text-sm text-slate-500">Horas impartidas</p>
             <p class="text-3xl font-bold text-green-700">{{ number_format($horasImpartidas, 2) }}h</p>
         </div>
-        <div class="bg-white rounded-2xl shadow border border-slate-100 p-5">
-            <p class="text-sm text-slate-500">Inscritos activos</p>
-            <p class="text-3xl font-bold text-amber-700">{{ $inscritosActivos }}</p>
-        </div>
+        @if($puedeVerParticipantes)
+            <div class="bg-white rounded-2xl shadow border border-slate-100 p-5">
+                <p class="text-sm text-slate-500">Inscritos activos</p>
+                <p class="text-3xl font-bold text-amber-700">{{ $inscritosActivos }}</p>
+            </div>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -72,11 +82,17 @@
                             <td class="px-3 py-3">{{ $sesion->aula_liga ?? 'Sin aula/liga' }}<br><span class="text-xs text-slate-500">{{ $sesion->modalidad }}</span></td>
                             <td class="px-3 py-3 text-xs">{{ $sesion->requiere_equipo ? implode(', ', $sesion->equipo_requerido ?? []) : 'No' }}</td>
                             <td class="px-3 py-3 text-right whitespace-nowrap">
-                                <a href="{{ route('educacion_continua.sesiones.asistencia', [$curso, $sesion]) }}" class="text-green-700 font-semibold hover:underline">Asistencia</a>
-                                <form method="POST" action="{{ route('educacion_continua.sesiones.destroy', [$curso, $sesion]) }}" class="inline" onsubmit="return confirm('¿Eliminar sesión?')">
-                                    @csrf @method('DELETE')
-                                    <button class="text-red-600 font-semibold hover:underline ml-2">Eliminar</button>
-                                </form>
+                                @if($puedeGestionarEducacionContinua)
+                                    <a href="{{ route('educacion_continua.sesiones.asistencia', [$curso, $sesion]) }}" class="text-green-700 font-semibold hover:underline">Asistencia</a>
+                                    <form method="POST" action="{{ route('educacion_continua.sesiones.destroy', [$curso, $sesion]) }}" class="inline" onsubmit="return confirm('¿Eliminar sesión?')">
+                                        @csrf @method('DELETE')
+                                        <button class="text-red-600 font-semibold hover:underline ml-2">Eliminar</button>
+                                    </form>
+                                @elseif($esSistemas)
+                                    <span class="text-xs font-semibold text-blue-700">Asignación técnica</span>
+                                @else
+                                    <span class="text-xs text-slate-400">Solo consulta</span>
+                                @endif
                             </td>
                         </tr>
                     @empty
@@ -88,6 +104,7 @@
         </div>
 
         <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
+            @if($puedeGestionarEducacionContinua)
             <h2 class="text-xl font-bold text-slate-900 mb-4">Agregar sesión</h2>
             <form method="POST" action="{{ route('educacion_continua.sesiones.store', $curso) }}" class="space-y-3">
                 @csrf
@@ -133,9 +150,56 @@
                 <textarea name="observaciones" rows="2" class="w-full rounded-xl border-slate-300" placeholder="Observaciones"></textarea>
                 <button class="w-full rounded-xl bg-indigo-600 text-white font-semibold py-2">Agregar sesión</button>
             </form>
+            @elseif($esSistemas)
+                <h2 class="text-xl font-bold text-slate-900 mb-3">Soporte técnico</h2>
+                <p class="text-sm text-slate-600">Puedes asignar aula, liga y equipo en la sección técnica. La planeación académica, asistencia e inscritos permanecen bloqueados.</p>
+            @else
+                <h2 class="text-xl font-bold text-slate-900 mb-3">Consulta del curso</h2>
+                <p class="text-sm text-slate-600">Tu rol tiene acceso de consulta. Las altas, cambios y bajas corresponden al área académica.</p>
+            @endif
         </div>
     </div>
 
+    @if($esSistemas)
+        <div class="bg-blue-50 rounded-2xl border border-blue-200 p-6">
+            <div class="mb-4">
+                <h2 class="text-xl font-bold text-blue-950">Asignación técnica de aula y equipo</h2>
+                <p class="text-sm text-blue-800">Solo se modifican recursos técnicos de la sesión. Fechas, horarios, docentes, asistencia e inscritos no cambian.</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                @forelse($curso->sesiones as $sesion)
+                    <form method="POST" action="{{ route('educacion_continua.sesiones.update', [$curso, $sesion]) }}" class="rounded-xl border border-blue-200 bg-white p-4 space-y-3">
+                        @csrf
+                        @method('PUT')
+                        <div>
+                            <p class="font-semibold text-slate-800">{{ $sesion->fecha->format('d/m/Y') }} · {{ $sesion->horario }}</p>
+                            <p class="text-xs text-slate-500">{{ $sesion->expositor }}</p>
+                        </div>
+                        <div>
+                            <label class="text-sm font-semibold text-slate-700">Aula o liga</label>
+                            <input type="text" name="aula_liga" value="{{ $sesion->aula_liga }}" class="w-full rounded-xl border-slate-300" maxlength="180">
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-700 mb-2">Equipo requerido</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                @foreach($equipos as $equipo)
+                                    <label class="text-xs flex gap-2 items-center">
+                                        <input type="checkbox" name="equipo_requerido[]" value="{{ $equipo }}" @checked(in_array($equipo, $sesion->equipo_requerido ?? [], true))>
+                                        {{ $equipo }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <button class="w-full rounded-xl bg-blue-700 text-white font-semibold py-2 hover:bg-blue-800">Guardar recursos</button>
+                    </form>
+                @empty
+                    <p class="text-sm text-blue-800">Todavía no existen sesiones para asignar recursos.</p>
+                @endforelse
+            </div>
+        </div>
+    @endif
+
+    @if($puedeVerParticipantes)
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div class="xl:col-span-2 bg-white rounded-2xl shadow border border-slate-100 p-6">
             <div class="flex items-center justify-between mb-4">
@@ -163,6 +227,7 @@
         </div>
 
         <div class="bg-white rounded-2xl shadow border border-slate-100 p-6" x-data="{ tipo: 'Externo' }">
+            @if($puedeGestionarEducacionContinua)
             <h2 class="text-xl font-bold text-slate-900 mb-4">Inscribir participante</h2>
             <form method="POST" action="{{ route('educacion_continua.inscritos.store', $curso) }}" class="space-y-3">
                 @csrf
@@ -189,7 +254,12 @@
                 <textarea name="observaciones" rows="2" class="w-full rounded-xl border-slate-300" placeholder="Observaciones"></textarea>
                 <button class="w-full rounded-xl bg-emerald-600 text-white font-semibold py-2">Inscribir</button>
             </form>
+            @else
+                <h2 class="text-xl font-bold text-slate-900 mb-3">Participantes</h2>
+                <p class="text-sm text-slate-600">La inscripción y modificación de participantes está reservada al área académica.</p>
+            @endif
         </div>
     </div>
+    @endif
 </div>
 @endsection

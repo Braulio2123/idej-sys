@@ -32,8 +32,17 @@
             </div>
         @endif
 
+
+        @if((float) ($alumno->saldo_a_favor ?? 0) > 0)
+            <div class="mb-5 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl p-4">
+                <p class="font-bold">Saldo a favor disponible: ${{ number_format((float) $alumno->saldo_a_favor, 2) }}</p>
+                <p class="text-sm">Se aplicará automáticamente después de la beca. El cargo conservará el importe exacto utilizado para mantener la trazabilidad.</p>
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('alumnos.cargos.store', $alumno) }}" class="space-y-5">
             @csrf
+            <input type="hidden" name="operacion_uuid" value="{{ old('operacion_uuid', (string) \Illuminate\Support\Str::uuid()) }}">
 
             <div>
                 <label class="block font-semibold mb-1 text-slate-700">Concepto</label>
@@ -47,7 +56,7 @@
                 </select>
             </div>
 
-            <div id="infoConcepto" class="hidden grid grid-cols-1 md:grid-cols-4 gap-3 border border-slate-200 rounded-xl p-4 bg-slate-50">
+            <div id="infoConcepto" class="hidden grid grid-cols-1 md:grid-cols-5 gap-3 border border-slate-200 rounded-xl p-4 bg-slate-50">
                 <div>
                     <p class="text-xs uppercase text-slate-500">Monto base</p>
                     <p class="font-bold text-slate-900">$<span id="montoBase">0.00</span></p>
@@ -59,6 +68,10 @@
                 <div>
                     <p class="text-xs uppercase text-slate-500">Descuento beca</p>
                     <p class="font-bold text-emerald-700">$<span id="descuentoBeca">0.00</span></p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase text-slate-500">Saldo aplicado</p>
+                    <p class="font-bold text-blue-700">$<span id="saldoAplicado">0.00</span></p>
                 </div>
                 <div>
                     <p class="text-xs uppercase text-slate-500">Adeudo a generar</p>
@@ -73,7 +86,7 @@
 
             <div>
                 <label class="block font-semibold mb-1 text-slate-700">Monto base real</label>
-                <input type="number" step="0.01" name="monto_original" id="monto_original" value="{{ old('monto_original') }}" class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500" required>
+                <input type="number" step="0.01" min="0.01" max="99999999.99" name="monto_original" id="monto_original" value="{{ old('monto_original') }}" class="w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500" required>
                 <p class="text-xs text-slate-500 mt-1">Guarda el monto real del concepto. El sistema calculará el adeudo final si hay beca vigente y el concepto es becable.</p>
             </div>
 
@@ -101,9 +114,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const montoBase = document.getElementById('montoBase');
     const tipo = document.getElementById('tipoConcepto');
     const descuentoBeca = document.getElementById('descuentoBeca');
+    const saldoAplicado = document.getElementById('saldoAplicado');
     const montoFinal = document.getElementById('montoFinal');
     const inputMonto = document.getElementById('monto_original');
     const becaPorcentaje = {{ $becaActiva?->porcentaje ?? 0 }};
+    const saldoDisponible = {{ json_encode(round((float) ($alumno->saldo_a_favor ?? 0), 2)) }};
 
     function recalcular() {
         const selected = select.options[select.selectedIndex];
@@ -111,7 +126,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const monto = parseFloat(inputMonto.value || selectedMonto || 0);
         const becable = selected?.getAttribute('data-becable') === '1';
         const descuento = (becaPorcentaje > 0 && becable) ? monto * (becaPorcentaje / 100) : 0;
-        const final = Math.max(monto - descuento, 0);
+        const despuesBeca = Math.max(monto - descuento, 0);
+        const saldo = Math.min(saldoDisponible, despuesBeca);
+        const final = Math.max(despuesBeca - saldo, 0);
 
         if (select.value) {
             info.classList.remove('hidden');
@@ -120,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         montoBase.textContent = monto.toFixed(2);
         tipo.textContent = becable ? 'Becable' : 'No becable';
         descuentoBeca.textContent = descuento.toFixed(2);
+        saldoAplicado.textContent = saldo.toFixed(2);
         montoFinal.textContent = final.toFixed(2);
     }
 

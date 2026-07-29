@@ -11,6 +11,7 @@ class CorteCaja extends Model
 
     public const ESTATUS_ABIERTA = 'Abierta';
     public const ESTATUS_CERRADA = 'Cerrada';
+    public const TOLERANCIA_DIFERENCIA = 0.009;
 
     protected $table = 'cortes_caja';
 
@@ -28,8 +29,12 @@ class CorteCaja extends Model
         'efectivo_reportado',
         'transferencia_reportado',
         'tarjeta_reportado',
+        'otro_reportado',
         'total_reportado',
         'diferencia_efectivo',
+        'diferencia_transferencia',
+        'diferencia_tarjeta',
+        'diferencia_otro',
         'diferencia_total',
         'estatus',
         'observaciones_apertura',
@@ -47,8 +52,12 @@ class CorteCaja extends Model
         'efectivo_reportado' => 'decimal:2',
         'transferencia_reportado' => 'decimal:2',
         'tarjeta_reportado' => 'decimal:2',
+        'otro_reportado' => 'decimal:2',
         'total_reportado' => 'decimal:2',
         'diferencia_efectivo' => 'decimal:2',
+        'diferencia_transferencia' => 'decimal:2',
+        'diferencia_tarjeta' => 'decimal:2',
+        'diferencia_otro' => 'decimal:2',
         'diferencia_total' => 'decimal:2',
     ];
 
@@ -97,6 +106,17 @@ class CorteCaja extends Model
         return $this->estatus === self::ESTATUS_CERRADA;
     }
 
+    public static function tieneDiferencia(float ...$diferencias): bool
+    {
+        foreach ($diferencias as $diferencia) {
+            if (abs(round($diferencia, 2)) > self::TOLERANCIA_DIFERENCIA) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function calcularTotalesSistema(): array
     {
         $pagos = $this->pagos()->activos();
@@ -123,22 +143,55 @@ class CorteCaja extends Model
 
     public function resumenMovimientos(): array
     {
-        $movimientos = $this->movimientos()->aplicados();
+        $metodos = MovimientoCaja::metodosPago();
+        $resumen = [];
 
-        $entradasEfectivo = (float) (clone $movimientos)->where('tipo', MovimientoCaja::TIPO_ENTRADA)->where('metodo_pago', 'Efectivo')->sum('monto');
-        $salidasEfectivo = (float) (clone $movimientos)->where('tipo', MovimientoCaja::TIPO_SALIDA)->where('metodo_pago', 'Efectivo')->sum('monto');
-        $entradasTotal = (float) $this->movimientos()->aplicados()->where('tipo', MovimientoCaja::TIPO_ENTRADA)->sum('monto');
-        $salidasTotal = (float) $this->movimientos()->aplicados()->where('tipo', MovimientoCaja::TIPO_SALIDA)->sum('monto');
+        foreach ($metodos as $metodo) {
+            $clave = strtolower($metodo);
+            $movimientos = $this->movimientos()->aplicados();
 
-        return [
-            'entradas_efectivo' => round($entradasEfectivo, 2),
-            'salidas_efectivo' => round($salidasEfectivo, 2),
-            'neto_efectivo' => round($entradasEfectivo - $salidasEfectivo, 2),
+            if ($metodo === 'Otro') {
+                $movimientos->whereNotIn('metodo_pago', ['Efectivo', 'Transferencia', 'Tarjeta']);
+            } else {
+                $movimientos->where('metodo_pago', $metodo);
+            }
+
+            $entradas = (float) (clone $movimientos)->where('tipo', MovimientoCaja::TIPO_ENTRADA)->sum('monto');
+            $salidas = (float) (clone $movimientos)->where('tipo', MovimientoCaja::TIPO_SALIDA)->sum('monto');
+
+            $resumen["entradas_{$clave}"] = round($entradas, 2);
+            $resumen["salidas_{$clave}"] = round($salidas, 2);
+            $resumen["neto_{$clave}"] = round($entradas - $salidas, 2);
+        }
+
+        $entradasTotal = array_sum(array_map(
+            fn (string $metodo): float => (float) $resumen['entradas_'.strtolower($metodo)],
+            $metodos
+        ));
+        $salidasTotal = array_sum(array_map(
+            fn (string $metodo): float => (float) $resumen['salidas_'.strtolower($metodo)],
+            $metodos
+        ));
+
+        return array_merge($resumen, [
             'entradas_total' => round($entradasTotal, 2),
             'salidas_total' => round($salidasTotal, 2),
             'neto_total' => round($entradasTotal - $salidasTotal, 2),
             'cantidad' => (int) $this->movimientos()->aplicados()->count(),
-        ];
+        ]);
+    }
+
+    public function efectivoDisponible(): float
+    {
+        $totales = $this->calcularTotalesSistema();
+        $movimientos = $this->resumenMovimientos();
+
+        return round(
+            (float) $this->saldo_inicial
+            + (float) $totales['efectivo_sistema']
+            + (float) $movimientos['neto_efectivo'],
+            2
+        );
     }
 
     public function resumenAjustes(): array
@@ -160,4 +213,3 @@ class CorteCaja extends Model
         ];
     }
 }
-

@@ -2,10 +2,10 @@
     <div class="mb-5">
         <h1 class="text-xl font-bold text-slate-900">Recuperar contraseña</h1>
         <p class="text-sm text-slate-600 mt-2 leading-relaxed">
-            Captura el correo de tu usuario interno. Si el correo existe y el servicio de correo está configurado, recibirás un enlace para crear una nueva contraseña.
+            Captura el correo de tu usuario interno. Por seguridad, la respuesta será la misma exista o no una cuenta asociada.
         </p>
         <p class="text-xs text-slate-500 mt-2 leading-relaxed">
-            Si no recibes el correo, solicita a Sistemas o Administración que restablezca tu contraseña desde el módulo de Usuarios.
+            El enlace vence en 60 minutos. Si no recibes instrucciones, revisa spam o solicita apoyo a Sistemas o Administración.
         </p>
     </div>
 

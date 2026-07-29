@@ -2,8 +2,8 @@
 
 return [
     'reset' => 'La contraseña se actualizó correctamente.',
-    'sent' => 'Si el correo pertenece a un usuario interno activo, se enviará un enlace de recuperación.',
+    'sent' => 'Si la información coincide con un usuario interno activo, recibirás instrucciones para restablecer tu contraseña.',
     'throttled' => 'Espera antes de volver a solicitar otro enlace de recuperación.',
     'token' => 'El enlace de recuperación no es válido o ya expiró.',
-    'user' => 'No encontramos un usuario interno activo con ese correo.',
+    'user' => 'Si la información coincide con un usuario interno activo, recibirás instrucciones para restablecer tu contraseña.',
 ];

@@ -12,9 +12,6 @@ class CalendarioAcademico extends Model
     protected $table = 'calendarios_academicos';
 
     public const ESTATUS_AGENDADO = 'Agendado';
-    public const ESTATUS_BORRADOR = 'Borrador';
-    public const ESTATUS_PLANEADO = 'Planeado';
-    public const ESTATUS_APROBADO = 'Aprobado';
     public const ESTATUS_EN_CURSO = 'En curso';
     public const ESTATUS_FINALIZADO = 'Finalizado';
     public const ESTATUS_CANCELADO = 'Cancelado';
@@ -43,12 +40,16 @@ class CalendarioAcademico extends Model
         'creado_por_id',
         'aprobado_por_id',
         'fecha_aprobacion',
+        'cancelado_por_id',
+        'fecha_cancelacion',
+        'motivo_cancelacion',
     ];
 
     protected $casts = [
         'fecha_inicio' => 'date',
         'fecha_fin' => 'date',
         'fecha_aprobacion' => 'datetime',
+        'fecha_cancelacion' => 'datetime',
     ];
 
     public function grupo()
@@ -78,6 +79,11 @@ class CalendarioAcademico extends Model
         );
     }
 
+    public function canceladoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'cancelado_por_id');
+    }
+
     public function creadoPor()
     {
         return $this->belongsTo(Usuario::class, 'creado_por_id');
@@ -96,6 +102,16 @@ class CalendarioAcademico extends Model
             self::TIPO_LICENCIATURA_MATUTINA,
             self::TIPO_LICENCIATURA_VESPERTINA,
             self::TIPO_PERSONALIZADO,
+        ];
+    }
+
+    public static function estatuses(): array
+    {
+        return [
+            self::ESTATUS_AGENDADO,
+            self::ESTATUS_EN_CURSO,
+            self::ESTATUS_FINALIZADO,
+            self::ESTATUS_CANCELADO,
         ];
     }
 

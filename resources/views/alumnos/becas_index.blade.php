@@ -6,7 +6,7 @@
 @php
     use App\Models\Rol;
     $usuarioActual = Auth::user();
-    $puedeGestionarBecas = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS) ?? false;
+    $puedeGestionarBecas = $usuarioActual?->tieneRol(Rol::ADMIN, Rol::CADMIN) ?? false;
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-6">

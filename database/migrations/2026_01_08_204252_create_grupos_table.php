@@ -15,11 +15,11 @@ return new class extends Migration
 
             $table->foreignId('ciclo_escolar_id')
                 ->constrained('ciclos_escolares')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('programa_id')
                 ->constrained('programas')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('docente_id')
                 ->nullable()
@@ -34,6 +34,10 @@ return new class extends Migration
             $table->string('aula', 50)->nullable();
 
             $table->unsignedTinyInteger('cupo_maximo')->default(30);
+            $table->boolean('activo')->default(true)->index();
+            $table->timestamp('archivado_at')->nullable();
+            $table->foreignId('archivado_por_id')->nullable()->constrained('usuarios')->nullOnDelete();
+            $table->text('motivo_archivo')->nullable();
 
             $table->timestamps();
         });

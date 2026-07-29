@@ -18,6 +18,7 @@ class MovimientoCaja extends Model
     public const ESTATUS_CANCELADO = 'Cancelado';
 
     protected $fillable = [
+        'operacion_uuid',
         'corte_caja_id',
         'usuario_id',
         'cancelado_por_id',
@@ -28,6 +29,9 @@ class MovimientoCaja extends Model
         'referencia',
         'comprobante_path',
         'comprobante_original',
+        'comprobante_mime',
+        'comprobante_tamano',
+        'comprobante_sha256',
         'observaciones',
         'fecha_movimiento',
         'estatus',
@@ -39,6 +43,7 @@ class MovimientoCaja extends Model
         'monto' => 'decimal:2',
         'fecha_movimiento' => 'datetime',
         'fecha_cancelacion' => 'datetime',
+        'comprobante_tamano' => 'integer',
     ];
 
     public static function tipos(): array

@@ -33,6 +33,14 @@ class LoginRequest extends FormRequest
         ];
     }
 
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'email' => Str::lower(trim((string) $this->input('email'))),
+        ]);
+    }
+
     /**
      * Attempt to authenticate the request's credentials.
      *
@@ -42,7 +50,11 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt([
+            'email' => $this->string('email')->toString(),
+            'password' => $this->string('password')->toString(),
+            'activo' => true,
+        ], false)) {
             RateLimiter::hit($this->throttleKey());
 
             $this->registrarEventoSeguridad(
@@ -56,22 +68,6 @@ class LoginRequest extends FormRequest
         }
 
         $usuario = Auth::user();
-
-        if ($usuario && method_exists($usuario, 'estaActivo') && ! $usuario->estaActivo()) {
-            $this->registrarEventoSeguridad(
-                'Intento de ingreso con usuario desactivado',
-                'Usuario desactivado intentó iniciar sesión: '.$usuario->email.'. IP '.$this->ip().'.',
-                $usuario->id
-            );
-
-            Auth::logout();
-            RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'email' => 'Tu usuario interno está desactivado. Solicita reactivación al área de Sistemas o Administración.',
-            ]);
-        }
-
 
         if ($usuario && method_exists($usuario, 'requiereCambioPassword') && $usuario->requiereCambioPassword() && $usuario->temporary_password_expires_at?->isPast()) {
             $this->registrarEventoSeguridad(

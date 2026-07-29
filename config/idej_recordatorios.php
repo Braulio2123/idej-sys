@@ -32,6 +32,6 @@ return [
     ],
 
     'notificaciones' => [
-        'polling_milisegundos' => (int) env('IDEJ_NOTIFICACIONES_POLLING_MS', 5000),
+        'polling_milisegundos' => (int) env('IDEJ_NOTIFICACIONES_POLLING_MS', 3000),
     ],
 ];

@@ -42,7 +42,12 @@ if (! function_exists('usuarioTienePermiso')) {
 if (! function_exists('rolesParaPermiso')) {
     function rolesParaPermiso(string $permiso): array
     {
-        return config("idej_permisos.permisos.{$permiso}.roles", []);
+        $permisos = config('idej_permisos.permisos', []);
+        $configuracion = is_array($permisos) ? ($permisos[$permiso] ?? null) : null;
+
+        return is_array($configuracion) && is_array($configuracion['roles'] ?? null)
+            ? $configuracion['roles']
+            : [];
     }
 }
 

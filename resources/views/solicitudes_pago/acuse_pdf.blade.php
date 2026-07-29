@@ -68,13 +68,13 @@
 <table>
     <tr>
         <td><div class="label">Docente</div><div class="value">{{ $solicitud->docente->nombre_completo ?? '—' }}</div></td>
-        <td><div class="label">Fecha de pago</div><div class="value">{{ optional($solicitud->fecha_pago)->format('d/m/Y') ?? '—' }}</div></td>
-        <td><div class="label">Método</div><div class="value">{{ $solicitud->metodo_pago ?? '—' }}</div></td>
+        <td><div class="label">Fecha tentativa informada</div><div class="value">{{ $solicitud->fecha_tentativa_pago?->format('d/m/Y') ?? '—' }}</div></td>
+        <td><div class="label">Fecha real de pago</div><div class="value">{{ $solicitud->fecha_pago?->format('d/m/Y') ?? '—' }}</div></td>
     </tr>
     <tr>
+        <td><div class="label">Método</div><div class="value">{{ $solicitud->metodo_pago ?? '—' }}</div></td>
         <td><div class="label">Referencia / folio</div><div class="value">{{ $solicitud->referencia_pago ?? '—' }}</div></td>
         <td><div class="label">Banco / cuenta</div><div class="value">{{ $solicitud->banco_pago ?? '—' }}</div></td>
-        <td><div class="label">Procesado por</div><div class="value">{{ $solicitud->procesadoPor->nombre ?? '—' }}</div></td>
     </tr>
 </table>
 
@@ -82,7 +82,7 @@
 <table>
     <tr>
         <td class="center">
-            <div class="label">Monto autorizado y registrado como pagado</div>
+            <div class="label">Monto determinado por Coordinación Administrativa y registrado como pagado</div>
             <div class="amount">${{ number_format((float) $solicitud->monto, 2) }}</div>
         </td>
     </tr>
@@ -92,33 +92,45 @@
 <table>
     <tr>
         <td><div class="label">Origen</div><div class="value">{{ $solicitud->origen ?? 'Manual' }}</div></td>
-        <td><div class="label">Concepto</div><div class="value">{{ $solicitud->concepto_pago ?? '—' }}</div></td>
-        <td><div class="label">Nivel</div><div class="value">{{ $solicitud->nivel ?? '—' }}</div></td>
+        <td><div class="label">Tipo de clase</div><div class="value">{{ $solicitud->tipo_clase ?? $solicitud->nivel ?? '—' }}</div></td>
+        <td><div class="label">Modalidad</div><div class="value">{{ $solicitud->modalidad ?? '—' }}</div></td>
     </tr>
     <tr>
-        <td colspan="2"><div class="label">Educación Programática / grupo</div><div class="value">{{ $solicitud->programa_grupo ?? '—' }}</div></td>
+        <td colspan="2"><div class="label">Programa / grupo</div><div class="value">{{ $solicitud->programa_grupo ?? '—' }}</div></td>
         <td><div class="label">Periodo</div><div class="value">{{ $solicitud->periodo ?? '—' }}</div></td>
     </tr>
     <tr>
-        <td colspan="3"><div class="label">Materia / actividad</div><div class="value">{{ $solicitud->materia_actividad ?? '—' }}</div></td>
+        <td colspan="3"><div class="label">Materia / curso / actividad</div><div class="value">{{ $solicitud->materia_actividad ?? '—' }}</div></td>
+    </tr>
+    <tr>
+        <td colspan="3">
+            <div class="label">Fechas de clase registradas por Coordinación Académica</div>
+            <div class="value">
+                @forelse($solicitud->fechas_clase_ordenadas as $fecha)
+                    {{ \Carbon\Carbon::parse($fecha)->format('d/m/Y') }}@if(! $loop->last), @endif
+                @empty
+                    —
+                @endforelse
+            </div>
+        </td>
     </tr>
 </table>
 
-<div class="section-title">Cálculo base</div>
+<div class="section-title">Valoración administrativa</div>
 <table>
     <tr>
         <th>Sesiones</th>
         <th>Horas totales</th>
-        <th>Tarifa por hora</th>
-        <th>Fecha solicitud</th>
-        <th>Fecha autorización</th>
+        <th>Esquema</th>
+        <th>Tarifa unitaria</th>
+        <th>Fecha valoración</th>
     </tr>
     <tr>
         <td class="center">{{ $solicitud->numero_sesiones ?? '—' }}</td>
         <td class="center">{{ $solicitud->horas_totales ?? '—' }}</td>
-        <td class="right">{{ $solicitud->tarifa_hora ? '$'.number_format((float) $solicitud->tarifa_hora, 2) : '—' }}</td>
-        <td class="center">{{ optional($solicitud->fecha_solicitud)->format('d/m/Y') ?? '—' }}</td>
-        <td class="center">{{ optional($solicitud->fecha_autorizacion)->format('d/m/Y H:i') ?? '—' }}</td>
+        <td class="center">{{ $solicitud->esquema_pago ?? '—' }}</td>
+        <td class="right">{{ $solicitud->tarifa_unitaria ? '$'.number_format((float) $solicitud->tarifa_unitaria, 2) : '—' }}</td>
+        <td class="center">{{ $solicitud->fecha_valoracion?->format('d/m/Y H:i') ?? $solicitud->fecha_autorizacion?->format('d/m/Y H:i') ?? '—' }}</td>
     </tr>
 </table>
 
@@ -126,7 +138,7 @@
 <table>
     <tr>
         <td><div class="label">Solicitado por</div><div class="value">{{ $solicitud->creadoPor->nombre ?? '—' }}</div></td>
-        <td><div class="label">Autorizado por</div><div class="value">{{ $solicitud->autorizadoPor->nombre ?? '—' }}</div></td>
+        <td><div class="label">Valorado por</div><div class="value">{{ $solicitud->valoradoPor->nombre ?? $solicitud->autorizadoPor->nombre ?? '—' }}</div></td>
         <td><div class="label">Comprobante adjunto</div><div class="value">{{ $solicitud->comprobante_pago_original ?: 'Sin archivo adjunto' }}</div></td>
     </tr>
 </table>
@@ -135,7 +147,7 @@
     <div class="section-title">Observaciones</div>
     <div class="note">
         @if($solicitud->observaciones_administracion)
-            <strong>Administración/Finanzas:</strong> {{ $solicitud->observaciones_administracion }}<br>
+            <strong>Coordinación Administrativa:</strong> {{ $solicitud->observaciones_administracion }}<br>
         @endif
         @if($solicitud->observaciones_academica)
             <strong>Académica:</strong> {{ $solicitud->observaciones_academica }}
@@ -145,7 +157,7 @@
 
 <table class="signatures">
     <tr>
-        <td><div class="signature-line">Responsable de autorización</div></td>
+        <td><div class="signature-line">Responsable de valoración administrativa</div></td>
         <td><div class="signature-line">Responsable de pago</div></td>
     </tr>
 </table>

@@ -24,12 +24,9 @@
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">Mantener sesión iniciada</span>
-            </label>
-        </div>
+        <p class="mt-4 text-xs leading-relaxed text-slate-500">
+            Por seguridad, el acceso no permanecerá recordado al cerrar el navegador. En equipos compartidos, utiliza siempre la opción Cerrar sesión.
+        </p>
 
         <div class="flex items-center justify-between gap-3 mt-4">
             @if (Route::has('password.request'))

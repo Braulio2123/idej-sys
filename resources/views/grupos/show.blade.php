@@ -3,6 +3,7 @@
 @section('title', 'Detalle de grupo')
 
 @section('content')
+@php $puedeGestionarCatalogos = usuarioTienePermiso('catalogos_academicos.gestionar'); @endphp
 <div class="max-w-7xl mx-auto space-y-6">
     <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -11,18 +12,33 @@
                 <p class="text-sm text-slate-500 mt-1">{{ $grupo->programa->nombre ?? 'Sin programa' }} · {{ $grupo->cicloEscolar->nombre ?? 'Sin ciclo' }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a href="{{ route('grupos.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">Regresar</a>
-                <a href="{{ route('grupos.edit', $grupo) }}" class="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Editar grupo</a>
-                <a href="{{ route('calendarios_academicos.create', ['grupo_id' => $grupo->id]) }}" class="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700">+ Crear calendario</a>
+                <a href="{{ route('grupos.index', $grupo->activo ? [] : ['archivados' => 1]) }}" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">Regresar</a>
+                @if($grupo->activo)
+                    @if($puedeGestionarCatalogos)
+                        <a href="{{ route('grupos.edit', $grupo) }}" class="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Editar grupo</a>
+                    @endif
+                    @if(usuarioTienePermiso('calendarios.gestionar'))
+                        <a href="{{ route('calendarios_academicos.create', ['grupo_id' => $grupo->id]) }}" class="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700">+ Crear calendario</a>
+                    @endif
+                @endif
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-6">
+        @unless($grupo->activo)
+            <div class="mt-5 rounded-xl border border-slate-300 bg-slate-100 p-4 text-slate-700">
+                <p class="font-bold">Grupo archivado</p>
+                <p class="text-sm mt-1">{{ $grupo->motivo_archivo ?: 'Sin motivo capturado.' }}</p>
+                <p class="text-xs mt-2">Archivado {{ $grupo->archivado_at?->format('d/m/Y H:i') ?? 'sin fecha' }} por {{ $grupo->archivadoPor->nombre ?? 'usuario no disponible' }}.</p>
+            </div>
+        @endunless
+
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mt-6">
             <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Ciclo</p><p class="font-semibold text-slate-800">{{ $grupo->cicloEscolar->nombre ?? '—' }}</p></div>
             <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Periodo</p><p class="font-semibold text-slate-800">{{ $grupo->semestre_o_cuatrimestre }}</p></div>
             <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Turno</p><p class="font-semibold text-slate-800">{{ $grupo->turno }}</p></div>
             <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Aula base</p><p class="font-semibold text-slate-800">{{ $grupo->aula ?? '—' }}</p></div>
             <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Cupo</p><p class="font-semibold text-slate-800">{{ $grupo->alumnos->count() }} / {{ $grupo->cupo_maximo }}</p></div>
+            <div class="bg-slate-50 rounded-xl p-4 border border-slate-200"><p class="text-xs text-slate-500">Estatus</p><p class="font-semibold {{ $grupo->activo ? 'text-green-700' : 'text-slate-700' }}">{{ $grupo->activo ? 'Activo' : 'Archivado' }}</p></div>
         </div>
     </div>
 

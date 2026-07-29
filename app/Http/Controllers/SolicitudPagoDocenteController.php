@@ -5,15 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\CalendarioMateria;
 use App\Models\CursoEducacionContinua;
 use App\Models\CursoSesion;
+use App\Models\CalendarioSesion;
 use App\Models\Docente;
+use App\Models\NotificacionInterna;
 use App\Models\Rol;
 use App\Models\SolicitudPagoDocente;
+use App\Services\PrivateFileService;
+use App\Services\TeacherPaymentCalculator;
 use App\Traits\RegistraBitacora;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -21,35 +25,34 @@ class SolicitudPagoDocenteController extends Controller
 {
     use RegistraBitacora;
 
+    public function __construct(
+        private readonly PrivateFileService $privateFiles,
+        private readonly TeacherPaymentCalculator $paymentCalculator,
+    ) {
+    }
+
     public function index(Request $request)
     {
         $rol = Auth::user()->rolClave();
 
-        $query = SolicitudPagoDocente::with(['docente', 'creadoPor', 'autorizadoPor', 'procesadoPor'])
-            ->orderByRaw("FIELD(estatus, 'Pendiente', 'Observada', 'Autorizada', 'Pagada', 'Cancelada')")
+        $query = SolicitudPagoDocente::with([
+            'docente', 'creadoPor', 'valoradoPor', 'autorizadoPor', 'procesadoPor', 'rechazadoPor',
+        ])
+            ->orderByRaw("FIELD(estatus, 'Pendiente', 'Observada', 'Autorizada', 'Pagada', 'Rechazada', 'Cancelada')")
             ->orderByDesc('fecha_solicitud')
             ->orderByDesc('id');
 
-        if ($rol === Rol::ACADEMICA) {
-            $query->where(function ($q) {
-                $q->where('creado_por_id', Auth::id())
-                    ->orWhereIn('estatus', [
-                        SolicitudPagoDocente::ESTATUS_PENDIENTE,
-                        SolicitudPagoDocente::ESTATUS_OBSERVADA,
-                        SolicitudPagoDocente::ESTATUS_AUTORIZADA,
-                    ]);
-            });
-        } elseif ($rol === Rol::DIRECCION) {
+        if ($rol === Rol::DIRECCION) {
             $query->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA]);
-        } elseif (!in_array($rol, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
+        } elseif (! in_array($rol, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA], true)) {
             $query->where('creado_por_id', Auth::id());
         }
 
         $query->when($request->filled('estatus'), fn ($q) => $q->where('estatus', $request->estatus));
         $query->when($request->filled('docente_id'), fn ($q) => $q->where('docente_id', $request->docente_id));
-        $query->when($request->filled('origen'), fn ($q) => $q->where('origen', $request->origen));
+        $query->when($request->filled('tipo_clase'), fn ($q) => $q->where('tipo_clase', $request->tipo_clase));
         $query->when($request->filled('q'), function ($q) use ($request) {
-            $term = trim($request->q);
+            $term = trim((string) $request->q);
             $q->where(function ($sub) use ($term) {
                 $sub->where('folio', 'like', "%{$term}%")
                     ->orWhere('materia_actividad', 'like', "%{$term}%")
@@ -58,23 +61,18 @@ class SolicitudPagoDocenteController extends Controller
             });
         });
 
-        $solicitudes = $query->paginate(15)->withQueryString();
-
-        $resumen = [
-            'pendientes' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PENDIENTE)->count(),
-            'observadas' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_OBSERVADA)->count(),
-            'autorizadas' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_AUTORIZADA)->count(),
-            'pagadas_mes' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PAGADA)
-                ->whereDate('fecha_pago', '>=', now()->startOfMonth()->toDateString())
-                ->sum('monto'),
-        ];
-
         return view('solicitudes_pago.index', [
-            'solicitudes' => $solicitudes,
+            'solicitudes' => $query->paginate(15)->withQueryString(),
             'docentes' => Docente::orderBy('nombre_completo')->get(['id', 'nombre_completo']),
             'estatuses' => SolicitudPagoDocente::estatuses(),
-            'origenes' => SolicitudPagoDocente::origenes(),
-            'resumen' => $resumen,
+            'tiposClase' => SolicitudPagoDocente::tiposClase(),
+            'resumen' => [
+                'pendientes' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PENDIENTE)->count(),
+                'observadas' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_OBSERVADA)->count(),
+                'autorizadas' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_AUTORIZADA)->count(),
+                'pagadas_mes' => SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PAGADA)
+                    ->whereDate('fecha_pago', '>=', now()->startOfMonth()->toDateString())->sum('monto'),
+            ],
         ]);
     }
 
@@ -85,45 +83,53 @@ class SolicitudPagoDocenteController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $this->validateSolicitud($request);
+        $validated = $this->validarRegistroAcademico($request);
 
-        DB::transaction(function () use ($validated) {
+        $solicitud = DB::transaction(function () use ($validated) {
             $solicitud = SolicitudPagoDocente::create(array_merge($validated, [
                 'folio' => null,
-                'fecha_solicitud' => $validated['fecha_solicitud'] ?? now()->toDateString(),
+                'fecha_solicitud' => now()->toDateString(),
                 'estatus' => SolicitudPagoDocente::ESTATUS_PENDIENTE,
                 'creado_por_id' => Auth::id(),
-                'observaciones' => $validated['observaciones_academica'] ?? null,
+                'monto' => 0,
+                'tarifa_hora' => null,
+                'tarifa_unitaria' => null,
+                'esquema_pago' => null,
+                'concepto_pago' => null,
+                'fecha_tentativa_pago' => null,
+                'fecha_limite_pago' => null,
             ]));
 
-            $solicitud->forceFill([
-                'folio' => $this->generarFolio($solicitud),
-            ])->save();
+            $solicitud->forceFill(['folio' => $this->generarFolio($solicitud)])->save();
 
             $this->bitacora(
                 'Crear Solicitud de Pago Docente',
-                "Solicitud {$solicitud->folio} creada para {$solicitud->docente?->nombre_completo} por {$solicitud->resumen_servicio}.",
+                "Académica registró la solicitud {$solicitud->folio} para {$solicitud->docente?->nombre_completo}.",
                 'Solicitudes de Pago Docente',
                 $solicitud
             );
+
+            $this->notificarCAdmin(
+                $solicitud,
+                'solicitud_docente_nueva',
+                'Nueva solicitud de pago docente',
+                "Académica envió {$solicitud->folio} para {$solicitud->docente?->nombre_completo}. Requiere valoración y fecha tentativa.",
+                NotificacionInterna::SEVERIDAD_ALTA
+            );
+
+            return $solicitud;
         }, 3);
 
-        return redirect()->route('solicitudes_pago.index')
-            ->with('success', 'Solicitud creada correctamente y enviada a Coordinación Administrativa/Finanzas para revisión.');
+        return redirect()->route('solicitudes_pago.show', $solicitud)
+            ->with('success', 'Solicitud enviada a Coordinación Administrativa para valoración. Académica no asigna montos ni precios.');
     }
 
     public function show(SolicitudPagoDocente $solicitud_pago)
     {
         $solicitud_pago->load([
-            'docente',
-            'creadoPor',
-            'autorizadoPor',
-            'procesadoPor',
-            'canceladoPor',
-            'calendarioMateria.calendario.grupo.programa',
-            'calendarioMateria.materia',
-            'curso',
-            'cursoSesion',
+            'docente', 'creadoPor', 'valoradoPor', 'autorizadoPor', 'procesadoPor',
+            'canceladoPor', 'rechazadoPor', 'calendarioMateria.calendario.grupo.programa',
+            'calendarioMateria.materia', 'curso', 'cursoSesion',
         ]);
 
         return view('solicitudes_pago.show', ['solicitud' => $solicitud_pago]);
@@ -139,76 +145,232 @@ class SolicitudPagoDocenteController extends Controller
     public function update(Request $request, SolicitudPagoDocente $solicitud_pago)
     {
         $this->autorizarEdicionAcademica($solicitud_pago);
-
-        $validated = $this->validateSolicitud($request, $solicitud_pago);
+        $validated = $this->validarRegistroAcademico($request);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
-            $nuevoEstatus = $solicitud_pago->estatus === SolicitudPagoDocente::ESTATUS_OBSERVADA
-                ? SolicitudPagoDocente::ESTATUS_PENDIENTE
-                : $solicitud_pago->estatus;
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
 
-            $solicitud_pago->update(array_merge($validated, [
-                'estatus' => $nuevoEstatus,
-                'motivo_observacion' => $nuevoEstatus === SolicitudPagoDocente::ESTATUS_PENDIENTE ? null : $solicitud_pago->motivo_observacion,
-                'observaciones' => $validated['observaciones_academica'] ?? $solicitud_pago->observaciones,
+            if (! $solicitud->puedeEditarAcademica()) {
+                throw ValidationException::withMessages([
+                    'fechas_clase' => 'La solicitud ya fue valorada o cerrada y no puede modificarse desde Académica.',
+                ]);
+            }
+
+            $solicitud->update(array_merge($validated, [
+                'estatus' => SolicitudPagoDocente::ESTATUS_PENDIENTE,
+                'motivo_observacion' => null,
+                'motivo_rechazo' => null,
+                'valorado_por_id' => null,
+                'autorizado_por_id' => null,
+                'fecha_valoracion' => null,
+                'fecha_autorizacion' => null,
+                'esquema_pago' => null,
+                'tarifa_unitaria' => null,
+                'tarifa_hora' => null,
+                'monto' => 0,
+                'concepto_pago' => null,
+                'fecha_tentativa_pago' => null,
+                'fecha_limite_pago' => null,
             ]));
 
             $this->bitacora(
-                'Actualizar Solicitud de Pago Docente',
-                "Solicitud {$solicitud_pago->folio} actualizada.",
+                'Reenviar Solicitud de Pago Docente',
+                "Académica corrigió y reenvió la solicitud {$solicitud->folio}.",
                 'Solicitudes de Pago Docente',
-                $solicitud_pago
+                $solicitud
             );
-        });
+
+            $this->notificarCAdmin(
+                $solicitud,
+                'solicitud_docente_corregida',
+                'Solicitud docente corregida',
+                "Académica corrigió {$solicitud->folio}. Está pendiente de una nueva valoración.",
+                NotificacionInterna::SEVERIDAD_ALTA
+            );
+        }, 3);
 
         return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-            ->with('success', 'Solicitud actualizada correctamente.');
+            ->with('success', 'Solicitud corregida y reenviada a Coordinación Administrativa.');
     }
 
-    public function aprobar(SolicitudPagoDocente $solicitud_pago, Request $request)
+    public function formValorar(SolicitudPagoDocente $solicitud_pago)
     {
-        if (!in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
-            abort(403);
+        $this->autorizarRevisionAdministrativa();
+
+        if (! in_array($solicitud_pago->estatus, [
+            SolicitudPagoDocente::ESTATUS_PENDIENTE,
+            SolicitudPagoDocente::ESTATUS_AUTORIZADA,
+        ], true)) {
+            return redirect()->route('solicitudes_pago.show', $solicitud_pago)
+                ->with('error', 'Solo pueden valorarse solicitudes pendientes o autorizadas que aún no han sido pagadas.');
         }
 
+        return view('solicitudes_pago.valorar', [
+            'solicitud' => $solicitud_pago->load('docente'),
+            'esquemasPago' => SolicitudPagoDocente::esquemasPago(),
+            'prioridades' => SolicitudPagoDocente::prioridades(),
+        ]);
+    }
+
+    public function valorar(SolicitudPagoDocente $solicitud_pago, Request $request)
+    {
+        $this->autorizarRevisionAdministrativa();
+
         $validated = $request->validate([
-            'observaciones_administracion' => 'nullable|string|max:1000',
+            'esquema_pago' => ['required', Rule::in(SolicitudPagoDocente::esquemasPago())],
+            'tarifa_unitaria' => ['nullable', 'numeric', 'decimal:0,2', 'min:0.01', 'max:999999.99'],
+            'monto' => ['nullable', 'numeric', 'decimal:0,2', 'min:1', 'max:9999999.99'],
+            'fecha_tentativa_pago' => ['required', 'date', 'after_or_equal:today'],
+            'fecha_limite_pago' => ['nullable', 'date', 'after_or_equal:fecha_tentativa_pago'],
+            'prioridad' => ['required', Rule::in(SolicitudPagoDocente::prioridades())],
+            'observaciones_administracion' => ['nullable', 'string', 'max:1500'],
+        ]);
+
+        if ($validated['esquema_pago'] !== SolicitudPagoDocente::ESQUEMA_FIJO && empty($validated['tarifa_unitaria'])) {
+            throw ValidationException::withMessages([
+                'tarifa_unitaria' => 'Indica la tarifa unitaria cuando el pago se calcula por sesión o por hora.',
+            ]);
+        }
+
+        if ($validated['esquema_pago'] === SolicitudPagoDocente::ESQUEMA_FIJO && empty($validated['monto'])) {
+            throw ValidationException::withMessages([
+                'monto' => 'Indica el monto fijo aprobado.',
+            ]);
+        }
+
+        DB::transaction(function () use ($solicitud_pago, $validated) {
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($solicitud->estatus, [
+                SolicitudPagoDocente::ESTATUS_PENDIENTE,
+                SolicitudPagoDocente::ESTATUS_AUTORIZADA,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'monto' => 'La solicitud ya fue pagada, rechazada o cancelada y no puede valorarse nuevamente.',
+                ]);
+            }
+
+            $esRevaloracion = $solicitud->estatus === SolicitudPagoDocente::ESTATUS_AUTORIZADA;
+
+            try {
+                $montoCalculado = $this->paymentCalculator->calculate(
+                    $validated['esquema_pago'],
+                    $validated['tarifa_unitaria'] ?? null,
+                    count($solicitud->fechas_clase_ordenadas),
+                    $solicitud->horas_totales,
+                    $validated['monto'] ?? null,
+                );
+            } catch (\InvalidArgumentException $exception) {
+                $campo = $validated['esquema_pago'] === SolicitudPagoDocente::ESQUEMA_FIJO
+                    ? 'monto'
+                    : 'tarifa_unitaria';
+
+                throw ValidationException::withMessages([
+                    $campo => $exception->getMessage(),
+                ]);
+            }
+
+            $tarifaUnit = $validated['esquema_pago'] === SolicitudPagoDocente::ESQUEMA_FIJO
+                ? null
+                : ($validated['tarifa_unitaria'] ?? null);
+
+            $solicitud->update([
+                'estatus' => SolicitudPagoDocente::ESTATUS_AUTORIZADA,
+                'concepto_pago' => SolicitudPagoDocente::conceptoParaTipo($solicitud->tipo_clase),
+                'esquema_pago' => $validated['esquema_pago'],
+                'tarifa_unitaria' => $tarifaUnit,
+                'tarifa_hora' => $validated['esquema_pago'] === SolicitudPagoDocente::ESQUEMA_HORA
+                    ? $tarifaUnit : null,
+                'monto' => $montoCalculado,
+                'fecha_tentativa_pago' => $validated['fecha_tentativa_pago'],
+                'fecha_limite_pago' => $validated['fecha_limite_pago'] ?? null,
+                'prioridad' => $validated['prioridad'],
+                'observaciones_administracion' => $validated['observaciones_administracion'] ?? null,
+                'valorado_por_id' => Auth::id(),
+                'autorizado_por_id' => Auth::id(),
+                'fecha_valoracion' => now(),
+                'fecha_autorizacion' => now(),
+            ]);
+
+            $tentativa = $solicitud->fecha_tentativa_pago?->format('d/m/Y') ?? 'por confirmar';
+
+            $this->bitacora(
+                $esRevaloracion ? 'Corregir Valoración de Pago Docente' : 'Valorar Solicitud de Pago Docente',
+                "CAdmin ".($esRevaloracion ? 'corrigió la valoración de' : 'valoró')." {$solicitud->folio} por {$solicitud->esquema_pago}, con total de $".number_format((float) $solicitud->monto, 2)." y tentativa para {$tentativa}.",
+                'Solicitudes de Pago Docente',
+                $solicitud
+            );
+
+            $this->notificarAcademica(
+                $solicitud,
+                $esRevaloracion ? 'solicitud_docente_valoracion_corregida' : 'solicitud_docente_valorada',
+                $esRevaloracion ? 'Valoración docente corregida' : 'Solicitud docente valorada',
+                "CAdmin ".($esRevaloracion ? 'corrigió la valoración de' : 'valoró')." {$solicitud->folio}. Fecha tentativa de pago: {$tentativa}.",
+                NotificacionInterna::SEVERIDAD_MEDIA
+            );
+        }, 3);
+
+        return redirect()->route('solicitudes_pago.show', $solicitud_pago)
+            ->with('success', 'Valoración calculada y guardada correctamente. Académica recibió la fecha tentativa de pago.');
+    }
+
+    /** Compatibilidad con formularios anteriores. */
+    public function aprobar(SolicitudPagoDocente $solicitud_pago, Request $request)
+    {
+        return $this->valorar($solicitud_pago, $request);
+    }
+
+    public function actualizarTentativa(SolicitudPagoDocente $solicitud_pago, Request $request)
+    {
+        $this->autorizarRevisionAdministrativa();
+
+        $validated = $request->validate([
+            'fecha_tentativa_pago' => ['required', 'date', 'after_or_equal:today'],
+            'observaciones_administracion' => ['nullable', 'string', 'max:1500'],
         ]);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
             $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
 
-            if ($solicitud->estatus !== SolicitudPagoDocente::ESTATUS_PENDIENTE) {
+            if ($solicitud->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA) {
                 throw ValidationException::withMessages([
-                    'observaciones_administracion' => 'Solo se pueden autorizar solicitudes pendientes. La solicitud pudo haber cambiado en otra pestaña.',
+                    'fecha_tentativa_pago' => 'Solo puede actualizarse la tentativa de una solicitud autorizada y pendiente de pago.',
                 ]);
             }
 
+            $anterior = $solicitud->fecha_tentativa_pago?->format('d/m/Y') ?? 'sin fecha';
             $solicitud->update([
-                'estatus' => SolicitudPagoDocente::ESTATUS_AUTORIZADA,
-                'autorizado_por_id' => Auth::id(),
-                'fecha_autorizacion' => now(),
+                'fecha_tentativa_pago' => $validated['fecha_tentativa_pago'],
                 'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud->observaciones_administracion,
             ]);
+            $nueva = $solicitud->fecha_tentativa_pago?->format('d/m/Y');
 
             $this->bitacora(
-                'Autorizar Solicitud de Pago Docente',
-                "Solicitud {$solicitud->folio} autorizada para pago.",
+                'Reprogramar Tentativa de Pago Docente',
+                "CAdmin cambió la tentativa de {$solicitud->folio} de {$anterior} a {$nueva}.",
                 'Solicitudes de Pago Docente',
                 $solicitud
             );
+
+            $this->notificarAcademica(
+                $solicitud,
+                'solicitud_docente_tentativa_actualizada',
+                'Fecha tentativa de pago actualizada',
+                "CAdmin actualizó {$solicitud->folio}. Nueva tentativa: {$nueva}.",
+                NotificacionInterna::SEVERIDAD_ALTA
+            );
         }, 3);
 
-        return back()->with('success', 'Solicitud autorizada correctamente. Ahora puede registrarse el pago.');
+        return back()->with('success', 'Fecha tentativa actualizada y notificada a Coordinación Académica.');
     }
 
     public function formObservar(SolicitudPagoDocente $solicitud_pago)
     {
         $this->autorizarRevisionAdministrativa();
 
-        if (!in_array($solicitud_pago->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true)) {
+        if (! in_array($solicitud_pago->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true)) {
             return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-                ->with('error', 'Esta solicitud ya no puede marcarse como observada.');
+                ->with('error', 'Esta solicitud ya no puede devolverse a Académica.');
         }
 
         return view('solicitudes_pago.observar', ['solicitud' => $solicitud_pago->load('docente')]);
@@ -217,61 +379,108 @@ class SolicitudPagoDocenteController extends Controller
     public function observar(SolicitudPagoDocente $solicitud_pago, Request $request)
     {
         $this->autorizarRevisionAdministrativa();
-
-        $validated = $request->validate([
-            'motivo_observacion' => 'required|string|min:8|max:1500',
-        ]);
+        $validated = $request->validate(['motivo_observacion' => 'required|string|min:8|max:1500']);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
             $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
 
-            if (!in_array($solicitud->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true)) {
-                throw ValidationException::withMessages([
-                    'motivo_observacion' => 'Esta solicitud ya no puede marcarse como observada. La solicitud pudo haber cambiado en otra pestaña.',
-                ]);
+            if (! in_array($solicitud->estatus, [SolicitudPagoDocente::ESTATUS_PENDIENTE, SolicitudPagoDocente::ESTATUS_AUTORIZADA], true)) {
+                throw ValidationException::withMessages(['motivo_observacion' => 'La solicitud cambió de estado en otra pestaña.']);
             }
 
             $solicitud->update([
                 'estatus' => SolicitudPagoDocente::ESTATUS_OBSERVADA,
                 'motivo_observacion' => $validated['motivo_observacion'],
+                'valorado_por_id' => null,
                 'autorizado_por_id' => null,
+                'fecha_valoracion' => null,
                 'fecha_autorizacion' => null,
+                'esquema_pago' => null,
+                'tarifa_unitaria' => null,
+                'tarifa_hora' => null,
+                'monto' => 0,
+                'fecha_tentativa_pago' => null,
+                'fecha_limite_pago' => null,
             ]);
 
-            $this->bitacora(
-                'Observar Solicitud de Pago Docente',
-                "Solicitud {$solicitud->folio} devuelta a Académica con observaciones.",
-                'Solicitudes de Pago Docente',
-                $solicitud
+            $this->bitacora('Observar Solicitud de Pago Docente', "CAdmin devolvió {$solicitud->folio} a Académica.", 'Solicitudes de Pago Docente', $solicitud);
+            $this->notificarAcademica(
+                $solicitud,
+                'solicitud_docente_observada',
+                'Solicitud docente con observaciones',
+                "CAdmin devolvió {$solicitud->folio}: {$validated['motivo_observacion']}",
+                NotificacionInterna::SEVERIDAD_ALTA
             );
         }, 3);
 
         return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-            ->with('success', 'Solicitud marcada como observada. Académica podrá corregirla y reenviarla.');
+            ->with('success', 'Solicitud devuelta a Académica con observaciones.');
+    }
+
+    public function formRechazar(SolicitudPagoDocente $solicitud_pago)
+    {
+        $this->autorizarRevisionAdministrativa();
+
+        if ($solicitud_pago->estaCerrada()) {
+            return redirect()->route('solicitudes_pago.show', $solicitud_pago)
+                ->with('error', 'La solicitud ya está cerrada.');
+        }
+
+        return view('solicitudes_pago.rechazar', ['solicitud' => $solicitud_pago->load('docente')]);
+    }
+
+    public function rechazar(SolicitudPagoDocente $solicitud_pago, Request $request)
+    {
+        $this->autorizarRevisionAdministrativa();
+        $validated = $request->validate(['motivo_rechazo' => 'required|string|min:8|max:1500']);
+
+        DB::transaction(function () use ($solicitud_pago, $validated) {
+            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+            if ($solicitud->estaCerrada()) {
+                throw ValidationException::withMessages(['motivo_rechazo' => 'La solicitud ya está cerrada.']);
+            }
+
+            $solicitud->update([
+                'estatus' => SolicitudPagoDocente::ESTATUS_RECHAZADA,
+                'rechazado_por_id' => Auth::id(),
+                'fecha_rechazo' => now(),
+                'motivo_rechazo' => $validated['motivo_rechazo'],
+                'fecha_tentativa_pago' => null,
+            ]);
+
+            $this->bitacora('Rechazar Solicitud de Pago Docente', "CAdmin rechazó {$solicitud->folio}.", 'Solicitudes de Pago Docente', $solicitud);
+            $this->notificarAcademica(
+                $solicitud,
+                'solicitud_docente_rechazada',
+                'Solicitud docente no aprobada',
+                "CAdmin decidió no ejecutar {$solicitud->folio}: {$validated['motivo_rechazo']}",
+                NotificacionInterna::SEVERIDAD_ALTA
+            );
+        }, 3);
+
+        return redirect()->route('solicitudes_pago.show', $solicitud_pago)
+            ->with('success', 'Solicitud rechazada y notificada a Coordinación Académica.');
     }
 
     public function formPagar(SolicitudPagoDocente $solicitud_pago)
     {
-        if (!in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
-            abort(403);
-        }
+        $this->autorizarRevisionAdministrativa();
 
-        if ($solicitud_pago->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA) {
+        if ($solicitud_pago->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA || (float) $solicitud_pago->monto <= 0) {
             return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-                ->with('error', 'Solo se pueden pagar solicitudes autorizadas.');
+                ->with('error', 'Solo pueden pagarse solicitudes valoradas y autorizadas con monto definido.');
         }
 
         return view('solicitudes_pago.pagar', [
-            'solicitud' => $solicitud_pago->load(['docente', 'autorizadoPor']),
+            'solicitud' => $solicitud_pago->load(['docente', 'valoradoPor']),
             'metodosPago' => SolicitudPagoDocente::metodosPago(),
         ]);
     }
 
     public function pagar(SolicitudPagoDocente $solicitud_pago, Request $request)
     {
-        if (!in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
-            abort(403);
-        }
+        $this->autorizarRevisionAdministrativa();
 
         $validated = $request->validate([
             'fecha_pago' => 'required|date',
@@ -281,63 +490,62 @@ class SolicitudPagoDocenteController extends Controller
             'comprobante_pago' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:5120', 'required_if:metodo_pago,Transferencia,Cheque,Tarjeta'],
             'observaciones_administracion' => 'nullable|string|max:1000',
             'pago_operacion_uuid' => ['required', 'uuid'],
-        ], [
-            'referencia_pago.required_if' => 'Captura la referencia, folio, clave de rastreo o número de operación del pago.',
-            'banco_pago.required_if' => 'Indica el banco, cuenta o medio utilizado para este método de pago.',
-            'comprobante_pago.required_if' => 'Adjunta el comprobante del pago para este método.',
-            'comprobante_pago.mimetypes' => 'El comprobante debe ser PDF o imagen válida.',
-            'comprobante_pago.max' => 'El comprobante no debe pesar más de 5 MB.',
         ]);
 
-        DB::transaction(function () use ($solicitud_pago, $validated, $request) {
-            $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+        $archivoGuardado = $request->hasFile('comprobante_pago')
+            ? $this->privateFiles->store($request->file('comprobante_pago'), 'comprobantes/docentes', PrivateFileService::DOCUMENT_MIMES, 'comprobante_pago')
+            : null;
 
-            if ($solicitud->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA) {
-                throw ValidationException::withMessages([
-                    'fecha_pago' => 'Solo se pueden pagar solicitudes autorizadas. La solicitud pudo haber cambiado en otra pestaña.',
+        try {
+            DB::transaction(function () use ($solicitud_pago, $validated, $archivoGuardado) {
+                $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
+
+                if ($solicitud->estatus !== SolicitudPagoDocente::ESTATUS_AUTORIZADA || (float) $solicitud->monto <= 0) {
+                    throw ValidationException::withMessages(['fecha_pago' => 'La solicitud ya no está disponible para pago.']);
+                }
+
+                $solicitud->update([
+                    'fecha_pago' => $validated['fecha_pago'],
+                    'metodo_pago' => $validated['metodo_pago'],
+                    'referencia_pago' => $validated['referencia_pago'] ?? null,
+                    'banco_pago' => $validated['banco_pago'] ?? null,
+                    'comprobante_pago_path' => $archivoGuardado['path'] ?? null,
+                    'comprobante_pago_original' => $archivoGuardado['original_name'] ?? null,
+                    'comprobante_pago_mime' => $archivoGuardado['mime_type'] ?? null,
+                    'comprobante_pago_tamano' => $archivoGuardado['size'] ?? null,
+                    'comprobante_pago_sha256' => $archivoGuardado['sha256'] ?? null,
+                    'pago_operacion_uuid' => $validated['pago_operacion_uuid'],
+                    'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud->observaciones_administracion,
+                    'procesado_por_id' => Auth::id(),
+                    'estatus' => SolicitudPagoDocente::ESTATUS_PAGADA,
                 ]);
-            }
 
-            $path = $solicitud->comprobante_pago_path;
-            $original = $solicitud->comprobante_pago_original;
-
-            if ($request->hasFile('comprobante_pago')) {
-                $path = $request->file('comprobante_pago')->store('comprobantes/docentes', 'local');
-                $original = $request->file('comprobante_pago')->getClientOriginalName();
-            }
-
-            $solicitud->update([
-                'fecha_pago' => $validated['fecha_pago'],
-                'metodo_pago' => $validated['metodo_pago'],
-                'referencia_pago' => $validated['referencia_pago'] ?? null,
-                'banco_pago' => $validated['banco_pago'] ?? null,
-                'comprobante_pago_path' => $path,
-                'comprobante_pago_original' => $original,
-                'pago_operacion_uuid' => $validated['pago_operacion_uuid'],
-                'observaciones_administracion' => $validated['observaciones_administracion'] ?? $solicitud->observaciones_administracion,
-                'procesado_por_id' => Auth::id(),
-                'estatus' => SolicitudPagoDocente::ESTATUS_PAGADA,
-            ]);
-
-            $this->bitacora(
-                'Pagar Solicitud de Pago Docente',
-                "Solicitud {$solicitud->folio} pagada por $".number_format((float) $solicitud->monto, 2).'.',
-                'Solicitudes de Pago Docente',
-                $solicitud
-            );
-        }, 3);
+                $this->bitacora('Pagar Solicitud de Pago Docente', "CAdmin pagó {$solicitud->folio}.", 'Solicitudes de Pago Docente', $solicitud);
+                $this->notificarAcademica(
+                    $solicitud,
+                    'solicitud_docente_pagada',
+                    'Pago docente ejecutado',
+                    "CAdmin registró el pago de {$solicitud->folio} para {$solicitud->docente?->nombre_completo} el {$solicitud->fecha_pago?->format('d/m/Y')}.",
+                    NotificacionInterna::SEVERIDAD_MEDIA
+                );
+            }, 3);
+        } catch (\Throwable $e) {
+            $this->privateFiles->delete($archivoGuardado['path'] ?? null);
+            throw $e;
+        }
 
         return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-            ->with('success', 'Pago registrado correctamente.');
+            ->with('success', 'Pago registrado y notificado a Coordinación Académica.');
     }
 
     public function formCancelar(SolicitudPagoDocente $solicitud_pago)
     {
-        $this->autorizarRevisionAdministrativa();
+        if (Auth::user()->rolClave() !== Rol::ADMIN) {
+            abort(403);
+        }
 
-        if ($solicitud_pago->estatus === SolicitudPagoDocente::ESTATUS_PAGADA) {
-            return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-                ->with('error', 'Una solicitud pagada no debe cancelarse desde este flujo. Registra un ajuste administrativo de egresos.');
+        if ($solicitud_pago->estaCerrada()) {
+            return redirect()->route('solicitudes_pago.show', $solicitud_pago)->with('error', 'La solicitud ya está cerrada.');
         }
 
         return view('solicitudes_pago.cancelar', ['solicitud' => $solicitud_pago->load('docente')]);
@@ -345,44 +553,28 @@ class SolicitudPagoDocenteController extends Controller
 
     public function cancelar(SolicitudPagoDocente $solicitud_pago, Request $request)
     {
-        $this->autorizarRevisionAdministrativa();
+        if (Auth::user()->rolClave() !== Rol::ADMIN) {
+            abort(403);
+        }
 
-        $validated = $request->validate([
-            'motivo_cancelacion' => 'required|string|min:8|max:1500',
-        ]);
+        $validated = $request->validate(['motivo_cancelacion' => 'required|string|min:8|max:1500']);
 
         DB::transaction(function () use ($solicitud_pago, $validated) {
             $solicitud = SolicitudPagoDocente::whereKey($solicitud_pago->id)->lockForUpdate()->firstOrFail();
-
-            if ($solicitud->estatus === SolicitudPagoDocente::ESTATUS_PAGADA) {
-                throw ValidationException::withMessages([
-                    'motivo_cancelacion' => 'Una solicitud pagada no debe cancelarse desde este flujo.',
-                ]);
+            if ($solicitud->estaCerrada()) {
+                throw ValidationException::withMessages(['motivo_cancelacion' => 'La solicitud ya está cerrada.']);
             }
-
-            if ($solicitud->estatus === SolicitudPagoDocente::ESTATUS_CANCELADA) {
-                throw ValidationException::withMessages([
-                    'motivo_cancelacion' => 'Esta solicitud ya fue cancelada anteriormente.',
-                ]);
-            }
-
             $solicitud->update([
                 'estatus' => SolicitudPagoDocente::ESTATUS_CANCELADA,
                 'cancelado_por_id' => Auth::id(),
                 'fecha_cancelacion' => now(),
                 'motivo_cancelacion' => $validated['motivo_cancelacion'],
             ]);
-
-            $this->bitacora(
-                'Cancelar Solicitud de Pago Docente',
-                "Solicitud {$solicitud->folio} cancelada.",
-                'Solicitudes de Pago Docente',
-                $solicitud
-            );
+            $this->bitacora('Cancelar Solicitud de Pago Docente', "Admin canceló {$solicitud->folio}.", 'Solicitudes de Pago Docente', $solicitud);
+            $this->notificarAcademica($solicitud, 'solicitud_docente_cancelada', 'Solicitud docente cancelada', "Admin canceló {$solicitud->folio}.", NotificacionInterna::SEVERIDAD_ALTA);
         }, 3);
 
-        return redirect()->route('solicitudes_pago.show', $solicitud_pago)
-            ->with('success', 'Solicitud cancelada correctamente.');
+        return redirect()->route('solicitudes_pago.show', $solicitud_pago)->with('success', 'Solicitud cancelada.');
     }
 
     public function descargarComprobante(SolicitudPagoDocente $solicitud_pago)
@@ -391,59 +583,37 @@ class SolicitudPagoDocenteController extends Controller
             abort(404);
         }
 
-        $disk = Storage::disk('local')->exists($solicitud_pago->comprobante_pago_path)
-            ? 'local'
-            : (Storage::disk('public')->exists($solicitud_pago->comprobante_pago_path) ? 'public' : null);
-
-        if (! $disk) {
-            abort(404);
+        $path = $this->privateFiles->ensurePrivate($solicitud_pago->comprobante_pago_path);
+        if (! $path) {
+            $this->bitacora('Incidente Comprobante Pago Docente', "No existe el comprobante de {$solicitud_pago->folio}.", 'Seguridad de Archivos', $solicitud_pago);
+            return back()->with('error', 'El comprobante no está disponible. El incidente quedó registrado.');
         }
 
-        $this->bitacora(
-            'Descargar Comprobante Pago Docente',
-            "Se descargó el comprobante de la solicitud {$solicitud_pago->folio}.",
-            'Solicitudes de Pago Docente',
-            $solicitud_pago
-        );
+        $sha256 = $this->privateFiles->sha256($path);
+        if ($solicitud_pago->comprobante_pago_sha256 && (! $sha256 || ! hash_equals($solicitud_pago->comprobante_pago_sha256, $sha256))) {
+            $this->bitacora('Incidente Integridad Pago Docente', "El comprobante de {$solicitud_pago->folio} no coincide con su huella.", 'Seguridad de Archivos', $solicitud_pago);
+            return back()->with('error', 'El comprobante no superó la validación de integridad.');
+        }
+        if (! $solicitud_pago->comprobante_pago_sha256 && $sha256) {
+            $solicitud_pago->forceFill(['comprobante_pago_sha256' => $sha256])->saveQuietly();
+        }
 
-        return Storage::disk($disk)->download(
-            $solicitud_pago->comprobante_pago_path,
-            $solicitud_pago->comprobante_pago_original ?: 'comprobante-pago-docente-'.$solicitud_pago->id
-        );
+        $this->bitacora('Descargar Comprobante Pago Docente', "Se descargó el comprobante de {$solicitud_pago->folio}.", 'Solicitudes de Pago Docente', $solicitud_pago);
+
+        return $this->privateFiles->download($path, $solicitud_pago->comprobante_pago_original ?: 'comprobante-pago-docente-'.$solicitud_pago->id.'.pdf');
     }
-
 
     public function acusePago(SolicitudPagoDocente $solicitud_pago)
     {
-        if (! in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION], true)) {
-            abort(403);
-        }
+        $this->autorizarRevisionAdministrativa();
 
         if ($solicitud_pago->estatus !== SolicitudPagoDocente::ESTATUS_PAGADA) {
-            return back()->with('error', 'El formato de pago docente se genera hasta que la solicitud está pagada.');
+            return back()->with('error', 'El formato se genera hasta que la solicitud está pagada.');
         }
 
-        $solicitud_pago->load([
-            'docente',
-            'creadoPor',
-            'autorizadoPor',
-            'procesadoPor',
-            'calendarioMateria.calendario.grupo.programa',
-            'calendarioMateria.materia',
-            'curso',
-            'cursoSesion',
-        ]);
-
-        $pdf = Pdf::loadView('solicitudes_pago.acuse_pdf', [
-            'solicitud' => $solicitud_pago,
-        ])->setPaper('letter', 'portrait');
-
-        $this->bitacora(
-            'Generar Formato de Pago Docente',
-            "Se generó formato de pago docente para la solicitud {$solicitud_pago->folio}.",
-            'Solicitudes de Pago Docente',
-            $solicitud_pago
-        );
+        $solicitud_pago->load(['docente', 'creadoPor', 'valoradoPor', 'autorizadoPor', 'procesadoPor', 'calendarioMateria.calendario.grupo.programa', 'calendarioMateria.materia', 'curso', 'cursoSesion']);
+        $pdf = Pdf::loadView('solicitudes_pago.acuse_pdf', ['solicitud' => $solicitud_pago])->setPaper('letter', 'portrait');
+        $this->bitacora('Generar Formato de Pago Docente', "Se generó formato para {$solicitud_pago->folio}.", 'Solicitudes de Pago Docente', $solicitud_pago);
 
         return $pdf->stream('pago_docente_'.str_replace(['/', '\\', ' '], '_', $solicitud_pago->folio ?: $solicitud_pago->id).'.pdf');
     }
@@ -453,230 +623,134 @@ class SolicitudPagoDocenteController extends Controller
         if (Auth::user()->rolClave() !== Rol::ADMIN) {
             abort(403);
         }
-
         if ($solicitud_pago->estatus === SolicitudPagoDocente::ESTATUS_PAGADA) {
-            return back()->with('error', 'No se puede eliminar una solicitud pagada. Conserva la trazabilidad.');
+            return back()->with('error', 'No puede eliminarse una solicitud pagada.');
         }
 
         DB::transaction(function () use ($solicitud_pago) {
             $folio = $solicitud_pago->folio ?: '#'.$solicitud_pago->id;
             $solicitud_pago->delete();
-
-            $this->bitacora(
-                'Eliminar Solicitud de Pago Docente',
-                "Solicitud {$folio} eliminada.",
-                'Solicitudes de Pago Docente'
-            );
+            $this->bitacora('Eliminar Solicitud de Pago Docente', "Solicitud {$folio} eliminada.", 'Solicitudes de Pago Docente');
         });
 
-        return redirect()->route('solicitudes_pago.index')
-            ->with('success', 'Solicitud eliminada correctamente.');
+        return redirect()->route('solicitudes_pago.index')->with('success', 'Solicitud eliminada.');
     }
 
     private function formData(SolicitudPagoDocente $solicitud): array
     {
-        $calendarioMaterias = CalendarioMateria::with(['calendario.grupo.programa', 'calendario.grupo.cicloEscolar', 'calendario.cicloEscolar', 'materia', 'docente', 'sesiones'])
-            ->whereNotIn('estatus', [CalendarioMateria::ESTATUS_CANCELADA])
-            ->orderByDesc('id')
-            ->limit(150)
-            ->get();
-
-        $cursos = CursoEducacionContinua::operativos()
-            ->withCount(['sesiones as sesiones_count' => fn ($q) => $q->where('estatus', '!=', CursoSesion::ESTATUS_CANCELADA)])
-            ->orderByDesc('fecha_inicio')
-            ->get(['id', 'nombre', 'tipo', 'modalidad', 'horas_totales', 'fecha_inicio', 'fecha_fin']);
-
-        $cursoSesiones = CursoSesion::with(['curso', 'docente'])
-            ->whereDate('fecha', '>=', now()->subMonths(2)->toDateString())
-            ->orderBy('fecha')
-            ->limit(200)
-            ->get();
-
         return [
             'solicitud' => $solicitud,
-            'docentes' => Docente::orderBy('nombre_completo')->get(),
+            'docentes' => Docente::orderBy('nombre_completo')->get(['id', 'nombre_completo']),
+            'tiposClase' => SolicitudPagoDocente::tiposClase(),
             'origenes' => SolicitudPagoDocente::origenes(),
-            'conceptos' => SolicitudPagoDocente::conceptos(),
-            'prioridades' => SolicitudPagoDocente::prioridades(),
-            'calendarioMaterias' => $calendarioMaterias,
-            'cursos' => $cursos,
-            'cursoSesiones' => $cursoSesiones,
-            'niveles' => ['Licenciatura', 'Maestría', 'Doctorado', 'Posdoctorado', 'Educación continua', 'Otro'],
             'modalidades' => ['Presencial', 'Virtual', 'Mixta'],
-            'puedeCalcularPago' => in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true),
+            'calendarioMaterias' => CalendarioMateria::with(['calendario.grupo.programa', 'materia', 'docente', 'sesiones'])
+                ->whereNotIn('estatus', [CalendarioMateria::ESTATUS_CANCELADA])->orderByDesc('id')->limit(150)->get(),
+            'cursos' => CursoEducacionContinua::query()
+                ->where('estatus', '!=', CursoEducacionContinua::ESTATUS_CANCELADO)
+                ->where(function ($query) {
+                    $query->whereNull('fecha_fin')
+                        ->orWhereDate('fecha_fin', '>=', now()->subYear()->toDateString());
+                })
+                ->with(['sesiones' => fn ($query) => $query->whereDate('fecha', '<=', today()->toDateString())
+                    ->where('estatus', '!=', CursoSesion::ESTATUS_CANCELADA)
+                    ->orderBy('fecha')])
+                ->orderByDesc('fecha_inicio')
+                ->get(['id', 'nombre', 'tipo', 'modalidad', 'fecha_inicio', 'fecha_fin']),
         ];
     }
 
-    private function normalizarSolicitudDesdeOrigen(Request $request): void
+    private function validarRegistroAcademico(Request $request): array
     {
-        $mergeIfBlank = function (string $key, mixed $value) use ($request): void {
-            if (! $request->filled($key) && $value !== null && $value !== '') {
-                $request->merge([$key => $value]);
-            }
-        };
-
-        $formatDate = function ($date) {
-            if (! $date) {
-                return null;
-            }
-
-            try {
-                return \Carbon\Carbon::parse($date)->format('Y-m-d');
-            } catch (\Throwable) {
-                return null;
-            }
-        };
-
-        if ($request->input('origen') === SolicitudPagoDocente::ORIGEN_CALENDARIO && $request->filled('calendario_materia_id')) {
-            $cm = CalendarioMateria::with(['calendario.grupo.programa', 'calendario.grupo.cicloEscolar', 'calendario.cicloEscolar', 'materia', 'docente', 'sesiones'])
-                ->find($request->input('calendario_materia_id'));
-
-            if ($cm) {
-                $cal = $cm->calendario;
-                $grupo = $cal?->grupo;
-                $programa = $grupo?->programa;
-                $ciclo = $grupo?->cicloEscolar ?? $cal?->cicloEscolar;
-                $sesiones = $cm->sesiones->whereNotIn('estatus', [\App\Models\CalendarioSesion::ESTATUS_CANCELADA, \App\Models\CalendarioSesion::ESTATUS_SUSPENDIDA]);
-                $seleccionadas = collect($request->input('calendario_sesion_ids', []))->map(fn ($id) => (int) $id)->filter()->all();
-                if (! empty($seleccionadas)) {
-                    $sesiones = $sesiones->whereIn('id', $seleccionadas);
-                }
-                $primera = $sesiones->sortBy('fecha')->first();
-                $ultima = $sesiones->sortByDesc('fecha')->first();
-                $horas = $sesiones->sum(function ($sesion) {
-                    if (! $sesion->hora_inicio || ! $sesion->hora_fin) {
-                        return 0;
-                    }
-
-                    try {
-                        $inicio = \Carbon\Carbon::parse($sesion->hora_inicio);
-                        $fin = \Carbon\Carbon::parse($sesion->hora_fin);
-                        return $fin->greaterThan($inicio) ? $inicio->diffInMinutes($fin) / 60 : 0;
-                    } catch (\Throwable $e) {
-                        return 0;
-                    }
-                });
-
-                $mergeIfBlank('docente_id', $cm->docente_id);
-                $mergeIfBlank('nivel', $programa?->nivel ?? $cm->materia?->nivel);
-                $mergeIfBlank('programa_grupo', trim(($programa?->nombre ?? '').($grupo?->nombre ? ' · '.$grupo->nombre : '')));
-                $mergeIfBlank('periodo', $cal?->periodo ?? $ciclo?->nombre);
-                $mergeIfBlank('materia_actividad', $cm->nombre_materia);
-                $mergeIfBlank('modalidad', $cal?->modalidad);
-                $mergeIfBlank('numero_sesiones', $sesiones->count() ?: null);
-                $mergeIfBlank('horas_totales', $horas > 0 ? round($horas, 2) : null);
-                $mergeIfBlank('fecha_inicio_periodo', $formatDate($primera?->fecha ?? $cal?->fecha_inicio));
-                $mergeIfBlank('fecha_fin_periodo', $formatDate($ultima?->fecha ?? $cal?->fecha_fin));
-            }
-        }
-
-        if ($request->input('origen') === SolicitudPagoDocente::ORIGEN_EDUCACION_CONTINUA) {
-            $idsSesion = collect($request->input('curso_sesion_ids', []))->map(fn ($id) => (int) $id)->filter()->values();
-            if ($idsSesion->isEmpty() && $request->filled('curso_sesion_id')) {
-                $idsSesion = collect([(int) $request->input('curso_sesion_id')]);
-            }
-
-            if ($idsSesion->isNotEmpty()) {
-                $sesiones = CursoSesion::with(['curso', 'docente'])->whereIn('id', $idsSesion)->orderBy('fecha')->get();
-                $sesion = $sesiones->first();
-
-                if ($sesion) {
-                    $curso = $sesion->curso;
-                    $primera = $sesiones->first();
-                    $ultima = $sesiones->sortByDesc('fecha')->first();
-                    $horas = $sesiones->sum(fn ($s) => (float) ($s->duracion_horas ?: $s->calcularDuracion()));
-                    $mergeIfBlank('curso_id', $sesion->curso_id);
-                    $mergeIfBlank('docente_id', $sesion->docente_id);
-                    $mergeIfBlank('nivel', 'Educación continua');
-                    $mergeIfBlank('programa_grupo', trim(($curso?->tipo ?? 'Curso').' · '.($curso?->nombre ?? '')));
-                    $mergeIfBlank('periodo', $primera?->fecha?->format('d/m/Y').' - '.$ultima?->fecha?->format('d/m/Y'));
-                    $mergeIfBlank('materia_actividad', trim(($curso?->nombre ?? 'Sesiones de educación continua')));
-                    $mergeIfBlank('modalidad', $sesion->modalidad ?? $curso?->modalidad);
-                    $mergeIfBlank('numero_sesiones', $sesiones->count());
-                    $mergeIfBlank('horas_totales', $horas > 0 ? round($horas, 2) : null);
-                    $mergeIfBlank('fecha_inicio_periodo', $formatDate($primera?->fecha));
-                    $mergeIfBlank('fecha_fin_periodo', $formatDate($ultima?->fecha));
-                }
-            } elseif ($request->filled('curso_id')) {
-                $curso = CursoEducacionContinua::with(['sesiones'])->find($request->input('curso_id'));
-
-                if ($curso) {
-                    $sesiones = $curso->sesiones->where('estatus', '!=', CursoSesion::ESTATUS_CANCELADA);
-                    $mergeIfBlank('nivel', 'Educación continua');
-                    $mergeIfBlank('programa_grupo', trim(($curso->tipo ?? 'Curso').' · '.($curso->nombre ?? '')));
-                    $mergeIfBlank('periodo', trim((optional($curso->fecha_inicio)->format('d/m/Y') ?? '').' - '.(optional($curso->fecha_fin)->format('d/m/Y') ?? '')));
-                    $mergeIfBlank('materia_actividad', $curso->nombre);
-                    $mergeIfBlank('modalidad', $curso->modalidad);
-                    $mergeIfBlank('numero_sesiones', $sesiones->count() ?: null);
-                    $mergeIfBlank('horas_totales', $curso->horas_totales);
-                    $mergeIfBlank('fecha_inicio_periodo', $formatDate($curso->fecha_inicio));
-                    $mergeIfBlank('fecha_fin_periodo', $formatDate($curso->fecha_fin));
-                }
-            }
-        }
-    }
-
-    private function validateSolicitud(Request $request, ?SolicitudPagoDocente $solicitud = null): array
-    {
-        $this->normalizarSolicitudDesdeOrigen($request);
-
         $validated = $request->validate([
-            'docente_id' => 'required|exists:docentes,id',
+            'docente_id' => ['required', 'exists:docentes,id'],
+            'tipo_clase' => ['required', Rule::in(SolicitudPagoDocente::tiposClase())],
             'origen' => ['required', Rule::in(SolicitudPagoDocente::origenes())],
-            'calendario_materia_id' => 'nullable|exists:calendario_materias,id',
-            'curso_id' => 'nullable|exists:cursos_educacion_continua,id',
-            'curso_sesion_id' => 'nullable|exists:curso_sesiones,id',
-            'calendario_sesion_ids' => ['nullable', 'array'],
-            'calendario_sesion_ids.*' => ['integer', 'exists:calendario_sesiones,id'],
-            'curso_sesion_ids' => ['nullable', 'array'],
-            'curso_sesion_ids.*' => ['integer', 'exists:curso_sesiones,id'],
-            'concepto_pago' => ['required', Rule::in(SolicitudPagoDocente::conceptos())],
-            'nivel' => 'required|string|max:50',
-            'programa_grupo' => 'nullable|string|max:180',
-            'materia_actividad' => 'required|string|max:220',
-            'periodo' => 'nullable|string|max:120',
-            'modalidad' => 'nullable|string|max:60',
-            'numero_sesiones' => 'nullable|integer|min:1|max:300',
-            'horas_totales' => 'nullable|numeric|min:0|max:9999',
-            'tarifa_hora' => 'nullable|numeric|min:0|max:999999',
-            'monto' => in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) ? 'required|numeric|min:1|max:9999999' : 'nullable|numeric|min:0|max:9999999',
-            'fecha_solicitud' => 'required|date',
-            'fecha_inicio_periodo' => 'nullable|date',
-            'fecha_fin_periodo' => 'nullable|date|after_or_equal:fecha_inicio_periodo',
-            'fecha_limite_pago' => 'nullable|date',
-            'fecha_tentativa_pago' => 'nullable|date',
-            'prioridad' => ['required', Rule::in(SolicitudPagoDocente::prioridades())],
-            'observaciones_academica' => 'nullable|string|max:1500',
+            'calendario_materia_id' => ['nullable', 'exists:calendario_materias,id'],
+            'curso_id' => ['nullable', 'exists:cursos_educacion_continua,id'],
+            'fechas_clase' => ['required', 'array', 'min:1', 'max:100'],
+            'fechas_clase.*' => ['required', 'date', 'before_or_equal:today', 'distinct'],
+            'programa_grupo' => ['nullable', 'string', 'max:180'],
+            'materia_actividad' => ['required', 'string', 'max:220'],
+            'periodo' => ['nullable', 'string', 'max:120'],
+            'modalidad' => ['nullable', 'string', 'max:60'],
+            'horas_totales' => ['nullable', 'numeric', 'min:0', 'max:9999'],
+            'observaciones_academica' => ['nullable', 'string', 'max:1500'],
+        ], [
+            'fechas_clase.required' => 'Registra al menos una fecha en la que el docente impartió clase.',
+            'fechas_clase.*.before_or_equal' => 'Las fechas deben corresponder a clases ya impartidas.',
+            'fechas_clase.*.distinct' => 'No repitas una misma fecha de clase.',
         ]);
 
-        if (! in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
-            $validated['tarifa_hora'] = 0;
-            $validated['monto'] = 0;
-            $validated['fecha_limite_pago'] = null;
-        }
+        $fechas = collect($validated['fechas_clase'])->map(fn ($fecha) => (string) $fecha)->unique()->sort()->values();
+        $validated['fechas_clase'] = $fechas->all();
+        $validated['numero_sesiones'] = $fechas->count();
+        $validated['fecha_inicio_periodo'] = $fechas->first();
+        $validated['fecha_fin_periodo'] = $fechas->last();
+        $validated['nivel'] = $validated['tipo_clase'];
+        $validated['observaciones'] = $validated['observaciones_academica'] ?? null;
 
-        $montoSugerido = SolicitudPagoDocente::calcularMontoSugerido(
-            $validated['concepto_pago'] ?? null,
-            round((float) ($validated['horas_totales'] ?? 0), 2),
-            (int) ($validated['numero_sesiones'] ?? 0),
-            round((float) ($validated['tarifa_hora'] ?? 0), 2)
-        );
-
-        if (in_array(Auth::user()?->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true) && $montoSugerido !== null && abs(round((float) $validated['monto'], 2) - $montoSugerido) > 0.01) {
-            throw ValidationException::withMessages([
-                'monto' => 'El monto no coincide con el cálculo esperado para el concepto seleccionado. Revisa sesiones/horas, tarifa y monto.',
-            ]);
-        }
+        $validated['calendario_sesion_ids'] = null;
+        $validated['curso_sesion_ids'] = null;
+        $validated['curso_sesion_id'] = null;
 
         if ($validated['origen'] === SolicitudPagoDocente::ORIGEN_CALENDARIO) {
             $validated['curso_id'] = null;
-            $validated['curso_sesion_id'] = null;
+
+            if (! empty($validated['calendario_materia_id'])) {
+                $materia = CalendarioMateria::with('sesiones')->findOrFail($validated['calendario_materia_id']);
+
+                if ($materia->docente_id && (int) $materia->docente_id !== (int) $validated['docente_id']) {
+                    throw ValidationException::withMessages([
+                        'docente_id' => 'El docente seleccionado no coincide con el docente asignado a la materia relacionada.',
+                    ]);
+                }
+
+                $sesiones = $materia->sesiones
+                    ->filter(fn ($sesion) => $sesion->fecha
+                        && $sesion->fecha->lte(today())
+                        && ! in_array($sesion->estatus, [CalendarioSesion::ESTATUS_CANCELADA, CalendarioSesion::ESTATUS_SUSPENDIDA], true))
+                    ->filter(fn ($sesion) => in_array($sesion->fecha->format('Y-m-d'), $validated['fechas_clase'], true));
+
+                $fechasRelacionadas = $sesiones->pluck('fecha')->map(fn ($fecha) => $fecha->format('Y-m-d'))->unique()->sort()->values();
+                $faltantes = collect($validated['fechas_clase'])->diff($fechasRelacionadas);
+
+                if ($faltantes->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'fechas_clase' => 'Al relacionar una materia, todas las fechas deben corresponder a sesiones activas de esa materia. Fechas sin coincidencia: '.$faltantes->implode(', ').'.',
+                    ]);
+                }
+
+                $validated['calendario_sesion_ids'] = $sesiones->pluck('id')->values()->all();
+            }
         } elseif ($validated['origen'] === SolicitudPagoDocente::ORIGEN_EDUCACION_CONTINUA) {
             $validated['calendario_materia_id'] = null;
+
+            if (! empty($validated['curso_id'])) {
+                $sesiones = CursoSesion::query()
+                    ->where('curso_id', $validated['curso_id'])
+                    ->where('docente_id', $validated['docente_id'])
+                    ->whereDate('fecha', '<=', today()->toDateString())
+                    ->where('estatus', '!=', CursoSesion::ESTATUS_CANCELADA)
+                    ->whereIn('fecha', $validated['fechas_clase'])
+                    ->orderBy('fecha')
+                    ->get();
+
+                $fechasRelacionadas = $sesiones->pluck('fecha')->map(fn ($fecha) => $fecha->format('Y-m-d'))->unique()->sort()->values();
+                $faltantes = collect($validated['fechas_clase'])->diff($fechasRelacionadas);
+
+                if ($faltantes->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'fechas_clase' => 'Al relacionar un curso o diplomado, todas las fechas deben corresponder a sesiones impartidas por el docente seleccionado. Fechas sin coincidencia: '.$faltantes->implode(', ').'.',
+                    ]);
+                }
+
+                $validated['curso_sesion_ids'] = $sesiones->pluck('id')->values()->all();
+                $validated['curso_sesion_id'] = $sesiones->first()?->id;
+            }
         } else {
             $validated['calendario_materia_id'] = null;
             $validated['curso_id'] = null;
-            $validated['curso_sesion_id'] = null;
         }
 
         return $validated;
@@ -685,29 +759,53 @@ class SolicitudPagoDocenteController extends Controller
     private function autorizarEdicionAcademica(SolicitudPagoDocente $solicitud): void
     {
         $rol = Auth::user()->rolClave();
-
-        if ($rol === Rol::ADMIN) {
+        if ($rol === Rol::ADMIN || ($rol === Rol::ACADEMICA && $solicitud->puedeEditarAcademica())) {
             return;
         }
-
-        if ($rol === Rol::ACADEMICA && $solicitud->puedeEditarAcademica()) {
-            return;
-        }
-
         abort(403);
     }
 
     private function autorizarRevisionAdministrativa(): void
     {
-        if (!in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true)) {
+        if (! in_array(Auth::user()->rolClave(), [Rol::ADMIN, Rol::CADMIN], true)) {
             abort(403);
         }
+    }
+
+    private function notificarCAdmin(SolicitudPagoDocente $solicitud, string $tipo, string $titulo, string $mensaje, string $severidad): void
+    {
+        $this->crearNotificacion($solicitud, $tipo, $titulo, $mensaje, $severidad, Rol::CADMIN);
+    }
+
+    private function notificarAcademica(SolicitudPagoDocente $solicitud, string $tipo, string $titulo, string $mensaje, string $severidad): void
+    {
+        $this->crearNotificacion($solicitud, $tipo, $titulo, $mensaje, $severidad, Rol::ACADEMICA);
+    }
+
+    private function crearNotificacion(SolicitudPagoDocente $solicitud, string $tipo, string $titulo, string $mensaje, string $severidad, string $rol): void
+    {
+        NotificacionInterna::create([
+            'rol_clave' => $rol,
+            'tipo' => $tipo,
+            'modulo' => 'Solicitudes de Pago Docente',
+            'titulo' => $titulo,
+            'mensaje' => $mensaje,
+            'url' => route('solicitudes_pago.show', $solicitud, false),
+            'severidad' => $severidad,
+            'referencia_tipo' => SolicitudPagoDocente::class,
+            'referencia_id' => $solicitud->id,
+            'hash' => sha1('spd|'.$solicitud->id.'|'.$tipo.'|'.Str::uuid()),
+            'metadata' => [
+                'folio' => $solicitud->folio,
+                'docente_id' => $solicitud->docente_id,
+                'estatus' => $solicitud->estatus,
+            ],
+        ]);
     }
 
     private function generarFolio(SolicitudPagoDocente $solicitud): string
     {
         $fecha = optional($solicitud->fecha_solicitud)->format('Ym') ?: now()->format('Ym');
-
         return 'SPD-'.$fecha.'-'.str_pad((string) $solicitud->id, 6, '0', STR_PAD_LEFT);
     }
 }

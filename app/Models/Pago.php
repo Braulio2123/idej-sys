@@ -33,6 +33,10 @@ class Pago extends Model
         'operacion_uuid',
         'referencia_bancaria',
         'archivo_comprobante',
+        'archivo_comprobante_original',
+        'archivo_comprobante_mime',
+        'archivo_comprobante_tamano',
+        'archivo_comprobante_sha256',
         'banco_emisor',
         'cuenta_origen',
         'numero_autorizacion',
@@ -55,6 +59,7 @@ class Pago extends Model
         'fecha_transferencia' => 'datetime',
         'recibo_emitido_at' => 'datetime',
         'recibo_version' => 'integer',
+        'archivo_comprobante_tamano' => 'integer',
     ];
 
     public function alumno()

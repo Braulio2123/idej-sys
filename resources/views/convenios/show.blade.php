@@ -14,8 +14,18 @@
         {{ session('error') }}
     </div>
 @endif
+@if(session('info'))
+    <div class="mb-4 p-4 bg-blue-100 text-blue-800 border border-blue-300 rounded-lg shadow">
+        {{ session('info') }}
+    </div>
+@endif
+@if($errors->any())
+    <div class="mb-4 p-4 bg-red-50 text-red-800 border border-red-200 rounded-lg shadow">
+        <ul class="list-disc pl-5 text-sm">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+    </div>
+@endif
 
-
+@php($convenioActivo = $convenio->estatus === 'Activo')
 <div class="container mx-auto px-4 py-8">
 
 
@@ -38,12 +48,21 @@
             <span class="
                 px-3 py-1 text-sm rounded font-semibold
                 @if($convenio->estatus === 'Finalizado') bg-green-100 text-green-700
+                @elseif($convenio->estatus === 'Cancelado') bg-red-100 text-red-700
                 @else bg-yellow-100 text-yellow-700
                 @endif
             ">
                 Estatus: {{ $convenio->estatus }}
             </span>
         </div>
+
+        @if($convenio->estatus === 'Cancelado')
+            <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
+                <p class="font-bold">Convenio cancelado</p>
+                <p class="text-sm mt-1">{{ $convenio->motivo_cancelacion ?: 'Sin motivo capturado.' }}</p>
+                <p class="text-xs mt-2">Cancelado {{ $convenio->fecha_cancelacion?->format('d/m/Y H:i') ?? 'sin fecha' }} por {{ $convenio->canceladoPor->nombre ?? 'usuario no disponible' }}. Los cargos, parcialidades y vínculos se conservaron como historial.</p>
+            </div>
+        @endif
 
         {{-- TOTALES --}}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
@@ -92,27 +111,35 @@
                 Ver Parcialidades
             </a>
 
-            <a href="{{ route('parcialidades.create', $convenio) }}"
-               class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
-                + Crear Parcialidad
-            </a>
+            @if($convenioActivo && !$tienePagosAplicados)
+                <a href="{{ route('parcialidades.create', $convenio) }}"
+                   class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
+                    + Crear Parcialidad
+                </a>
 
-            <a href="{{ route('alumnos.convenios.edit', [$alumno, $convenio]) }}"
-               class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-yellow-700">
-                Editar Convenio
-            </a>
-
-            <form action="{{ route('alumnos.convenios.destroy', [$alumno, $convenio]) }}"
-                  method="POST"
-                  onsubmit="return confirm('¿Eliminar este convenio?');">
-                @csrf
-                @method('DELETE')
-                <button class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">
-                    Eliminar Convenio
-                </button>
-            </form>
+                <a href="{{ route('alumnos.convenios.edit', [$alumno, $convenio]) }}"
+                   class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-yellow-700">
+                    Editar Convenio
+                </a>
+            @endif
 
         </div>
+
+        @if($convenioActivo && !$tienePagosAplicados)
+            <details class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
+                <summary class="cursor-pointer font-semibold text-red-700">Cancelar convenio y reactivar cargos</summary>
+                <form action="{{ route('alumnos.convenios.destroy', [$alumno, $convenio]) }}" method="POST" class="mt-3 space-y-3" data-confirm="¿Cancelar este convenio? Se conservarán parcialidades y vínculos, y se reactivarán los cargos originales.">
+                    @csrf
+                    @method('DELETE')
+                    <textarea name="motivo_cancelacion" required minlength="10" maxlength="3000" rows="3" class="w-full rounded-lg border-red-300" placeholder="Explica el motivo administrativo de la cancelación"></textarea>
+                    <button class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">Confirmar cancelación</button>
+                </form>
+            </details>
+        @elseif($convenioActivo && $tienePagosAplicados)
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Este convenio ya tiene pagos aplicados. No puede cancelarse ni cambiar su calendario desde esta pantalla; cualquier corrección requiere un ajuste administrativo documentado.
+            </div>
+        @endif
 
     </div>
 
@@ -216,23 +243,16 @@
 
                             <td class="px-4 py-2 text-right space-x-2">
 
-                                {{-- Editar parcialidad --}}
-                                <a href="{{ route('parcialidades.edit', [$convenio, $p]) }}"
-                                   class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                                    Editar
-                                </a>
+                                @if($convenioActivo && !$tienePagosAplicados && $p->estatus !== 'Cancelada')
+                                    <a href="{{ route('parcialidades.edit', [$convenio, $p]) }}"
+                                       class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                                        Editar
+                                    </a>
+                                @else
+                                    <span class="text-slate-400">Solo consulta</span>
+                                @endif
 
-                                {{-- Eliminar parcialidad --}}
-                                <form action="{{ route('parcialidades.destroy', [$convenio, $p]) }}"
-                                      method="POST"
-                                      class="inline-block"
-                                      onsubmit="return confirm('¿Eliminar esta parcialidad?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                                        Eliminar
-                                    </button>
-                                </form>
+                                <span class="text-xs text-slate-500">Las parcialidades forman parte del historial contractual.</span>
 
                             </td>
                         </tr>

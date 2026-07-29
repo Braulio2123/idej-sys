@@ -6,18 +6,19 @@ use App\Models\AjusteCaja;
 use App\Models\Alumno;
 use App\Models\Cargo;
 use App\Models\ConfiguracionInstitucional;
+use App\Models\Convenio;
 use App\Models\CorteCaja;
 use App\Models\Pago;
 use App\Models\ParcialidadConvenio;
 use App\Models\NotificacionInterna;
 use App\Models\Rol;
+use App\Services\PrivateFileService;
 use App\Traits\RegistraBitacora;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +26,10 @@ use Illuminate\Validation\ValidationException;
 class PagoController extends Controller
 {
     use RegistraBitacora;
+
+    public function __construct(private readonly PrivateFileService $privateFiles)
+    {
+    }
 
     /**
      * Formulario para registrar un pago del alumno.
@@ -38,7 +43,8 @@ class PagoController extends Controller
 
         $parcialidadesPendientes = ParcialidadConvenio::whereIn('estatus', ['Pendiente', 'Parcialmente Pagado'])
             ->whereHas('convenio', function ($query) use ($alumno) {
-                $query->where('alumno_id', $alumno->id);
+                $query->where('alumno_id', $alumno->id)
+                    ->where('estatus', 'Activo');
             })
             ->with('convenio')
             ->orderBy('fecha_vencimiento')
@@ -61,11 +67,11 @@ class PagoController extends Controller
     {
         $validated = $request->validate([
             'metodo_pago' => ['required', Rule::in(['Efectivo', 'Transferencia', 'Tarjeta'])],
-            'monto_total_pagado' => ['required', 'numeric', 'min:0.01'],
-            'monto_recibido_efectivo' => ['nullable', 'numeric', 'min:0.01'],
-            'tratamiento_excedente' => ['nullable', Rule::in(['cambio', 'saldo_favor'])],
+            'monto_total_pagado' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
+            'monto_recibido_efectivo' => ['nullable', 'required_if:metodo_pago,Efectivo', 'numeric', 'min:0.01', 'max:99999999.99'],
+            'tratamiento_excedente' => ['nullable', 'required_if:metodo_pago,Efectivo', Rule::in(['cambio', 'saldo_favor'])],
             'es_pago_anticipado' => ['nullable', 'boolean'],
-            'fecha_pago' => ['nullable', 'date'],
+            'fecha_pago' => ['nullable', 'date', 'before_or_equal:today'],
             'operacion_uuid' => ['required', 'uuid'],
 
             'cargos' => ['nullable', 'array'],
@@ -73,26 +79,39 @@ class PagoController extends Controller
             'parcialidades' => ['nullable', 'array'],
             'parcialidades.*' => ['integer', 'distinct'],
 
-            'folio_recibo' => ['nullable', 'string', 'max:50'],
             'observaciones' => ['nullable', 'string', 'max:1000'],
 
             // Transferencia
             'banco_emisor' => ['nullable', 'string', 'max:150'],
             'cuenta_origen' => ['nullable', 'string', 'max:100'],
             'numero_autorizacion' => ['nullable', 'string', 'max:100'],
-            'clave_rastreo' => ['nullable', 'string', 'max:100'],
+            'clave_rastreo' => [
+                'nullable',
+                'string',
+                'max:100',
+                Rule::requiredIf(fn () => $request->input('metodo_pago') === 'Transferencia'
+                    && blank($request->input('referencia_transferencia'))
+                    && blank($request->input('numero_autorizacion'))),
+            ],
             'concepto_transferencia' => ['nullable', 'string', 'max:255'],
             'referencia_transferencia' => ['nullable', 'string', 'max:150'],
-            'fecha_transferencia' => ['nullable', 'date'],
+            'fecha_transferencia' => ['nullable', 'date', 'before_or_equal:now'],
             'banco_destino' => ['nullable', 'string', 'max:150'],
             'archivo_comprobante' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:4096'],
 
             // Tarjeta
             'tarjeta_banco_emisor' => ['nullable', 'string', 'max:150'],
-            'tarjeta_numero_autorizacion' => ['nullable', 'string', 'max:100'],
+            'tarjeta_numero_autorizacion' => ['nullable', 'required_if:metodo_pago,Tarjeta', 'string', 'max:100'],
             'comprobante_tarjeta' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:4096'],
         ], [
             'monto_total_pagado.min' => 'El monto del pago debe ser mayor a cero.',
+            'monto_total_pagado.max' => 'El monto del pago excede el límite permitido.',
+            'monto_recibido_efectivo.required_if' => 'Captura el efectivo realmente recibido por caja.',
+            'tratamiento_excedente.required_if' => 'Indica si la diferencia en efectivo se entrega como cambio o se conserva como saldo a favor.',
+            'fecha_pago.before_or_equal' => 'La fecha del pago no puede ser posterior al día de hoy.',
+            'fecha_transferencia.before_or_equal' => 'La fecha de la transferencia no puede estar en el futuro.',
+            'clave_rastreo.required' => 'Captura una clave de rastreo, referencia o número de autorización para identificar la transferencia.',
+            'tarjeta_numero_autorizacion.required_if' => 'Captura el número de autorización de la operación con tarjeta.',
             'archivo_comprobante.mimes' => 'El comprobante de transferencia debe ser PDF o imagen JPG/PNG.',
             'comprobante_tarjeta.mimes' => 'El comprobante de tarjeta debe ser PDF o imagen JPG/PNG.',
         ]);
@@ -116,8 +135,16 @@ class PagoController extends Controller
                 ->with('info', "El pago #{$pagoExistente->id} ya había sido registrado. Se evitó duplicar la operación.");
         }
 
+        if ($pagoExistente) {
+            throw ValidationException::withMessages([
+                'operacion_uuid' => 'La operación ya fue utilizada en otro registro. Recarga el formulario antes de volver a intentarlo.',
+            ]);
+        }
+
+        $archivoComprobante = $this->guardarComprobante($request, $validated['metodo_pago']);
+
         try {
-            $pago = DB::transaction(function () use ($request, $validated, $alumno, $cargoIds, $parcialidadIds) {
+            $pago = DB::transaction(function () use ($validated, $alumno, $cargoIds, $parcialidadIds, $archivoComprobante) {
             $corteCaja = CorteCaja::abierta()
                 ->deUsuario(Auth::id())
                 ->lockForUpdate()
@@ -125,7 +152,7 @@ class PagoController extends Controller
 
             if (! $corteCaja) {
                 throw ValidationException::withMessages([
-                    'metodo_pago' => 'Antes de registrar pagos debes abrir una caja desde Finanzas → Cortes de Caja.',
+                    'metodo_pago' => 'Antes de registrar pagos debes abrir una caja desde Administración financiera → Cortes de Caja.',
                 ]);
             }
 
@@ -142,10 +169,31 @@ class PagoController extends Controller
                 ]);
             }
 
+            $convenioIds = ParcialidadConvenio::whereIn('id', $parcialidadIds)
+                ->pluck('convenio_id')
+                ->unique()
+                ->sort()
+                ->values();
+
+            $convenios = Convenio::whereIn('id', $convenioIds)
+                ->where('alumno_id', $alumno->id)
+                ->where('estatus', 'Activo')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($convenios->count() !== $convenioIds->count()) {
+                throw ValidationException::withMessages([
+                    'parcialidades' => 'Una o más parcialidades pertenecen a un convenio cancelado, finalizado o ajeno al alumno.',
+                ]);
+            }
+
             $parcialidades = ParcialidadConvenio::whereIn('id', $parcialidadIds)
+                ->whereIn('convenio_id', $convenioIds)
                 ->whereIn('estatus', ['Pendiente', 'Parcialmente Pagado'])
                 ->whereHas('convenio', function ($query) use ($alumno) {
-                    $query->where('alumno_id', $alumno->id);
+                    $query->where('alumno_id', $alumno->id)
+                        ->where('estatus', 'Activo');
                 })
                 ->with('convenio')
                 ->orderBy('fecha_vencimiento')
@@ -158,7 +206,6 @@ class PagoController extends Controller
                 ]);
             }
 
-            $archivoComprobante = $this->guardarComprobante($request, $validated['metodo_pago']);
             $montoDisponible = round((float) $validated['monto_total_pagado'], 2);
             $montoRecibidoEfectivo = null;
             $cambioEntregado = 0.00;
@@ -193,13 +240,17 @@ class PagoController extends Controller
                 'saldo_a_favor_generado' => 0,
                 'estatus' => 'Activo',
                 'fecha_pago' => $validated['fecha_pago'] ?? now()->toDateString(),
-                'folio_recibo' => $validated['folio_recibo'] ?? null,
+                'folio_recibo' => null,
                 'recibo_uuid' => (string) Str::uuid(),
                 'recibo_emitido_at' => now(),
                 'recibo_version' => 1,
                 'operacion_uuid' => $validated['operacion_uuid'],
                 'referencia_bancaria' => $this->obtenerReferenciaBancaria($validated),
-                'archivo_comprobante' => $archivoComprobante,
+                'archivo_comprobante' => $archivoComprobante['path'] ?? null,
+                'archivo_comprobante_original' => $archivoComprobante['original_name'] ?? null,
+                'archivo_comprobante_mime' => $archivoComprobante['mime_type'] ?? null,
+                'archivo_comprobante_tamano' => $archivoComprobante['size'] ?? null,
+                'archivo_comprobante_sha256' => $archivoComprobante['sha256'] ?? null,
                 'banco_emisor' => $this->obtenerBancoEmisor($validated),
                 'cuenta_origen' => $validated['cuenta_origen'] ?? null,
                 'numero_autorizacion' => $this->obtenerNumeroAutorizacion($validated),
@@ -286,6 +337,8 @@ class PagoController extends Controller
             return $pago;
             }, 3);
         } catch (QueryException $e) {
+            $this->eliminarComprobanteSiExiste($archivoComprobante['path'] ?? null);
+
             if ((string) $e->getCode() === '23000') {
                 $pagoExistente = Pago::where('operacion_uuid', $validated['operacion_uuid'])->first();
 
@@ -294,16 +347,25 @@ class PagoController extends Controller
                         ->route('alumnos.show', $alumno)
                         ->with('info', "El pago #{$pagoExistente->id} ya había sido registrado. Se evitó duplicar la operación.");
                 }
-
-                throw ValidationException::withMessages([
-                    'operacion_uuid' => 'La operación ya fue procesada o existe un folio duplicado. Revisa la ficha del alumno antes de intentar nuevamente.',
-                ]);
             }
+
+            // Una violación de integridad distinta al UUID puede indicar una llave
+            // foránea, dato obligatorio o catálogo inconsistente. No debe ocultarse
+            // como si fuera un doble envío.
+            throw $e;
+        } catch (\Throwable $e) {
+            $this->eliminarComprobanteSiExiste($archivoComprobante['path'] ?? null);
 
             throw $e;
         }
 
-        $this->notificarPagoAcademicoSiAplica($pago);
+        try {
+            $this->notificarPagoAcademicoSiAplica($pago);
+        } catch (\Throwable $e) {
+            // El pago ya fue confirmado. Una notificación secundaria nunca debe
+            // convertir una operación financiera exitosa en un error para el usuario.
+            report($e);
+        }
 
         return redirect()
             ->route('alumnos.show', $alumno)
@@ -531,12 +593,36 @@ class PagoController extends Controller
             abort(404);
         }
 
-        $disk = Storage::disk('local')->exists($pago->archivo_comprobante)
-            ? 'local'
-            : (Storage::disk('public')->exists($pago->archivo_comprobante) ? 'public' : null);
+        $path = $this->privateFiles->ensurePrivate($pago->archivo_comprobante);
 
-        if (! $disk) {
-            abort(404);
+        if (! $path) {
+            $this->bitacora(
+                'Incidente Comprobante de Pago',
+                "El comprobante del pago #{$pago->id} no existe en almacenamiento privado ni público heredado.",
+                'Seguridad de Archivos',
+                $pago,
+                $alumno->id
+            );
+
+            return back()->with('error', 'El comprobante no está disponible. El incidente quedó registrado para revisión de Sistemas.');
+        }
+
+        $sha256 = $this->privateFiles->sha256($path);
+
+        if ($pago->archivo_comprobante_sha256 && (! $sha256 || ! hash_equals($pago->archivo_comprobante_sha256, $sha256))) {
+            $this->bitacora(
+                'Incidente Integridad Comprobante',
+                "El comprobante del pago #{$pago->id} no coincide con la huella de integridad registrada.",
+                'Seguridad de Archivos',
+                $pago,
+                $alumno->id
+            );
+
+            return back()->with('error', 'El comprobante no superó la validación de integridad. Contacta al área de Sistemas.');
+        }
+
+        if (! $pago->archivo_comprobante_sha256 && $sha256) {
+            $pago->forceFill(['archivo_comprobante_sha256' => $sha256])->saveQuietly();
         }
 
         $this->bitacora(
@@ -547,10 +633,10 @@ class PagoController extends Controller
             $alumno->id
         );
 
-        $extension = pathinfo($pago->archivo_comprobante, PATHINFO_EXTENSION) ?: 'pdf';
-        $nombre = 'comprobante-pago-'.$pago->id.'.'.$extension;
+        $extension = pathinfo($path, PATHINFO_EXTENSION) ?: 'pdf';
+        $nombre = $pago->archivo_comprobante_original ?: 'comprobante-pago-'.$pago->id.'.'.$extension;
 
-        return Storage::disk($disk)->download($pago->archivo_comprobante, $nombre);
+        return $this->privateFiles->download($path, $nombre);
     }
 
     /**
@@ -663,17 +749,36 @@ class PagoController extends Controller
         return sprintf('%s-%s-%06d', strtoupper($prefijo), $fecha, $pago->id);
     }
 
-    private function guardarComprobante(Request $request, string $metodoPago): ?string
+    private function guardarComprobante(Request $request, string $metodoPago): ?array
     {
         if ($metodoPago === 'Transferencia' && $request->hasFile('archivo_comprobante')) {
-            return $request->file('archivo_comprobante')->store('comprobantes/pagos', 'local');
+            return $this->privateFiles->store(
+                $request->file('archivo_comprobante'),
+                'comprobantes/pagos',
+                PrivateFileService::DOCUMENT_MIMES,
+                'archivo_comprobante'
+            );
         }
 
         if ($metodoPago === 'Tarjeta' && $request->hasFile('comprobante_tarjeta')) {
-            return $request->file('comprobante_tarjeta')->store('comprobantes/pagos', 'local');
+            return $this->privateFiles->store(
+                $request->file('comprobante_tarjeta'),
+                'comprobantes/pagos',
+                PrivateFileService::DOCUMENT_MIMES,
+                'comprobante_tarjeta'
+            );
         }
 
         return null;
+    }
+
+    private function eliminarComprobanteSiExiste(?string $path): void
+    {
+        try {
+            $this->privateFiles->delete($path);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     private function obtenerReferenciaBancaria(array $validated): ?string
@@ -689,7 +794,7 @@ class PagoController extends Controller
             return $validated['tarjeta_numero_autorizacion'] ?? null;
         }
 
-        return $validated['folio_recibo'] ?? null;
+        return null;
     }
 
     private function obtenerBancoEmisor(array $validated): ?string

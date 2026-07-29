@@ -5,11 +5,14 @@
 @section('content')
 @php
     use App\Models\Prospecto;
+    $puedeConvertir = usuarioTienePermiso('prospectos.convertir');
+    $puedeVerAlumnoConvertido = usuarioTienePermiso('alumnos.ver');
     $convertido = $prospecto->estaConvertido();
+    $archivado = filled($prospecto->archivado_at) || $prospecto->estatus === Prospecto::ESTATUS_DESCARTADO;
     $vencido = $prospecto->fecha_proximo_contacto && $prospecto->fecha_proximo_contacto->isPast() && !in_array($prospecto->estatus, [Prospecto::ESTATUS_INSCRITO, Prospecto::ESTATUS_DESCARTADO], true);
 @endphp
 
-<div class="max-w-7xl mx-auto space-y-6" x-data="{ seguimiento: false, conversion: {{ old('matricula') || $errors->has('matricula') || $errors->has('correo') || $errors->has('grupo_id') ? 'true' : 'false' }} }">
+<div class="max-w-7xl mx-auto space-y-6" x-data="{ seguimiento: false, conversion: {{ $puedeConvertir && (old('matricula') || $errors->has('matricula') || $errors->has('correo') || $errors->has('grupo_id')) ? 'true' : 'false' }} }">
     <div class="bg-gradient-to-r from-blue-900 via-blue-800 to-slate-900 text-white rounded-3xl shadow overflow-hidden">
         <div class="p-6 md:p-8 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div>
@@ -38,13 +41,21 @@
             <div class="flex flex-wrap gap-3">
                 <a href="{{ route('prospectos.index') }}" class="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold">Volver</a>
 
-                @unless($convertido)
+                @if(!$convertido && !$archivado)
                     <a href="{{ route('prospectos.edit', $prospecto) }}" class="bg-white text-blue-900 hover:bg-blue-50 px-4 py-2 rounded-xl text-sm font-semibold shadow">Editar</a>
                     <button type="button" @click="seguimiento = !seguimiento" class="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">+ Seguimiento</button>
-                    <button type="button" @click="conversion = !conversion" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">Abrir conversión a alumno</button>
-                @else
+                    @if($puedeConvertir)
+                        <button type="button" @click="conversion = !conversion" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">Validar y convertir a alumno</button>
+                    @else
+                        <span class="bg-amber-400/90 text-amber-950 px-4 py-2 rounded-xl text-sm font-semibold">Conversión a cargo de C. Administrativa</span>
+                    @endif
+                @elseif($convertido && $puedeVerAlumnoConvertido && $prospecto->alumno)
                     <a href="{{ route('alumnos.show', $prospecto->alumno) }}" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-semibold shadow">Ver alumno</a>
-                @endunless
+                @elseif($convertido)
+                    <span class="bg-green-500/90 px-4 py-2 rounded-xl text-sm font-semibold">Conversión completada</span>
+                @else
+                    <span class="bg-white/10 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold">Solo consulta</span>
+                @endif
             </div>
         </div>
     </div>
@@ -94,7 +105,7 @@
         </div>
     </div>
 
-    @unless($convertido)
+    @if(!$convertido && !$archivado)
         <div x-show="seguimiento" x-transition class="bg-purple-50 border border-purple-200 rounded-2xl shadow p-6">
             <div class="flex items-start justify-between gap-4 mb-4">
                 <div>
@@ -160,6 +171,7 @@
             </form>
         </div>
 
+        @if($puedeConvertir)
         <div x-show="conversion" x-transition class="bg-green-50 border border-green-200 rounded-2xl shadow p-6">
             <div class="flex items-start justify-between gap-4 mb-4">
                 <div>
@@ -208,7 +220,8 @@
                 </div>
             </form>
         </div>
-    @endunless
+        @endif
+    @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-1 bg-white rounded-2xl shadow border border-slate-100 p-6 space-y-4">
@@ -225,6 +238,23 @@
                 <h3 class="font-bold text-slate-800 mb-2">Observaciones</h3>
                 <p class="text-sm text-slate-600 whitespace-pre-line">{{ $prospecto->observaciones ?: 'Sin observaciones.' }}</p>
             </div>
+
+            @if($archivado)
+                <div class="pt-4 border-t border-slate-100 rounded-xl bg-slate-50 p-4">
+                    <h3 class="font-bold text-slate-800 mb-2">Prospecto archivado</h3>
+                    <p class="text-xs text-slate-500">{{ $prospecto->archivado_at?->format('d/m/Y H:i') ?? 'Sin fecha registrada' }} · {{ $prospecto->archivadoPor->nombre ?? 'Usuario no disponible' }}</p>
+                </div>
+            @elseif(!$convertido)
+                <details class="pt-4 border-t border-red-100">
+                    <summary class="cursor-pointer font-bold text-red-700">Descartar y archivar prospecto</summary>
+                    <form method="POST" action="{{ route('prospectos.destroy', $prospecto) }}" class="mt-3 space-y-3" data-confirm="¿Archivar este prospecto? Se conservarán todos sus seguimientos.">
+                        @csrf
+                        @method('DELETE')
+                        <textarea name="motivo_descarte" required minlength="10" maxlength="3000" rows="3" class="w-full rounded-xl border-red-300" placeholder="Explica por qué se descarta y archiva"></textarea>
+                        <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-semibold">Archivar prospecto</button>
+                    </form>
+                </details>
+            @endif
 
             @if($prospecto->motivo_descarte)
                 <div class="pt-4 border-t border-slate-100">

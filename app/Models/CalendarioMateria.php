@@ -59,7 +59,7 @@ class CalendarioMateria extends Model
     public function solicitudesPagoDocenteOperativas()
     {
         return $this->solicitudesPagoDocente()
-            ->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA]);
+            ->whereNotIn('estatus', [SolicitudPagoDocente::ESTATUS_CANCELADA, SolicitudPagoDocente::ESTATUS_RECHAZADA]);
     }
 
     public function getNombreMateriaAttribute(): string

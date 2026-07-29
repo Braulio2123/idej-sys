@@ -8,6 +8,7 @@ use App\Http\Middleware\RolMiddleware;
 use App\Http\Middleware\RequireFreshPassword;
 use App\Http\Middleware\PermisoMiddleware;
 use App\Http\Middleware\EnsureUsuarioInternoActivo;
+use App\Http\Middleware\PreventDuplicateSubmission;
 use App\Models\Bitacora;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -30,6 +31,15 @@ return Application::configure(basePath: dirname(__DIR__))
     // ✅ Registrar grupos y alias de middleware
     ->withMiddleware(function (Middleware $middleware) {
 
+        // El host se valida contra APP_URL fuera del entorno local. Esto evita
+        // que encabezados Host manipulados alteren enlaces institucionales.
+        $middleware->trustHosts();
+
+        // TrustProxies forma parte del middleware global de Laravel y lee la
+        // configuración durante la solicitud, cuando el contenedor ya registró
+        // el repositorio de configuración. No debe invocarse config() en esta
+        // fase temprana del bootstrap.
+
         // 🔹 Grupo "web" — requerido por Breeze y las rutas
         $middleware->group('web', [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
@@ -47,6 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'rol' => RolMiddleware::class,
             'password.fresh' => RequireFreshPassword::class,
             'permiso' => PermisoMiddleware::class,
+            'idempotent' => PreventDuplicateSubmission::class,
         ]);
     })
 

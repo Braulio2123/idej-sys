@@ -3,15 +3,15 @@
 @section('title', 'Ciclos Escolares')
 
 @section('content')
+@php $puedeGestionarCatalogos = usuarioTienePermiso('catalogos_academicos.gestionar'); @endphp
 <div class="container mx-auto px-4 py-6">
 
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold text-gray-800">📅 Ciclos Escolares</h1>
 
-        <a href="{{ route('ciclos_escolares.create') }}"
-           class="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700">
-            + Nuevo Ciclo
-        </a>
+        @if($puedeGestionarCatalogos)
+            <a href="{{ route('ciclos_escolares.create') }}" class="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700">+ Nuevo Ciclo</a>
+        @endif
     </div>
 
     @if(session('success'))
@@ -55,15 +55,15 @@
                         @endif
                     </td>
                     <td class="px-4 py-3 text-center">
-                        <a href="{{ route('ciclos_escolares.edit', $ciclo) }}" class="text-blue-600 hover:underline">Editar</a>
-
-                        <form action="{{ route('ciclos_escolares.destroy', $ciclo) }}" method="POST"
-                              class="inline"
-                              onsubmit="return confirm('¿Eliminar ciclo escolar?')">
-                            @csrf
-                            @method('DELETE')
-                            <button class="text-red-600 hover:underline ml-2">Eliminar</button>
-                        </form>
+                        @if($puedeGestionarCatalogos)
+                            <a href="{{ route('ciclos_escolares.edit', $ciclo) }}" class="text-blue-600 hover:underline">Editar</a>
+                            <form action="{{ route('ciclos_escolares.destroy', $ciclo) }}" method="POST" class="inline" onsubmit="return confirm('¿Eliminar ciclo escolar?')">
+                                @csrf @method('DELETE')
+                                <button class="text-red-600 hover:underline ml-2">Eliminar</button>
+                            </form>
+                        @else
+                            <span class="text-xs text-slate-500">Solo consulta</span>
+                        @endif
                     </td>
                 </tr>
                 @endforeach

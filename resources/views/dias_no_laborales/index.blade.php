@@ -3,6 +3,7 @@
 @section('title', 'Días no laborales')
 
 @section('content')
+@php $puedeGestionarCalendarios = usuarioTienePermiso('calendarios.gestionar'); @endphp
 <div class="max-w-7xl mx-auto space-y-6">
     <div class="bg-white rounded-2xl shadow border border-slate-100 p-6">
         <h1 class="text-3xl font-bold text-slate-800">Días no laborales</h1>
@@ -14,6 +15,7 @@
     @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    @if($puedeGestionarCalendarios)
         <form method="POST" action="{{ route('dias_no_laborales.cargar-oficiales') }}" class="bg-amber-50 rounded-2xl shadow border border-amber-200 p-5 space-y-3">
             @csrf
             <h2 class="font-bold text-amber-900">Carga anual oficial</h2>
@@ -21,6 +23,7 @@
             <input type="number" name="anio" min="2020" max="2100" value="{{ $anio ?? now()->year }}" class="w-full rounded-xl border-amber-300">
             <button class="rounded-xl bg-amber-600 text-white px-4 py-2 hover:bg-amber-700">Cargar días oficiales</button>
         </form>
+    @endif
 
         <form method="GET" action="{{ route('dias_no_laborales.index') }}" class="bg-white rounded-2xl shadow border border-slate-100 p-5 space-y-3">
             <h2 class="font-bold text-slate-800">Filtrar año</h2>
@@ -34,6 +37,7 @@
         </div>
     </div>
 
+    @if($puedeGestionarCalendarios)
     <form method="POST" action="{{ route('dias_no_laborales.store') }}" class="bg-white rounded-2xl shadow border border-slate-100 p-5 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
         @csrf
         <div>
@@ -60,6 +64,7 @@
         </label>
         <button class="rounded-xl bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700">Agregar</button>
     </form>
+    @endif
 
     <div class="bg-white rounded-2xl shadow border border-slate-100 overflow-hidden">
         <div class="overflow-x-auto">
@@ -81,11 +86,15 @@
                             <td class="px-4 py-3 text-center">{{ $dia->tipo }}</td>
                             <td class="px-4 py-3 text-center">{{ $dia->activo ? 'Sí' : 'No' }}</td>
                             <td class="px-4 py-3 text-right">
+                                @if($puedeGestionarCalendarios)
                                 <form method="POST" action="{{ route('dias_no_laborales.destroy', $dia) }}" onsubmit="return confirm('¿Eliminar este día no laboral?')">
                                     @csrf
                                     @method('DELETE')
                                     <button class="text-red-600 font-semibold hover:underline">Eliminar</button>
                                 </form>
+                                @else
+                                    <span class="text-xs text-slate-500">Solo consulta</span>
+                                @endif
                             </td>
                         </tr>
                     @empty

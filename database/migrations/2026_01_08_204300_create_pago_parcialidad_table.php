@@ -13,11 +13,11 @@ return new class extends Migration
 
             $table->foreignId('pago_id')
                 ->constrained('pagos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('parcialidad_id')
                 ->constrained('parcialidades_convenio')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->decimal('monto_aplicado', 10, 2);
 

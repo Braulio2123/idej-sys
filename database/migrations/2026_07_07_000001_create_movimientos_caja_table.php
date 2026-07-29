@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('movimientos_caja', function (Blueprint $table) {
             $table->id();
+            $table->uuid('operacion_uuid')->nullable()->unique();
             $table->foreignId('corte_caja_id')
                 ->constrained('cortes_caja')
                 ->restrictOnDelete();
@@ -28,6 +29,9 @@ return new class extends Migration
             $table->string('referencia', 200)->nullable();
             $table->string('comprobante_path')->nullable();
             $table->string('comprobante_original')->nullable();
+            $table->string('comprobante_mime', 120)->nullable();
+            $table->unsignedBigInteger('comprobante_tamano')->nullable();
+            $table->char('comprobante_sha256', 64)->nullable();
             $table->text('observaciones')->nullable();
             $table->dateTime('fecha_movimiento');
             $table->string('estatus', 30)->default('Aplicado');

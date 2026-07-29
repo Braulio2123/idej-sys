@@ -18,7 +18,7 @@ class RolSeeder extends Seeder
             [
                 'nombre' => 'Sistemas IDEJ',
                 'clave' => Rol::SISTEMAS,
-                'descripcion' => 'Administración técnica de usuarios, bitácora y soporte.',
+                'descripcion' => 'Soporte técnico, diagnóstico y mantenimiento; consulta básica de usuarios sin gestión de credenciales.',
             ],
             [
                 'nombre' => 'Dirección IDEJ',
@@ -38,17 +38,12 @@ class RolSeeder extends Seeder
             [
                 'nombre' => 'Recepción IDEJ',
                 'clave' => Rol::RECEPCION,
-                'descripcion' => 'Atención a alumnos, cargos, pagos y convenios operativos.',
+                'descripcion' => 'Atención a alumnos, recepción documental y cobro limitado en su propia caja.',
             ],
             [
                 'nombre' => 'Relaciones Públicas IDEJ',
                 'clave' => Rol::RRPP,
-                'descripcion' => 'Seguimiento comercial y consulta de alumnos.',
-            ],
-            [
-                'nombre' => 'Finanzas IDEJ',
-                'clave' => Rol::FINANZAS,
-                'descripcion' => 'Gestión de pagos, reportes financieros y solicitudes aprobadas.',
+                'descripcion' => 'Captación, prospectos, seguimientos comerciales y consulta de la oferta académica.',
             ],
         ];
 

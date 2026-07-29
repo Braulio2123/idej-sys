@@ -216,7 +216,7 @@
     {{-- ====================== --}}
     {{-- BECAS INSTITUCIONALES --}}
     {{-- ====================== --}}
-    @can('puede-ver-finanzas')
+    @can('puede-ver-administracion-financiera')
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="p-6 bg-white shadow rounded-xl border border-slate-100">
             <h2 class="text-gray-600">Becas activas</h2>
@@ -304,7 +304,7 @@
     {{-- ====================== --}}
     {{-- RESUMEN ADMINISTRATIVO / FINANCIERO --}}
     {{-- ====================== --}}
-    @can('puede-ver-finanzas')
+    @can('puede-ver-administracion-financiera')
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
 
         <div class="p-6 bg-white shadow rounded-xl">

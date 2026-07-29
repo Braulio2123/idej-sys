@@ -3,6 +3,10 @@
 @section('title', 'Mantenimiento del Sistema')
 
 @section('content')
+@php
+    $puedeDescargarBackups = usuarioTienePermiso('mantenimiento.backups');
+    $puedeLimpiarLogs = usuarioTienePermiso('mantenimiento.logs');
+@endphp
 <div class="max-w-7xl mx-auto space-y-6">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
@@ -12,16 +16,24 @@
             </p>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('sistema.mantenimiento.backup-db') }}" class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                <i class='bx bx-data'></i>
-                Respaldo de base de datos
-            </a>
-            <a href="{{ route('sistema.mantenimiento.backup-archivos') }}" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
-                <i class='bx bx-archive'></i>
-                Respaldo de archivos
-            </a>
-        </div>
+        @if($puedeDescargarBackups)
+            <div class="flex flex-wrap gap-2">
+                <form method="POST" action="{{ route('sistema.mantenimiento.backup-db') }}" onsubmit="return confirm('El respaldo contiene información institucional sensible. ¿Deseas generarlo y descargarlo ahora?');">
+                    @csrf
+                    <button class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                        <i class='bx bx-data'></i>
+                        Respaldo de base de datos
+                    </button>
+                </form>
+                <form method="POST" action="{{ route('sistema.mantenimiento.backup-archivos') }}" onsubmit="return confirm('El respaldo contiene documentos privados y comprobantes. ¿Deseas generarlo y descargarlo ahora?');">
+                    @csrf
+                    <button class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                        <i class='bx bx-archive'></i>
+                        Respaldo de archivos
+                    </button>
+                </form>
+            </div>
+        @endif
     </div>
 
     @if(session('success'))
@@ -106,39 +118,49 @@
                         <p class="mt-2 text-xs text-slate-500 leading-relaxed">Usar si logos o archivos públicos no se muestran después de instalar o mover el sistema. No expone documentos privados.</p>
                     </form>
 
-                    <form method="POST" action="{{ route('sistema.mantenimiento.limpiar-logs') }}" onsubmit="return confirm('¿Seguro que deseas vaciar el registro técnico principal? La bitácora institucional no se borra.');">
-                        @csrf
-                        <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700">
-                            <i class='bx bx-trash'></i>
-                            Vaciar registro técnico principal
-                        </button>
-                        <p class="mt-2 text-xs text-slate-500 leading-relaxed">Reduce el tamaño del archivo de eventos técnicos. La bitácora institucional no se borra.</p>
-                    </form>
+                    @if($puedeLimpiarLogs)
+                        <form method="POST" action="{{ route('sistema.mantenimiento.limpiar-logs') }}" onsubmit="return confirm('¿Seguro que deseas vaciar el registro técnico principal? Esta acción elimina evidencia técnica reciente; la bitácora institucional no se borra.');">
+                            @csrf
+                            <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700">
+                                <i class='bx bx-trash'></i>
+                                Vaciar registro técnico principal
+                            </button>
+                            <p class="mt-2 text-xs text-slate-500 leading-relaxed">Reservado a Admin. La bitácora institucional no se borra.</p>
+                        </form>
+                    @endif
                 </div>
             </div>
 
-            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-5 py-4 bg-slate-50 border-b border-slate-200">
-                    <h2 class="font-semibold text-slate-800">Respaldos manuales</h2>
-                    <p class="text-xs text-slate-500">Descargas inmediatas para resguardo local.</p>
+            @if($puedeDescargarBackups)
+                <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div class="px-5 py-4 bg-slate-50 border-b border-slate-200">
+                        <h2 class="font-semibold text-slate-800">Respaldos manuales</h2>
+                        <p class="text-xs text-slate-500">Descargas inmediatas para resguardo institucional autorizado.</p>
+                    </div>
+
+                    <div class="p-5 space-y-3 text-sm text-slate-600">
+                        <form method="POST" action="{{ route('sistema.mantenimiento.backup-db') }}" onsubmit="return confirm('¿Generar y descargar un respaldo completo de la base de datos?');">
+                            @csrf
+                            <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700">
+                                <i class='bx bx-download'></i>
+                                Descargar respaldo de base de datos
+                            </button>
+                        </form>
+
+                        <form method="POST" action="{{ route('sistema.mantenimiento.backup-archivos') }}" onsubmit="return confirm('¿Generar y descargar un respaldo con documentos privados y comprobantes?');">
+                            @csrf
+                            <button class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 font-semibold text-white hover:bg-purple-700">
+                                <i class='bx bx-folder-open'></i>
+                                Descargar respaldo de documentos y archivos
+                            </button>
+                        </form>
+
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            Estos respaldos contienen información sensible. Deben almacenarse cifrados, con acceso restringido y junto con una política de retención.
+                        </p>
+                    </div>
                 </div>
-
-                <div class="p-5 space-y-3 text-sm text-slate-600">
-                    <a href="{{ route('sistema.mantenimiento.backup-db') }}" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700">
-                        <i class='bx bx-download'></i>
-                        Descargar respaldo de base de datos
-                    </a>
-
-                    <a href="{{ route('sistema.mantenimiento.backup-archivos') }}" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 font-semibold text-white hover:bg-purple-700">
-                        <i class='bx bx-folder-open'></i>
-                        Descargar respaldo de documentos y archivos
-                    </a>
-
-                    <p class="text-xs text-slate-500 leading-relaxed">
-                        El respaldo de archivos incluye documentos privados, comprobantes, logos institucionales y demás archivos cargados al sistema. Debe resguardarse como información sensible.
-                    </p>
-                </div>
-            </div>
+            @endif
 
             <div class="bg-slate-900 text-slate-100 rounded-2xl shadow-sm overflow-hidden">
                 <div class="px-5 py-4 border-b border-white/10">

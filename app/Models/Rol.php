@@ -16,7 +16,6 @@ class Rol extends Model
     public const ACADEMICA = 'Academica';
     public const RECEPCION = 'Recepcion';
     public const RRPP = 'RRPP';
-    public const FINANZAS = 'Finanzas';
 
     protected $table = 'roles';
 

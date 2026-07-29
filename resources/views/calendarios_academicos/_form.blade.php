@@ -64,7 +64,7 @@
         <label class="block text-sm font-semibold text-slate-700 mb-1">Estatus operativo</label>
         <select name="estatus" class="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
             @foreach($estatuses as $estatus)
-                <option value="{{ $estatus }}" @selected(old('estatus', $calendario->estatus ?? 'Borrador') === $estatus)>{{ $estatus }}</option>
+                <option value="{{ $estatus }}" @selected(old('estatus', $calendario->estatus ?: \App\Models\CalendarioAcademico::ESTATUS_AGENDADO) === $estatus)>{{ $estatus }}</option>
             @endforeach
         </select>
         @error('estatus') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror

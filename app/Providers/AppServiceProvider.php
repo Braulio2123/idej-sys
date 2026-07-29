@@ -3,9 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,9 +19,15 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot()
+    public function boot(): void
     {
-        if (config('app.env') === 'production') {
+        PasswordRule::defaults(fn () => PasswordRule::min(12)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols());
+
+        if (config('idej_security.force_https')) {
             URL::forceScheme('https');
         }
     }

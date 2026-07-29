@@ -3,13 +3,18 @@
 @section('title', 'Educación Continua')
 
 @section('content')
+@php
+    $puedeGestionarEducacionContinua = Auth::user()?->tienePermiso('educacion_continua.gestionar') ?? false;
+@endphp
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold text-slate-900">Educación Continua</h1>
             <p class="text-slate-500">Cursos especiales, MASC, oratoria, masterclass, talleres y eventos medidos por horas.</p>
         </div>
-        <a href="{{ route('educacion_continua.create') }}" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">+ Nuevo curso</a>
+        @if($puedeGestionarEducacionContinua)
+            <a href="{{ route('educacion_continua.create') }}" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700">+ Nuevo curso</a>
+        @endif
     </div>
 
     @if(session('success')) <div class="p-4 rounded-xl bg-green-50 text-green-700 border border-green-200">{{ session('success') }}</div> @endif
@@ -59,8 +64,10 @@
                         <td class="px-4 py-3"><span class="px-2 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">{{ $curso->estatus }}</span></td>
                         <td class="px-4 py-3 text-right">
                             <a href="{{ route('educacion_continua.show', $curso) }}" class="text-indigo-700 font-semibold hover:underline">Ver</a>
-                            <span class="text-slate-300 mx-1">|</span>
-                            <a href="{{ route('educacion_continua.edit', $curso) }}" class="text-amber-700 font-semibold hover:underline">Editar</a>
+                            @if($puedeGestionarEducacionContinua)
+                                <span class="text-slate-300 mx-1">|</span>
+                                <a href="{{ route('educacion_continua.edit', $curso) }}" class="text-amber-700 font-semibold hover:underline">Editar</a>
+                            @endif
                         </td>
                     </tr>
                 @empty

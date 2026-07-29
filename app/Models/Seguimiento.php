@@ -44,12 +44,16 @@ class Seguimiento extends Model
         'fecha_contacto',
         'fecha_proximo_contacto',
         'fecha_cierre',
+        'cancelado_por_id',
+        'fecha_cancelacion',
+        'motivo_cancelacion',
     ];
 
     protected $casts = [
         'fecha_contacto' => 'datetime',
         'fecha_proximo_contacto' => 'datetime',
         'fecha_cierre' => 'datetime',
+        'fecha_cancelacion' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -86,6 +90,11 @@ class Seguimiento extends Model
             self::ESTATUS_CERRADO,
             self::ESTATUS_CANCELADO,
         ];
+    }
+
+    public function canceladoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'cancelado_por_id');
     }
 
     public function alumno()

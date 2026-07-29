@@ -8,7 +8,7 @@
     use App\Models\Seguimiento;
 
     $usuarioActual = Auth::user();
-    $puedeGestionar = $usuarioActual?->tieneRol(Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS, Rol::RRPP, Rol::ACADEMICA) ?? false;
+    $puedeGestionar = usuarioTienePermiso('seguimientos.gestionar');
 @endphp
 
 @if(session('success'))
@@ -200,23 +200,37 @@
                                 <p class="text-sm text-slate-700 whitespace-pre-line">{{ $seguimiento->resultado }}</p>
                             </div>
                         @endif
+
+                        @if($seguimiento->motivo_cancelacion)
+                            <div class="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                                <p class="text-xs uppercase font-semibold text-red-600 mb-1">Motivo de cancelación</p>
+                                <p class="text-sm text-red-700 whitespace-pre-line">{{ $seguimiento->motivo_cancelacion }}</p>
+                                <p class="text-xs text-red-500 mt-2">{{ $seguimiento->fecha_cancelacion?->format('d/m/Y H:i') ?? 'Sin fecha' }} · {{ $seguimiento->canceladoPor->nombre ?? 'Usuario no disponible' }}</p>
+                            </div>
+                        @endif
                     </div>
 
-                    @if($puedeGestionar)
-                        <div class="flex xl:flex-col gap-2">
+                    @if($puedeGestionar && $seguimiento->estatus !== \App\Models\Seguimiento::ESTATUS_CANCELADO)
+                        <div class="flex xl:flex-col gap-2 min-w-48">
                             <button type="button" @click="editar = editar === {{ $seguimiento->id }} ? null : {{ $seguimiento->id }}" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold">
                                 Editar
                             </button>
-                            <form method="POST" action="{{ route('alumnos.seguimientos.destroy', [$alumno, $seguimiento]) }}" onsubmit="return confirm('¿Eliminar este seguimiento? Esta acción quedará registrada en bitácora.');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">Eliminar</button>
-                            </form>
+                            <details class="rounded-lg border border-red-200 bg-red-50 p-2">
+                                <summary class="cursor-pointer text-red-700 text-sm font-semibold">Cancelar</summary>
+                                <form method="POST" action="{{ route('alumnos.seguimientos.destroy', [$alumno, $seguimiento]) }}" class="mt-2 space-y-2" data-confirm="¿Cancelar este seguimiento? El registro permanecerá en el historial.">
+                                    @csrf
+                                    @method('DELETE')
+                                    <textarea name="motivo_cancelacion" required minlength="8" maxlength="2000" rows="3" class="w-full rounded border-red-300 text-xs" placeholder="Motivo de cancelación"></textarea>
+                                    <button type="submit" class="w-full px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold">Confirmar cancelación</button>
+                                </form>
+                            </details>
                         </div>
+                    @elseif($seguimiento->estatus === \App\Models\Seguimiento::ESTATUS_CANCELADO)
+                        <span class="text-sm text-slate-400">Solo consulta</span>
                     @endif
                 </div>
 
-                @if($puedeGestionar)
+                @if($puedeGestionar && $seguimiento->estatus !== \App\Models\Seguimiento::ESTATUS_CANCELADO)
                     <div x-show="editar === {{ $seguimiento->id }}" x-transition class="mt-5 border-t border-slate-200 pt-5">
                         <form method="POST" action="{{ route('alumnos.seguimientos.update', [$alumno, $seguimiento]) }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                             @csrf

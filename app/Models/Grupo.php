@@ -13,15 +13,34 @@ class Grupo extends Model
     protected $table = 'grupos';
 
     protected $fillable = [
-    'nombre',
-    'ciclo_escolar_id',
-    'programa_id',
-    'semestre_o_cuatrimestre',
-    'turno',
-    'aula',
-    'cupo_maximo'
-];
+        'nombre',
+        'ciclo_escolar_id',
+        'programa_id',
+        'semestre_o_cuatrimestre',
+        'turno',
+        'aula',
+        'cupo_maximo',
+        'activo',
+        'archivado_at',
+        'archivado_por_id',
+        'motivo_archivo',
+    ];
 
+
+    protected $casts = [
+        'activo' => 'boolean',
+        'archivado_at' => 'datetime',
+    ];
+
+    public function scopeActivos($query)
+    {
+        return $query->where('activo', true);
+    }
+
+    public function archivadoPor()
+    {
+        return $this->belongsTo(Usuario::class, 'archivado_por_id');
+    }
 
     public function cicloEscolar()
     {

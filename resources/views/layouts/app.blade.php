@@ -48,19 +48,25 @@
     $active = 'bg-amber-400 text-slate-900 shadow-lg shadow-amber-500/30';
     $inactive = 'text-slate-100/80 hover:bg-white/10 hover:text-white';
 
-    $puedeVerAlumnos = in_array($rolClave, [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS, Rol::RRPP, Rol::ACADEMICA, Rol::DIRECCION], true);
-    $puedeProspectos = in_array($rolClave, [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::RRPP, Rol::DIRECCION], true);
-    $puedeAcademica = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::SISTEMAS], true);
-    $puedeEducacionContinua = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::SISTEMAS, Rol::DIRECCION], true);
-    $puedeSolicitudes = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::ACADEMICA, Rol::FINANZAS, Rol::DIRECCION], true);
-    $puedeFinanzas = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS], true);
-    $puedeCaja = in_array($rolClave, [Rol::ADMIN, Rol::RECEPCION, Rol::CADMIN, Rol::FINANZAS], true);
-    $puedeReportes = in_array($rolClave, [Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS, Rol::DIRECCION], true);
+    $puedeVerAlumnos = usuarioTienePermiso('alumnos.ver');
+    $puedeProspectos = usuarioTienePermiso('prospectos.ver');
+    $puedeOfertaAcademica = usuarioTienePermiso('oferta_academica.ver');
+    $puedeAcademica = usuarioTienePermiso('academica.ver');
+    $puedeCalendarios = usuarioTienePermiso('calendarios.ver');
+    $puedeHorarios = usuarioTienePermiso('horarios.ver');
+    $puedeRequisitosDocumentales = usuarioTienePermiso('requisitos_documentales.gestionar');
+    $puedeEducacionContinua = usuarioTienePermiso('educacion_continua.ver');
+    $puedeSolicitudes = usuarioTienePermiso('solicitudes_pago.ver');
+    $puedeAdministracionFinanciera = usuarioTienePermiso('conceptos.gestionar');
+    $puedeCaja = usuarioTienePermiso('caja.ver');
+    $puedeBecas = usuarioTienePermiso('becas.ver');
+    $puedeReportes = usuarioTienePermiso('reportes.ver');
     $puedeReporteEjecutivo = usuarioTienePermiso('reportes.ejecutivos');
-    $puedeUsuarios = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
-    $puedeConfiguracion = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
+    $puedeUsuarios = usuarioTienePermiso('usuarios.ver');
+    $puedeConfiguracion = usuarioTienePermiso('configuracion.editar');
     $puedePanelPermisos = usuarioTienePermiso('seguridad.permisos.ver');
-    $puedeMantenimiento = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS], true);
+    $puedeMantenimiento = usuarioTienePermiso('mantenimiento.ver');
+    $puedeAdministracion = $puedeUsuarios || $puedeConfiguracion || $puedePanelPermisos || $puedeMantenimiento;
     $puedeBitacora = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS, Rol::DIRECCION], true);
     $puedeAgendaOperativa = in_array($rolClave, [Rol::ADMIN, Rol::SISTEMAS, Rol::ACADEMICA, Rol::CADMIN, Rol::DIRECCION, Rol::RECEPCION], true);
     $puedeCentroControlOperativo = usuarioTienePermiso('centro_control.ver');
@@ -109,15 +115,17 @@
             </a>
         @endif
 
-        @if($puedeUsuarios)
+        @if($puedeAdministracion)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-amber-200/90">
                 Administración
             </p>
 
-            <a href="{{ route('usuarios.index') }}" class="{{ $linkBase }} {{ request()->routeIs('usuarios.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user-circle text-2xl'></i></span>
-                <span x-show="sidebarOpen">Usuarios</span>
-            </a>
+            @if($puedeUsuarios)
+                <a href="{{ route('usuarios.index') }}" class="{{ $linkBase }} {{ request()->routeIs('usuarios.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user-circle text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Usuarios</span>
+                </a>
+            @endif
 
             @if($puedeConfiguracion)
                 <a href="{{ route('configuracion.institucional.edit') }}" class="{{ $linkBase }} {{ request()->routeIs('configuracion.*') ? $active : $inactive }}">
@@ -141,15 +149,17 @@
             @endif
         @endif
 
-        @if($puedeVerAlumnos)
+        @if($puedeVerAlumnos || $puedeProspectos)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-blue-200/90">
-                Alumnos y Recepción
+                Atención y seguimiento
             </p>
 
-            <a href="{{ route('alumnos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('alumnos.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user text-2xl'></i></span>
-                <span x-show="sidebarOpen">Alumnos</span>
-            </a>
+            @if($puedeVerAlumnos)
+                <a href="{{ route('alumnos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('alumnos.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Alumnos</span>
+                </a>
+            @endif
 
             @if($puedeProspectos)
                 <a href="{{ route('prospectos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('prospectos.*') ? $active : $inactive }}">
@@ -159,35 +169,61 @@
             @endif
         @endif
 
-        @if($puedeAcademica)
+        @if($puedeOfertaAcademica || $puedeAcademica || $puedeCalendarios || $puedeHorarios || $puedeRequisitosDocumentales || $puedeEducacionContinua)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-green-200/90">
                 Área Académica
             </p>
 
-            <a href="{{ route('ciclos_escolares.index') }}" class="{{ $linkBase }} {{ request()->routeIs('ciclos_escolares.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar text-2xl'></i></span>
-                <span x-show="sidebarOpen">Ciclos Escolares</span>
-            </a>
+            @if($puedeOfertaAcademica)
+                <a href="{{ route('ciclos_escolares.index') }}" class="{{ $linkBase }} {{ request()->routeIs('ciclos_escolares.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Ciclos Escolares</span>
+                </a>
+                <a href="{{ route('grupos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('grupos.*') || request()->routeIs('academica.grupos.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-group text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Grupos</span>
+                </a>
+                <a href="{{ route('programas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('programas.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Programas</span>
+                </a>
+            @endif
 
-            <a href="{{ route('grupos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('grupos.*') || request()->routeIs('academica.grupos.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-group text-2xl'></i></span>
-                <span x-show="sidebarOpen">Grupos</span>
-            </a>
+            @if($puedeAcademica)
+                <a href="{{ route('materias.index') }}" class="{{ $linkBase }} {{ request()->routeIs('materias.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book-content text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Materias</span>
+                </a>
+                <a href="{{ route('dias_no_laborales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('dias_no_laborales.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-x text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Días no laborales</span>
+                </a>
+                <a href="{{ route('docentes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('docentes.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-chalkboard text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Docentes</span>
+                </a>
+            @endif
 
-            <a href="{{ route('materias.index') }}" class="{{ $linkBase }} {{ request()->routeIs('materias.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book-content text-2xl'></i></span>
-                <span x-show="sidebarOpen">Materias</span>
-            </a>
+            @if($puedeCalendarios)
+                <a href="{{ route('calendarios_academicos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('calendarios_academicos.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-event text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Calendarios</span>
+                </a>
+            @endif
 
-            <a href="{{ route('calendarios_academicos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('calendarios_academicos.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-event text-2xl'></i></span>
-                <span x-show="sidebarOpen">Calendarios</span>
-            </a>
+            @if($puedeHorarios)
+                <a href="{{ route('horarios_academicos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('horarios_academicos.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-time-five text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Horarios</span>
+                </a>
+            @endif
 
-            <a href="{{ route('dias_no_laborales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('dias_no_laborales.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-x text-2xl'></i></span>
-                <span x-show="sidebarOpen">Días no laborales</span>
-            </a>
+            @if($puedeRequisitosDocumentales)
+                <a href="{{ route('requisitos_documentales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('requisitos_documentales.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-file text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Requisitos Documentales</span>
+                </a>
+            @endif
 
             @if($puedeEducacionContinua)
                 <a href="{{ route('educacion_continua.index') }}" class="{{ $linkBase }} {{ request()->routeIs('educacion_continua.*') ? $active : $inactive }}">
@@ -195,21 +231,6 @@
                     <span x-show="sidebarOpen">Educación Continua</span>
                 </a>
             @endif
-
-            <a href="{{ route('programas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('programas.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book text-2xl'></i></span>
-                <span x-show="sidebarOpen">Educación Programática</span>
-            </a>
-
-            <a href="{{ route('requisitos_documentales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('requisitos_documentales.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-file text-2xl'></i></span>
-                <span x-show="sidebarOpen">Requisitos Documentales</span>
-            </a>
-
-            <a href="{{ route('docentes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('docentes.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-chalkboard text-2xl'></i></span>
-                <span x-show="sidebarOpen">Docentes</span>
-            </a>
         @endif
 
         @if($puedeSolicitudes)
@@ -219,9 +240,9 @@
             </a>
         @endif
 
-        @if($puedeFinanzas || $puedeReportes || $puedeReporteEjecutivo || $puedeCaja)
+        @if($puedeAdministracionFinanciera || $puedeBecas || $puedeReportes || $puedeReporteEjecutivo || $puedeCaja)
             <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-yellow-200/90">
-                Finanzas
+                Administración financiera
             </p>
 
 
@@ -232,15 +253,10 @@
                 </a>
             @endif
 
-            @if($puedeFinanzas)
+            @if($puedeAdministracionFinanciera)
                 <a href="{{ route('conceptos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('conceptos.*') ? $active : $inactive }}">
                     <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-coin-stack text-2xl'></i></span>
                     <span x-show="sidebarOpen">Conceptos</span>
-                </a>
-
-                <a href="{{ route('becas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('becas.*') || request()->routeIs('alumnos.becas.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-purchase-tag-alt text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Becas</span>
                 </a>
 
                 <a href="{{ route('cargos.masivo.index') }}" class="{{ $linkBase }} {{ request()->routeIs('cargos.masivo.*') ? $active : $inactive }}">
@@ -253,6 +269,13 @@
                     <span x-show="sidebarOpen">Cargos recurrentes</span>
                 </a>
 
+            @endif
+
+            @if($puedeBecas)
+                <a href="{{ route('becas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('becas.*') || request()->routeIs('alumnos.becas.*') ? $active : $inactive }}">
+                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-purchase-tag-alt text-2xl'></i></span>
+                    <span x-show="sidebarOpen">Becas</span>
+                </a>
             @endif
 
             @if($puedeReportes)
@@ -433,44 +456,9 @@
     </main>
 </div>
 
+@include('partials.idempotent-forms')
+
 <script>
-    document.addEventListener('submit', function (event) {
-        const form = event.target;
-
-        if (! form.matches('form') || form.dataset.allowResubmit === 'true') {
-            return;
-        }
-
-        if (event.defaultPrevented) {
-            return;
-        }
-
-        if (form.dataset.confirm && ! window.confirm(form.dataset.confirm)) {
-            event.preventDefault();
-            return;
-        }
-
-        if (form.dataset.submitted === 'true') {
-            event.preventDefault();
-            return;
-        }
-
-        form.dataset.submitted = 'true';
-
-        form.querySelectorAll('button[type="submit"], button:not([type])').forEach((button) => {
-            button.disabled = true;
-            button.classList.add('opacity-60', 'cursor-not-allowed');
-
-            if (! button.dataset.originalText) {
-                button.dataset.originalText = button.innerHTML;
-            }
-
-            if (! button.dataset.keepText && form.dataset.keepText !== 'true') {
-                button.innerHTML = 'Procesando...';
-            }
-        });
-    });
-
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('main table').forEach(function (table) {
             if (table.closest('.idej-table-responsive') || table.closest('.overflow-x-auto') || table.closest('[data-no-responsive-table]')) {
@@ -485,7 +473,6 @@
         });
     });
 </script>
-
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -502,6 +489,20 @@
             return String(value ?? '').replace(/[&<>'"]/g, function (char) {
                 return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;'})[char];
             });
+        }
+
+        function mostrarToastNotificacion(item) {
+            if (! item) return;
+            const toast = document.createElement('a');
+            toast.href = item.url || endpoint;
+            toast.className = 'fixed right-4 top-4 z-[100] w-[min(92vw,380px)] rounded-2xl border border-blue-200 bg-white p-4 shadow-2xl transition';
+            toast.innerHTML = `<div class="flex items-start gap-3">
+                <span class="mt-1 h-3 w-3 flex-shrink-0 rounded-full bg-blue-600"></span>
+                <div class="min-w-0"><p class="font-bold text-slate-800">${escapeHtml(item.titulo)}</p>
+                <p class="mt-1 text-sm text-slate-600">${escapeHtml(item.mensaje)}</p>
+                <p class="mt-2 text-xs font-semibold text-blue-700">Abrir movimiento</p></div></div>`;
+            document.body.appendChild(toast);
+            window.setTimeout(() => toast.remove(), 8000);
         }
 
         function renderNotificaciones(items) {
@@ -555,6 +556,7 @@
                             badge.classList.remove('idej-notification-pulse');
                             void badge.offsetWidth;
                             badge.classList.add('idej-notification-pulse');
+                            mostrarToastNotificacion((data.recientes ?? [])[0]);
                         }
                     }
 

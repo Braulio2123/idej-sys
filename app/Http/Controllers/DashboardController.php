@@ -94,7 +94,7 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        // CAJA / FINANZAS
+        // CAJA / ADMINISTRACIÓN FINANCIERA
         $cajaAbierta = CorteCaja::abierta()->deUsuario($usuario->id)->first();
         $ingresosCajaAbierta = $cajaAbierta ? $cajaAbierta->calcularTotalesSistema() : null;
         $cortesAbiertos = CorteCaja::abierta()->count();
@@ -105,7 +105,7 @@ class DashboardController extends Controller
         // ACADÉMICA
         $solicitudesPendientes = SolicitudPagoDocente::where('estatus', SolicitudPagoDocente::ESTATUS_PENDIENTE)->count();
         $docentesActivos       = Docente::where('estatus', 'Activo')->count();
-        $gruposActivos         = Grupo::count();
+        $gruposActivos         = Grupo::activos()->count();
         $materiasActivas       = Materia::activas()->count();
         $calendariosActivos    = CalendarioAcademico::operativos()->count();
         $sesionesProgramadas   = CalendarioSesion::whereDate('fecha', '>=', $hoy)->whereNotIn('estatus', ['Cancelada', 'Suspendida'])->count();
@@ -282,7 +282,7 @@ class DashboardController extends Controller
                     $card('Ingresos hoy', '$'.number_format((float) $m['ingresosWebHoy'], 2), $m['pagosWebHoy'].' pago(s)', route('reportes.ejecutivo')),
                     $card('Alumnos con adeudo', $m['alumnosConAdeudo'], 'Seguimiento financiero', route('alumnos.index')),
                     $card('Prospectos activos', $m['prospectosActivos'], 'Relaciones Públicas', route('prospectos.index')),
-                    $card('Solicitudes pendientes', $m['solicitudesPendientes'], 'Pagos docentes por revisar', route('solicitudes_pago.index')),
+                    $card('Solicitudes pendientes', $m['solicitudesPendientes'], 'Solicitudes docentes por valorar', route('solicitudes_pago.index')),
                 ];
                 $base['acciones'] = [
                     $accion('Ver reporte ejecutivo', route('reportes.ejecutivo'), 'Indicadores generales del periodo'),
@@ -292,17 +292,17 @@ class DashboardController extends Controller
 
             case Rol::CADMIN:
                 $base['titulo'] = 'Panel de Coordinación Administrativa';
-                $base['descripcion'] = 'Control de caja, alumnos, becas, convenios y solicitudes de pago docente.';
+                $base['descripcion'] = 'Gestión administrativa y financiera: caja, alumnos, becas, cargos, convenios y pagos docentes.';
                 $base['cards'] = [
                     $card('Cajas abiertas', $m['cortesAbiertos'], 'Supervisión de cortes', route('cortes-caja.index')),
-                    $card('Solicitudes por revisar', $m['pagosPendientes'], 'Pendientes de autorización', route('solicitudes_pago.index')),
+                    $card('Solicitudes por revisar', $m['pagosPendientes'], 'Pendientes de valoración', route('solicitudes_pago.index')),
                     $card('Becas activas', $m['becasActivas'], 'Apoyos vigentes', route('becas.index')),
-                    $card('Documentos pendientes', $m['documentosPendientes'], 'Expedientes por completar', route('alumnos.index')),
+                    $card('Ingresos hoy', '$'.number_format((float) $m['ingresosWebHoy'], 2), $m['pagosWebHoy'].' pago(s)', route('reportes.index')),
                 ];
                 $base['acciones'] = [
                     $accion('Abrir / revisar caja', route('cortes-caja.index'), 'Operación diaria de caja'),
                     $accion('Cargos masivos', route('cargos.masivo.index'), 'Asignación de cargos por grupo'),
-                    $accion('Solicitudes docentes', route('solicitudes_pago.index'), 'Autorizar, observar o pagar'),
+                    $accion('Solicitudes docentes', route('solicitudes_pago.index'), 'Valorar, programar, observar, rechazar o pagar'),
                 ];
                 break;
 
@@ -327,7 +327,7 @@ class DashboardController extends Controller
                 $base['descripcion'] = 'Atención diaria, caja, expedientes, documentos y seguimiento de alumnos.';
                 $base['cards'] = [
                     $card('Seguimientos abiertos', $m['seguimientosAbiertos'], 'Pendientes o en proceso', route('alumnos.index')),
-                    $card('Alumnos con adeudo', $m['alumnosConAdeudo'], 'Canalizar a caja/finanzas', route('alumnos.index')),
+                    $card('Alumnos con adeudo', $m['alumnosConAdeudo'], 'Canalizar a Coordinación Administrativa', route('alumnos.index')),
                     $card('Documentos en revisión', $m['documentosRevision'], 'Expedientes por validar', route('alumnos.index')),
                     $card('Caja abierta', $m['cortesAbiertos'], 'Cortes activos del día', route('cortes-caja.index')),
                 ];
@@ -345,29 +345,15 @@ class DashboardController extends Controller
                     $card('Prospectos activos', $m['prospectosActivos'], 'En contacto o seguimiento', route('prospectos.index')),
                     $card('Prospectos vencidos', $m['prospectosVencidos'], 'Requieren contacto inmediato', route('prospectos.index')),
                     $card('Convertidos este mes', $m['prospectosInscritosMes'], 'Prospectos inscritos', route('prospectos.index')),
-                    $card('Seguimientos abiertos', $m['seguimientosAbiertos'], 'Pendientes de atención', route('alumnos.index')),
+                    $card('Grupos disponibles', $m['gruposActivos'], 'Oferta académica vigente', route('grupos.index')),
                 ];
                 $base['acciones'] = [
                     $accion('Nuevo prospecto', route('prospectos.create'), 'Capturar contacto nuevo'),
                     $accion('Ver prospectos', route('prospectos.index'), 'Filtrar por asesor, medio o programa'),
+                    $accion('Consultar oferta académica', route('programas.index'), 'Programas, ciclos y grupos disponibles'),
                 ];
                 break;
 
-            case Rol::FINANZAS:
-                $base['titulo'] = 'Panel de Finanzas';
-                $base['descripcion'] = 'Ingresos, caja, adeudos, solicitudes docentes y control financiero.';
-                $base['cards'] = [
-                    $card('Ingresos hoy', '$'.number_format((float) $m['ingresosWebHoy'], 2), $m['pagosWebHoy'].' pago(s)', route('reportes.index')),
-                    $card('Cajas abiertas', $m['cortesAbiertos'], 'Pendientes de cierre/revisión', route('cortes-caja.index')),
-                    $card('Solicitudes autorizadas', $m['pagosAprobados'], 'Listas para pago', route('solicitudes_pago.index')),
-                    $card('Alumnos con adeudo', $m['alumnosConAdeudo'], 'Cartera operativa', route('alumnos.index')),
-                ];
-                $base['acciones'] = [
-                    $accion('Revisar caja', route('cortes-caja.index'), 'Cortes e ingresos'),
-                    $accion('Pagar solicitudes docentes', route('solicitudes_pago.index'), 'Autorizadas y pendientes'),
-                    $accion('Reportes financieros', route('reportes.index'), 'Exportaciones y filtros'),
-                ];
-                break;
 
             default:
                 $base['titulo'] = 'Panel de Administración General';

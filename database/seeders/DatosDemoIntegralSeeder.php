@@ -34,6 +34,7 @@ use App\Models\Usuario;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class DatosDemoIntegralSeeder extends Seeder
@@ -42,7 +43,6 @@ class DatosDemoIntegralSeeder extends Seeder
     private ?Usuario $academica = null;
     private ?Usuario $cadmin = null;
     private ?Usuario $recepcion = null;
-    private ?Usuario $finanzas = null;
     private ?Usuario $sistemas = null;
     private ?Usuario $rrpp = null;
 
@@ -52,7 +52,7 @@ class DatosDemoIntegralSeeder extends Seeder
         $this->reforzarCatalogosBase();
         $this->sembrarProspectosYSeguimientos();
         $this->sembrarExpedientesDocumentales();
-        $this->sembrarFinanzasCajaPagosConvenios();
+        $this->sembrarAdministracionFinancieraCajaPagosConvenios();
         $this->sembrarCalendariosAcademicos();
         $this->sembrarEducacionContinua();
         $this->sembrarSolicitudesPagoDocenteDemo();
@@ -67,7 +67,6 @@ class DatosDemoIntegralSeeder extends Seeder
         $this->academica = Usuario::whereHas('rol', fn ($q) => $q->where('clave', Rol::ACADEMICA))->first() ?? $this->admin;
         $this->cadmin = Usuario::whereHas('rol', fn ($q) => $q->where('clave', Rol::CADMIN))->first() ?? $this->admin;
         $this->recepcion = Usuario::whereHas('rol', fn ($q) => $q->where('clave', Rol::RECEPCION))->first() ?? $this->admin;
-        $this->finanzas = Usuario::whereHas('rol', fn ($q) => $q->where('clave', Rol::FINANZAS))->first() ?? $this->admin;
         $this->sistemas = Usuario::whereHas('rol', fn ($q) => $q->where('clave', Rol::SISTEMAS))->first() ?? $this->admin;
         $this->rrpp = Usuario::whereHas('rol', fn ($q) => $q->where('clave', Rol::RRPP))->first() ?? $this->admin;
     }
@@ -225,29 +224,51 @@ class DatosDemoIntegralSeeder extends Seeder
                     default => DocumentoAlumno::ESTATUS_PENDIENTE,
                 };
 
+                $archivo = $estatus === DocumentoAlumno::ESTATUS_PENDIENTE
+                    ? null
+                    : $this->crearDocumentoPdfDemo($alumno, $requisito->tipo_documento);
+
                 DocumentoAlumno::updateOrCreate(
                     ['alumno_id' => $alumno->id, 'requisito_documental_id' => $requisito->id],
                     [
-                        'usuario_subio_id' => in_array($estatus, [DocumentoAlumno::ESTATUS_ENTREGADO, DocumentoAlumno::ESTATUS_EN_REVISION, DocumentoAlumno::ESTATUS_ACEPTADO], true) ? $this->recepcion?->id : null,
+                        'usuario_subio_id' => $archivo ? $this->recepcion?->id : null,
                         'usuario_reviso_id' => $estatus === DocumentoAlumno::ESTATUS_ACEPTADO ? $this->academica?->id : null,
                         'tipo_documento' => $requisito->tipo_documento,
-                        'nombre_original' => $estatus === DocumentoAlumno::ESTATUS_PENDIENTE ? null : Str::slug($requisito->tipo_documento).'_'.$alumno->matricula.'.pdf',
-                        'archivo_path' => $estatus === DocumentoAlumno::ESTATUS_PENDIENTE ? null : 'demo/documentos/'.$alumno->matricula.'/'.Str::slug($requisito->tipo_documento).'.pdf',
-                        'mime_type' => $estatus === DocumentoAlumno::ESTATUS_PENDIENTE ? null : 'application/pdf',
-                        'extension' => $estatus === DocumentoAlumno::ESTATUS_PENDIENTE ? null : 'pdf',
-                        'tamano_bytes' => $estatus === DocumentoAlumno::ESTATUS_PENDIENTE ? null : 245760,
+                        'nombre_original' => $archivo['nombre_original'] ?? null,
+                        'archivo_path' => $archivo['path'] ?? null,
+                        'mime_type' => $archivo ? 'application/pdf' : null,
+                        'extension' => $archivo ? 'pdf' : null,
+                        'tamano_bytes' => $archivo['tamano'] ?? null,
+                        'archivo_sha256' => $archivo['sha256'] ?? null,
+                        'archivo_verificado_at' => $archivo ? now() : null,
                         'estatus' => $estatus,
                         'fecha_documento' => now()->subMonths(2)->toDateString(),
-                        'fecha_entrega' => $estatus === DocumentoAlumno::ESTATUS_PENDIENTE ? null : now()->subDays(10 - $idx),
+                        'fecha_entrega' => $archivo ? now()->subDays(10 - $idx) : null,
                         'fecha_revision' => $estatus === DocumentoAlumno::ESTATUS_ACEPTADO ? now()->subDays(5) : null,
-                        'observaciones' => 'Documento demo generado para pruebas de expediente documental.',
+                        'observaciones' => 'Documento demo generado para pruebas de expediente documental. No contiene datos personales reales.',
                     ]
                 );
             }
         });
     }
 
-    private function sembrarFinanzasCajaPagosConvenios(): void
+    private function crearDocumentoPdfDemo(Alumno $alumno, string $tipoDocumento): array
+    {
+        $contenido = base64_decode('JVBERi0xLjMKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMSAvU3VidHlwZSAvVHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0NvbnRlbnRzIDcgMCBSIC9NZWRpYUJveCBbIDAgMCAzMDAgMjAwIF0gL1BhcmVudCA2IDAgUiAvUmVzb3VyY2VzIDw8Ci9Gb250IDEgMCBSIC9Qcm9jU2V0IFsgL1BERiAvVGV4dCAvSW1hZ2VCIC9JbWFnZUMgL0ltYWdlSSBdCj4+IC9Sb3RhdGUgMCAvVHJhbnMgPDwKCj4+IAogIC9UeXBlIC9QYWdlCj4+CmVuZG9iago0IDAgb2JqCjw8Ci9QYWdlTW9kZSAvVXNlTm9uZSAvUGFnZXMgNiAwIFIgL1R5cGUgL0NhdGFsb2cKPj4KZW5kb2JqCjUgMCBvYmoKPDwKL0F1dGhvciAoYW5vbnltb3VzKSAvQ3JlYXRpb25EYXRlIChEOjIwMjYwNzI3MTg0ODE2KzAwJzAwJykgL0NyZWF0b3IgKGFub255bW91cykgL0tleXdvcmRzICgpIC9Nb2REYXRlIChEOjIwMjYwNzI3MTg0ODE2KzAwJzAwJykgL1Byb2R1Y2VyIChSZXBvcnRMYWIgUERGIExpYnJhcnkgLSBcKG9wZW5zb3VyY2VcKSkgCiAgL1N1YmplY3QgKHVuc3BlY2lmaWVkKSAvVGl0bGUgKHVudGl0bGVkKSAvVHJhcHBlZCAvRmFsc2UKPj4KZW5kb2JqCjYgMCBvYmoKPDwKL0NvdW50IDEgL0tpZHMgWyAzIDAgUiBdIC9UeXBlIC9QYWdlcwo+PgplbmRvYmoKNyAwIG9iago8PAovRmlsdGVyIFsgL0FTQ0lJODVEZWNvZGUgL0ZsYXRlRGVjb2RlIF0gL0xlbmd0aCAxNTQKPj4Kc3RyZWFtCkdhclcvYjZsKj8nTF9db01SLTl1UlRvPWRkTChsRGdsOU0qN1NsYyY6JlRTJUEpVGBZY0cyLCgwST87UCY3RFBURyhNUjcpNnBTPE8qIlFqPytzQkVja25VREJbY0dWNTBmIzRMVyRwbyVWcDkvOUQiK0VyY21TY1xQJEsia0VOT1MuQXRoVUh0TXJRV2RlUVotXUpaYmo4fj5lbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDA2MSAwMDAwMCBuIAowMDAwMDAwMDkyIDAwMDAwIG4gCjAwMDAwMDAxOTkgMDAwMDAgbiAKMDAwMDAwMDM5MiAwMDAwMCBuIAowMDAwMDAwNDYwIDAwMDAwIG4gCjAwMDAwMDA3MjEgMDAwMDAgbiAKMDAwMDAwMDc4MCAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9JRCAKWzw2NWI2MmM2NDA4ZDliZWZkMWM2NTAyZDBhNjBhODhmNj48NjViNjJjNjQwOGQ5YmVmZDFjNjUwMmQwYTYwYTg4ZjY+XQolIFJlcG9ydExhYiBnZW5lcmF0ZWQgUERGIGRvY3VtZW50IC0tIGRpZ2VzdCAob3BlbnNvdXJjZSkKCi9JbmZvIDUgMCBSCi9Sb290IDQgMCBSCi9TaXplIDgKPj4Kc3RhcnR4cmVmCjEwMjQKJSVFT0YK', true);
+        $nombreBase = Str::slug($tipoDocumento) ?: 'documento';
+        $path = 'demo/documentos/'.$alumno->matricula.'/'.$nombreBase.'.pdf';
+
+        Storage::disk('local')->put($path, $contenido);
+
+        return [
+            'path' => $path,
+            'nombre_original' => $nombreBase.'_'.$alumno->matricula.'.pdf',
+            'tamano' => strlen($contenido),
+            'sha256' => hash('sha256', $contenido),
+        ];
+    }
+
+    private function sembrarAdministracionFinancieraCajaPagosConvenios(): void
     {
         $conceptoColegiatura = ConceptoPago::where('nombre', 'Colegiatura Mensual')->first() ?? ConceptoPago::first();
         $conceptoInscripcion = ConceptoPago::where('nombre', 'Inscripción')->first() ?? $conceptoColegiatura;
@@ -267,7 +288,7 @@ class DatosDemoIntegralSeeder extends Seeder
         );
 
         $corteCerrado = CorteCaja::firstOrCreate(
-            ['usuario_id' => $this->finanzas?->id, 'fecha_apertura' => now()->subDay()->startOfDay()->addHours(8)],
+            ['usuario_id' => $this->cadmin?->id, 'fecha_apertura' => now()->subDay()->startOfDay()->addHours(8)],
             [
                 'fecha_cierre' => now()->subDay()->endOfDay()->subHours(2),
                 'saldo_inicial' => 0,
@@ -374,7 +395,7 @@ class DatosDemoIntegralSeeder extends Seeder
                 ['folio_recibo' => 'IDEJ-DEMO-202605-000002'],
                 [
                     'alumno_id' => $cargoCancelado->alumno_id,
-                    'usuario_id' => $this->finanzas?->id,
+                    'usuario_id' => $this->cadmin?->id,
                     'cancelado_por_id' => $this->cadmin?->id,
                     'corte_caja_id' => $corteCerrado->id,
                     'metodo_pago' => 'Transferencia',
@@ -525,7 +546,7 @@ class DatosDemoIntegralSeeder extends Seeder
                 'periodo' => '2026 A',
                 'modalidad' => $modalidad,
                 'tipo_calendario' => $tipo,
-                'estatus' => CalendarioAcademico::ESTATUS_PLANEADO,
+                'estatus' => $this->estatusCalendarioParaRango($inicio, $fin),
                 'fecha_inicio' => $inicio,
                 'fecha_fin' => $fin,
                 'observaciones' => 'Calendario demo generado para probar bloqueos, conteos y reprogramaciones.',
@@ -568,6 +589,21 @@ class DatosDemoIntegralSeeder extends Seeder
                 );
             }
         }
+    }
+
+    private function estatusCalendarioParaRango(string $inicio, string $fin): string
+    {
+        $hoy = now()->toDateString();
+
+        if ($hoy < $inicio) {
+            return CalendarioAcademico::ESTATUS_AGENDADO;
+        }
+
+        if ($hoy > $fin) {
+            return CalendarioAcademico::ESTATUS_FINALIZADO;
+        }
+
+        return CalendarioAcademico::ESTATUS_EN_CURSO;
     }
 
     private function sembrarEducacionContinua(): void
@@ -775,7 +811,7 @@ class DatosDemoIntegralSeeder extends Seeder
                 'docente_id' => $cursoSesion?->docente_id ?? $docente->id,
                 'creado_por_id' => $this->academica?->id,
                 'autorizado_por_id' => $this->cadmin?->id,
-                'procesado_por_id' => $this->finanzas?->id,
+                'procesado_por_id' => $this->cadmin?->id,
                 'curso_id' => $curso?->id,
                 'curso_sesion_id' => $cursoSesion?->id,
                 'origen' => SolicitudPagoDocente::ORIGEN_EDUCACION_CONTINUA,
@@ -836,7 +872,7 @@ class DatosDemoIntegralSeeder extends Seeder
         $eventos = [
             ['usuario_id' => $this->admin?->id, 'accion' => 'Inicio de datos demo', 'modulo' => 'Sistema', 'descripcion' => 'Carga integral de seeders para pruebas locales.'],
             ['usuario_id' => $this->academica?->id, 'accion' => 'Planeación académica demo', 'modulo' => 'Calendarios', 'descripcion' => 'Se generaron calendarios académicos con fechas exactas.'],
-            ['usuario_id' => $this->finanzas?->id, 'accion' => 'Corte de caja demo', 'modulo' => 'Caja', 'descripcion' => 'Se generaron pagos, cortes y ajustes demo.'],
+            ['usuario_id' => $this->cadmin?->id, 'accion' => 'Corte de caja demo', 'modulo' => 'Caja', 'descripcion' => 'Se generaron pagos, cortes y ajustes demo.'],
             ['usuario_id' => $this->rrpp?->id, 'accion' => 'Seguimiento prospecto demo', 'modulo' => 'Prospectos', 'descripcion' => 'Se cargaron prospectos y seguimientos de prueba.'],
         ];
 

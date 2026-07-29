@@ -3,6 +3,7 @@
 @section('title', 'Educación Programática')
 
 @section('content')
+@php $puedeGestionarCatalogos = usuarioTienePermiso('catalogos_academicos.gestionar'); @endphp
 
 <div class="max-w-6xl mx-auto px-4 py-6">
 
@@ -28,11 +29,13 @@
             </div>
         </div>
 
+        @if($puedeGestionarCatalogos)
         <a href="{{ route('programas.create') }}"
            class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl shadow-md font-medium transition">
             <i class='bx bx-plus text-xl'></i>
             Nueva Educación Programática
         </a>
+        @endif
     </div>
 
     {{-- Si no hay programas --}}
@@ -84,6 +87,7 @@
                                 <div class="flex justify-center items-center gap-3">
 
                                     <!-- Editar -->
+                                    @if($puedeGestionarCatalogos)
                                     <a href="{{ route('programas.edit', $programa) }}"
                                        class="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium">
                                         <i class='bx bx-edit text-lg'></i>
@@ -103,6 +107,9 @@
                                             Eliminar
                                         </button>
                                     </form>
+                                    @else
+                                        <span class="text-xs text-slate-500">Solo consulta</span>
+                                    @endif
 
                                 </div>
                             </td>

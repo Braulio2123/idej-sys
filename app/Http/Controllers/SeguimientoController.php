@@ -20,7 +20,7 @@ class SeguimientoController extends Controller
         $prioridad = $request->get('prioridad');
 
         $seguimientos = $alumno->seguimientos()
-            ->with('usuario')
+            ->with(['usuario', 'canceladoPor'])
             ->when($estatus, fn ($query) => $query->where('estatus', $estatus))
             ->when($tipo, fn ($query) => $query->where('tipo', $tipo))
             ->when($prioridad, fn ($query) => $query->where('prioridad', $prioridad))
@@ -59,12 +59,17 @@ class SeguimientoController extends Controller
             $alumno->id
         );
 
-        return back()->with('success', 'Seguimiento registrado correctamente.');
+        return redirect()->route('alumnos.seguimientos.index', $alumno)
+            ->with('success', 'Seguimiento registrado correctamente.');
     }
 
     public function update(Request $request, Alumno $alumno, Seguimiento $seguimiento)
     {
         $this->verificarPertenencia($alumno, $seguimiento);
+
+        if ($seguimiento->estatus === Seguimiento::ESTATUS_CANCELADO) {
+            return back()->with('error', 'Un seguimiento cancelado se conserva únicamente como historial y no puede modificarse.');
+        }
 
         $validated = $this->validarSeguimiento($request, true);
 
@@ -86,26 +91,44 @@ class SeguimientoController extends Controller
             $alumno->id
         );
 
-        return back()->with('success', 'Seguimiento actualizado correctamente.');
+        return redirect()->route('alumnos.seguimientos.index', $alumno)
+            ->with('success', 'Seguimiento actualizado correctamente.');
     }
 
-    public function destroy(Alumno $alumno, Seguimiento $seguimiento)
+    public function destroy(Request $request, Alumno $alumno, Seguimiento $seguimiento)
     {
         $this->verificarPertenencia($alumno, $seguimiento);
 
-        $id = $seguimiento->id;
-        $asunto = $seguimiento->asunto;
-        $seguimiento->delete();
+        if ($seguimiento->estatus === Seguimiento::ESTATUS_CANCELADO) {
+            return back()->with('info', 'El seguimiento ya estaba cancelado.');
+        }
+
+        $validated = $request->validate([
+            'motivo_cancelacion' => ['required', 'string', 'min:8', 'max:2000'],
+        ], [
+            'motivo_cancelacion.required' => 'Explica por qué se cancela el seguimiento.',
+            'motivo_cancelacion.min' => 'El motivo debe describir claramente la cancelación.',
+        ]);
+
+        $seguimiento->update([
+            'estatus' => Seguimiento::ESTATUS_CANCELADO,
+            'fecha_cierre' => now(),
+            'fecha_proximo_contacto' => null,
+            'cancelado_por_id' => Auth::id(),
+            'fecha_cancelacion' => now(),
+            'motivo_cancelacion' => $validated['motivo_cancelacion'],
+        ]);
 
         $this->bitacora(
-            'Eliminar Seguimiento',
-            "Se eliminó seguimiento #{$id} ({$asunto}) de {$alumno->nombre_completo}.",
+            'Cancelar Seguimiento',
+            "Se canceló el seguimiento #{$seguimiento->id} ({$seguimiento->asunto}) de {$alumno->nombre_completo}. Motivo: {$validated['motivo_cancelacion']}",
             'Seguimientos',
-            null,
+            $seguimiento,
             $alumno->id
         );
 
-        return back()->with('success', 'Seguimiento eliminado correctamente.');
+        return redirect()->route('alumnos.seguimientos.index', $alumno)
+            ->with('success', 'Seguimiento cancelado. El registro se conserva en el historial.');
     }
 
     private function validarSeguimiento(Request $request, bool $actualizacion = false): array

@@ -33,6 +33,16 @@
     </p>
 </div>
 
+@if($convenio->estatus !== 'Activo')
+    <div class="mb-5 rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+        Este convenio está <strong>{{ strtolower($convenio->estatus) }}</strong>. Sus parcialidades se conservan como historial y no pueden modificarse.
+    </div>
+@elseif($tienePagosAplicados)
+    <div class="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        El convenio ya tiene pagos aplicados. Para conservar la trazabilidad contractual, su calendario de parcialidades quedó bloqueado.
+    </div>
+@endif
+
 {{-- BOTONES SUPERIORES --}}
 <div class="flex justify-between mb-4">
 
@@ -41,10 +51,16 @@
         ← Volver al Alumno
     </a>
 
-    <a href="{{ route('parcialidades.create', $convenio) }}"
-       class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow">
-        + Crear Parcialidad
-    </a>
+    @if($convenio->estatus === 'Activo' && ! $tienePagosAplicados)
+        <a href="{{ route('parcialidades.create', $convenio) }}"
+           class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow">
+            + Crear Parcialidad
+        </a>
+    @else
+        <span class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+            Calendario contractual en solo consulta
+        </span>
+    @endif
 
 </div>
 
@@ -86,7 +102,7 @@
                             px-3 py-1 rounded text-white text-sm
                             {{ $p->estatus === 'Pagado' ? 'bg-green-600' :
                                ($p->estatus === 'Parcialmente Pagado' ? 'bg-yellow-500' :
-                               'bg-red-600') }}
+                               ($p->estatus === 'Cancelada' ? 'bg-slate-500' : 'bg-red-600')) }}
                         ">
                             {{ $p->estatus }}
                         </span>
@@ -94,22 +110,16 @@
 
                     <td class="px-4 py-3 text-right space-x-2">
 
-                        {{-- EDITAR --}}
-                        <a href="{{ route('parcialidades.edit', [$convenio, $p]) }}"
-                           class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                            Editar
-                        </a>
+                        @if($convenio->estatus === 'Activo' && ! $tienePagosAplicados && $p->estatus !== 'Cancelada')
+                            <a href="{{ route('parcialidades.edit', [$convenio, $p]) }}"
+                               class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                                Editar
+                            </a>
+                        @else
+                            <span class="text-slate-400">Solo consulta</span>
+                        @endif
 
-                        {{-- ELIMINAR --}}
-                        <form action="{{ route('parcialidades.destroy', [$convenio, $p]) }}"
-                              method="POST" class="inline-block"
-                              onsubmit="return confirm('¿Eliminar esta parcialidad?');">
-                            @csrf
-                            @method('DELETE')
-                            <button class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                                Eliminar
-                            </button>
-                        </form>
+                        <span class="text-xs text-slate-500">No eliminable: historial contractual</span>
 
                     </td>
                 </tr>

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('calendario_materias', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('calendario_academico_id')->constrained('calendarios_academicos')->cascadeOnDelete();
+            $table->foreignId('calendario_academico_id')->constrained('calendarios_academicos')->restrictOnDelete();
             $table->foreignId('materia_id')->nullable()->constrained('materias')->nullOnDelete();
             $table->foreignId('docente_id')->nullable()->constrained('docentes')->nullOnDelete();
             $table->unsignedInteger('orden')->default(1);

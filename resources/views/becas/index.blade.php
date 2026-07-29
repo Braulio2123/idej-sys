@@ -5,12 +5,12 @@
 @section('content')
 @php
     use App\Models\Rol;
-    $puedeGestionarBecas = Auth::user()?->tieneRol(Rol::ADMIN, Rol::CADMIN, Rol::FINANZAS) ?? false;
+    $puedeGestionarBecas = Auth::user()?->tieneRol(Rol::ADMIN, Rol::CADMIN) ?? false;
 @endphp
 <div class="max-w-7xl mx-auto px-4 py-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-            <p class="text-sm uppercase tracking-[0.25em] text-blue-700 font-semibold">Finanzas</p>
+            <p class="text-sm uppercase tracking-[0.25em] text-blue-700 font-semibold">Administración financiera</p>
             <h1 class="text-3xl font-bold text-slate-900">Becas institucionales</h1>
             <p class="text-slate-600 mt-1">Consulta becas activas, programadas, vencidas o canceladas.</p>
         </div>

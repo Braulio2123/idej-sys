@@ -3,6 +3,10 @@
 @section('title', 'Gestión de Usuarios')
 
 @section('content')
+@php
+    $usuarioActual = Auth::user();
+    $puedeAdministrarUsuarios = $usuarioActual?->esAdmin() ?? false;
+@endphp
 <div class="max-w-6xl mx-auto bg-white shadow-md rounded-xl p-6 mt-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
         <div>
@@ -10,9 +14,11 @@
             <p class="text-sm text-gray-500">Administración de accesos internos, roles por área y estado de cuentas.</p>
         </div>
 
-        <a href="{{ route('usuarios.create') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700">
-            + Crear nuevo usuario
-        </a>
+        @if($puedeAdministrarUsuarios)
+            <a href="{{ route('usuarios.create') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700">
+                + Crear nuevo usuario
+            </a>
+        @endif
     </div>
 
     @if (session('success'))
@@ -70,29 +76,36 @@
                             {{ $u->ultimo_acceso_at?->format('d/m/Y H:i') ?? '—' }}
                         </td>
                         <td class="p-3 text-center space-x-2 whitespace-nowrap">
-                            <a href="{{ route('usuarios.edit', $u) }}" class="text-indigo-600 font-semibold">Editar</a>
+                            @if($puedeAdministrarUsuarios)
+                                <a href="{{ route('usuarios.edit', $u) }}" class="text-indigo-600 font-semibold">Editar</a>
+                            @endif
 
-                            @if($u->activo)
+                            @if($u->activo && ($usuarioActual?->puedeGestionarCredencialesDe($u) ?? false))
                                 <form action="{{ route('usuarios.password-temporal', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Generar contraseña temporal? Se mostrará una sola vez y el usuario deberá cambiarla al iniciar sesión.');">
                                     @csrf
                                     @method('PATCH')
                                     <button class="text-amber-700 font-semibold">Contraseña temporal</button>
                                 </form>
-
                             @endif
 
-                            @if($u->activo)
-                                <form action="{{ route('usuarios.destroy', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Desactivar este usuario? No se eliminará su historial.');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="text-red-600 font-semibold">Desactivar</button>
-                                </form>
-                            @else
-                                <form action="{{ route('usuarios.reactivar', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Reactivar este usuario?');">
-                                    @csrf
-                                    @method('PATCH')
-                                    <button class="text-emerald-700 font-semibold">Reactivar</button>
-                                </form>
+                            @if($puedeAdministrarUsuarios)
+                                @if($u->activo)
+                                    <form action="{{ route('usuarios.destroy', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Desactivar este usuario? No se eliminará su historial.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="text-red-600 font-semibold">Desactivar</button>
+                                    </form>
+                                @else
+                                    <form action="{{ route('usuarios.reactivar', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('¿Reactivar este usuario?');">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button class="text-emerald-700 font-semibold">Reactivar</button>
+                                    </form>
+                                @endif
+                            @endif
+
+                            @if(! $puedeAdministrarUsuarios && ! ($u->activo && ($usuarioActual?->puedeGestionarCredencialesDe($u) ?? false)))
+                                <span class="text-xs text-slate-400">Solo consulta</span>
                             @endif
                         </td>
                     </tr>

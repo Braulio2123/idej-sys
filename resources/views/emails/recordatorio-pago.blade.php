@@ -51,11 +51,11 @@
                         </table>
 
                         <p style="font-size:15px; line-height:1.6; margin:0 0 14px;">
-                            Si ya realizaste tu pago, comunícate con Recepción o Finanzas para validar tu comprobante y actualizar tu estatus.
+                            Si ya realizaste tu pago, comunícate con Recepción o Coordinación Administrativa para validar tu comprobante y actualizar tu estatus.
                         </p>
                         <p style="font-size:15px; line-height:1.6; margin:0;">
                             Atentamente,<br>
-                            <strong>{{ $configuracion->nombre_corto }} · Recepción / Finanzas</strong>
+                            <strong>{{ $configuracion->nombre_corto }} · Recepción / Coordinación Administrativa</strong>
                         </p>
                     </td>
                 </tr>

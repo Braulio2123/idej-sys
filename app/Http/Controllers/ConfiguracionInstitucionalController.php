@@ -6,7 +6,9 @@ use App\Models\ConfiguracionInstitucional;
 use App\Traits\RegistraBitacora;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 use Illuminate\Validation\Rule;
 
 class ConfiguracionInstitucionalController extends Controller
@@ -41,7 +43,7 @@ class ConfiguracionInstitucionalController extends Controller
             'telefono_principal' => ['nullable', 'string', 'max:40'],
             'telefono_secundario' => ['nullable', 'string', 'max:40'],
             'correo_contacto' => ['nullable', 'email', 'max:150'],
-            'sitio_web' => ['nullable', 'string', 'max:180'],
+            'sitio_web' => ['nullable', 'url:http,https', 'max:180'],
 
             'color_primario' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'color_secundario' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
@@ -67,20 +69,35 @@ class ConfiguracionInstitucionalController extends Controller
 
         unset($validated['logo'], $validated['eliminar_logo']);
 
-        if ($request->boolean('eliminar_logo') && $configuracion->logo_path) {
-            Storage::disk('public')->delete($configuracion->logo_path);
-            $validated['logo_path'] = null;
-        }
+        $logoAnterior = $configuracion->logo_path;
+        $logoNuevo = null;
 
-        if ($request->hasFile('logo')) {
-            if ($configuracion->logo_path) {
-                Storage::disk('public')->delete($configuracion->logo_path);
+        try {
+            if ($request->hasFile('logo')) {
+                $logoNuevo = $request->file('logo')->store('configuracion/logo', 'public');
+                $validated['logo_path'] = $logoNuevo;
+            } elseif ($request->boolean('eliminar_logo')) {
+                $validated['logo_path'] = null;
             }
 
-            $validated['logo_path'] = $request->file('logo')->store('configuracion/logo', 'public');
+            DB::transaction(function () use ($configuracion, $validated): void {
+                $configuracion->fill($validated)->save();
+            });
+        } catch (Throwable $e) {
+            if ($logoNuevo) {
+                Storage::disk('public')->delete($logoNuevo);
+            }
+
+            report($e);
+
+            return back()
+                ->withInput()
+                ->with('error', 'No se pudo actualizar la configuración institucional. Contacta al área de Sistemas.');
         }
 
-        $configuracion->fill($validated)->save();
+        if ($logoAnterior && $logoAnterior !== $configuracion->logo_path) {
+            Storage::disk('public')->delete($logoAnterior);
+        }
 
         $this->bitacora(
             'Actualizar Configuración Institucional',
@@ -93,4 +110,5 @@ class ConfiguracionInstitucionalController extends Controller
             ->route('configuracion.institucional.edit')
             ->with('success', 'Configuración institucional actualizada correctamente.');
     }
+
 }

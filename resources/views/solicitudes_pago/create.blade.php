@@ -11,7 +11,7 @@
                 Nueva solicitud de pago a docente
             </h1>
             <p class="text-sm text-slate-500 mt-1">
-                Coordinación Académica levanta la solicitud; Coordinación Administrativa/Finanzas la revisa, autoriza y registra el pago.
+                Coordinación Académica registra las fechas y el tipo de clase. Coordinación Administrativa define el monto, programa una fecha tentativa y ejecuta o rechaza el pago.
             </p>
         </div>
 

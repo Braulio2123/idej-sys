@@ -190,20 +190,19 @@
 
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Monto total pagado</label>
-                            <input type="number" step="0.01" min="0.01" name="monto_total_pagado" id="monto_total_pagado"
+                            <input type="number" step="0.01" min="0.01" max="99999999.99" name="monto_total_pagado" id="monto_total_pagado"
                                    class="w-full border rounded p-2" value="{{ old('monto_total_pagado') }}" required>
                         </div>
 
                         <div>
                             <label class="block font-semibold text-gray-700 mb-1">Fecha de pago</label>
-                            <input type="date" name="fecha_pago" class="w-full border rounded p-2"
+                            <input type="date" name="fecha_pago" max="{{ now()->toDateString() }}" class="w-full border rounded p-2"
                                    value="{{ old('fecha_pago', now()->toDateString()) }}">
                         </div>
 
-                        <div>
-                            <label class="block font-semibold text-gray-700 mb-1">Folio del recibo</label>
-                            <input type="text" name="folio_recibo" class="w-full border rounded p-2"
-                                   value="{{ old('folio_recibo') }}" placeholder="Ej: 000123">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                            <strong>Folio institucional automático.</strong>
+                            El sistema lo asignará después de registrar el pago para evitar folios repetidos o alterados manualmente.
                         </div>
                     </div>
                 </section>
@@ -215,7 +214,7 @@
                     <div class="space-y-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Efectivo recibido por caja</label>
-                            <input type="number" step="0.01" min="0.01" name="monto_recibido_efectivo" id="monto_recibido_efectivo" value="{{ old('monto_recibido_efectivo') }}" placeholder="Ej. 1000.00" class="w-full border rounded p-2">
+                            <input type="number" step="0.01" min="0.01" max="99999999.99" name="monto_recibido_efectivo" id="monto_recibido_efectivo" value="{{ old('monto_recibido_efectivo') }}" placeholder="Ej. 1000.00" class="w-full border rounded p-2">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tratamiento de diferencia en efectivo</label>
@@ -242,7 +241,7 @@
                         <input type="text" name="clave_rastreo" value="{{ old('clave_rastreo') }}" placeholder="Clave de rastreo" class="w-full border rounded p-2">
                         <input type="text" name="concepto_transferencia" value="{{ old('concepto_transferencia') }}" placeholder="Concepto" class="w-full border rounded p-2">
                         <input type="text" name="referencia_transferencia" value="{{ old('referencia_transferencia') }}" placeholder="Referencia bancaria" class="w-full border rounded p-2">
-                        <input type="datetime-local" name="fecha_transferencia" value="{{ old('fecha_transferencia') }}" class="w-full border rounded p-2">
+                        <input type="datetime-local" name="fecha_transferencia" max="{{ now()->format('Y-m-d\TH:i') }}" value="{{ old('fecha_transferencia') }}" class="w-full border rounded p-2">
                         <input type="text" name="banco_destino" value="{{ old('banco_destino') }}" placeholder="Banco destino" class="w-full border rounded p-2">
 
                         <div>

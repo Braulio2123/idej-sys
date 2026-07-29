@@ -8,6 +8,7 @@ use App\Models\CalendarioSesion;
 use App\Models\DiaNoLaboral;
 use App\Models\Docente;
 use App\Models\Materia;
+use App\Models\SolicitudPagoDocente;
 use App\Traits\RegistraBitacora;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class CalendarioMateriaController extends Controller
 
     public function create(CalendarioAcademico $calendarioAcademico)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         $calendarioAcademico->load(['grupo.programa', 'cicloEscolar']);
 
         return view('calendarios_academicos.materias.create', $this->formData($calendarioAcademico, new CalendarioMateria()));
@@ -27,6 +29,7 @@ class CalendarioMateriaController extends Controller
 
     public function store(Request $request, CalendarioAcademico $calendarioAcademico)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         $validated = $this->validar($request);
         $sesionesData = $this->obtenerSesiones($request, $calendarioAcademico, $validated);
 
@@ -75,6 +78,7 @@ class CalendarioMateriaController extends Controller
 
     public function edit(CalendarioAcademico $calendarioAcademico, CalendarioMateria $calendarioMateria)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         abort_unless($calendarioMateria->calendario_academico_id === $calendarioAcademico->id, 404);
 
         $calendarioAcademico->load(['grupo.programa', 'cicloEscolar']);
@@ -85,7 +89,9 @@ class CalendarioMateriaController extends Controller
 
     public function update(Request $request, CalendarioAcademico $calendarioAcademico, CalendarioMateria $calendarioMateria)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         abort_unless($calendarioMateria->calendario_academico_id === $calendarioAcademico->id, 404);
+        $this->asegurarMateriaSinHistorialAplicado($calendarioMateria);
 
         $validated = $this->validar($request);
         $sesionesData = $this->obtenerSesiones($request, $calendarioAcademico, $validated);
@@ -133,14 +139,46 @@ class CalendarioMateriaController extends Controller
 
     public function destroy(CalendarioAcademico $calendarioAcademico, CalendarioMateria $calendarioMateria)
     {
+        $this->asegurarCalendarioEditable($calendarioAcademico);
         abort_unless($calendarioMateria->calendario_academico_id === $calendarioAcademico->id, 404);
 
-        $descripcion = "Se eliminó {$calendarioMateria->nombre_materia} del calendario {$calendarioAcademico->nombre}.";
-        $calendarioMateria->delete();
+        return redirect()->route('calendarios_academicos.show', $calendarioAcademico)
+            ->with('error', 'Las materias asignadas no se eliminan porque sus sesiones forman parte del historial académico. Corrige la asignación mediante edición o cancela el calendario con motivo.');
+    }
 
-        $this->bitacora('Eliminar materia de calendario', $descripcion, 'Área Académica');
+    private function asegurarCalendarioEditable(CalendarioAcademico $calendario): void
+    {
+        $calendario->loadMissing('grupo');
 
-        return redirect()->route('calendarios_academicos.show', $calendarioAcademico)->with('success', 'Materia eliminada del calendario.');
+        if (! $calendario->grupo?->activo) {
+            abort(409, 'El grupo está archivado y su calendario se conserva únicamente como historial.');
+        }
+
+        if (in_array($calendario->estatus, [CalendarioAcademico::ESTATUS_CANCELADO, CalendarioAcademico::ESTATUS_FINALIZADO], true)) {
+            abort(409, 'El calendario está cancelado o finalizado y se conserva únicamente como historial.');
+        }
+    }
+
+    private function asegurarMateriaSinHistorialAplicado(CalendarioMateria $calendarioMateria): void
+    {
+        $tieneSesionesHistoricas = $calendarioMateria->sesiones()
+            ->where(function ($query) {
+                $query->whereDate('fecha', '<=', now()->toDateString())
+                    ->orWhereIn('estatus', [
+                        CalendarioSesion::ESTATUS_IMPARTIDA,
+                        CalendarioSesion::ESTATUS_CANCELADA,
+                        CalendarioSesion::ESTATUS_SUSPENDIDA,
+                    ])
+                    ->orWhereNotNull('sesion_origen_id');
+            })
+            ->exists();
+
+        $tieneSolicitudDocente = SolicitudPagoDocente::where('calendario_materia_id', $calendarioMateria->id)
+            ->exists();
+
+        if ($tieneSesionesHistoricas || $tieneSolicitudDocente) {
+            abort(409, 'La materia ya tiene sesiones históricas, reprogramaciones o solicitudes docentes relacionadas. No se puede regenerar su calendario; utiliza cancelación o reprogramación por sesión.');
+        }
     }
 
     private function formData(CalendarioAcademico $calendarioAcademico, CalendarioMateria $calendarioMateria): array

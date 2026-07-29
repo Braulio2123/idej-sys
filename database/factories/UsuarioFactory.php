@@ -42,6 +42,7 @@ class UsuarioFactory extends Factory
             'rol_id' => $rolId,
             'activo' => true,
             'password_changed_at' => now(),
+            'auth_version' => 1,
             'remember_token' => Str::random(10),
         ];
     }

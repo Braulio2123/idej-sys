@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CalendarioAcademico;
 use App\Models\Grupo;
 use App\Models\CicloEscolar;
 use App\Models\Programa;
@@ -13,13 +14,18 @@ class GrupoController extends Controller
 {
     use RegistraBitacora;
 
-    public function index()
+    public function index(Request $request)
     {
-        $grupos = Grupo::with(['cicloEscolar', 'programa'])
-            ->orderByDesc('created_at')
-            ->paginate(12);
+        $mostrarArchivados = $request->boolean('archivados');
 
-        return view('grupos.index', compact('grupos'));
+        $grupos = Grupo::with(['cicloEscolar', 'programa', 'archivadoPor'])
+            ->when(! $mostrarArchivados, fn ($query) => $query->activos())
+            ->when($mostrarArchivados, fn ($query) => $query->where('activo', false))
+            ->orderByDesc('created_at')
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('grupos.index', compact('grupos', 'mostrarArchivados'));
     }
 
     public function create()
@@ -39,6 +45,7 @@ class GrupoController extends Controller
         $validated['turno'] = 'Mixto';
         $validated['aula'] = null;
 
+        $validated['activo'] = true;
         $grupo = Grupo::create($validated);
 
         $this->bitacora(
@@ -55,6 +62,7 @@ class GrupoController extends Controller
         $grupo->load([
             'cicloEscolar',
             'programa',
+            'archivadoPor',
             'alumnos',
             'calendariosAcademicos.materiasCalendario.materia',
             'calendariosAcademicos.materiasCalendario.docente',
@@ -66,6 +74,11 @@ class GrupoController extends Controller
 
     public function edit(Grupo $grupo)
     {
+        if (! $grupo->activo) {
+            return redirect()->route('grupos.show', $grupo)
+                ->with('error', 'El grupo está archivado y su historial no puede modificarse.');
+        }
+
         $ciclos = CicloEscolar::orderByDesc('created_at')->get();
         $programas = Programa::where('activo', true)->orWhere('id', $grupo->programa_id)->orderBy('nombre')->get();
 
@@ -74,6 +87,11 @@ class GrupoController extends Controller
 
     public function update(Request $request, Grupo $grupo)
     {
+        if (! $grupo->activo) {
+            return redirect()->route('grupos.show', $grupo)
+                ->with('error', 'El grupo está archivado y su historial no puede modificarse.');
+        }
+
         $validated = $this->validar($request);
         $programa = Programa::findOrFail($validated['programa_id']);
         $this->validarSemestreContraPrograma($programa, (int) $validated['semestre_o_cuatrimestre']);
@@ -92,20 +110,45 @@ class GrupoController extends Controller
             ->with('success', 'Grupo académico actualizado correctamente.');
     }
 
-    public function destroy(Grupo $grupo)
+    public function destroy(Request $request, Grupo $grupo)
     {
-        $id = $grupo->id;
-        $nombre = $grupo->nombre;
+        if (! $grupo->activo) {
+            return redirect()->route('grupos.index', ['archivados' => 1])
+                ->with('info', 'El grupo ya estaba archivado.');
+        }
 
-        $grupo->delete();
+        $validated = $request->validate([
+            'motivo_archivo' => ['required', 'string', 'min:10', 'max:2000'],
+        ], [
+            'motivo_archivo.required' => 'Explica por qué se archiva el grupo.',
+            'motivo_archivo.min' => 'El motivo debe describir claramente la razón del archivo.',
+        ]);
+
+        $tieneCalendariosOperativos = CalendarioAcademico::where('grupo_id', $grupo->id)
+            ->operativos()
+            ->exists();
+
+        if ($tieneCalendariosOperativos) {
+            return redirect()->route('grupos.show', $grupo)
+                ->with('error', 'El grupo tiene calendarios activos o en curso. Finalízalos o cancélalos con motivo antes de archivar el grupo.');
+        }
+
+        $grupo->update([
+            'activo' => false,
+            'archivado_at' => now(),
+            'archivado_por_id' => auth()->id(),
+            'motivo_archivo' => $validated['motivo_archivo'],
+        ]);
 
         $this->bitacora(
-            'Eliminar Grupo',
-            "Se eliminó el grupo {$nombre} (ID {$id})."
+            'Archivar Grupo',
+            "Se archivó el grupo {$grupo->nombre} (ID {$grupo->id}) sin eliminar alumnos, calendarios ni sesiones. Motivo: {$validated['motivo_archivo']}",
+            'Área Académica',
+            $grupo
         );
 
         return redirect()->route('grupos.index')
-            ->with('success', 'Grupo eliminado correctamente.');
+            ->with('success', 'Grupo archivado correctamente. Su historial académico se conserva.');
     }
 
     private function validar(Request $request): array

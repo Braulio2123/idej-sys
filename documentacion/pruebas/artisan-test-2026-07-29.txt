@@ -1,0 +1,132 @@
+
+   PASS  Tests\Unit\AuthorizationBoundariesTest
+  ✓ sistemas cannot manage credentials of admin or sistemas                                                         0.91s  
+  ✓ admin can manage credentials of any internal user                                                               0.09s  
+  ✓ recepcion can only operate its own cash register                                                                0.23s  
+  ✓ cadmin and admin can supervise other users cash registers                                                       0.08s  
+  ✓ permissions with dots are resolved as literal keys                                                              0.08s  
+  ✓ finanzas role is retired and cadmin absorbs financial permissions                                               0.08s  
+  ✓ operational role matrix matches the real idej areas                                                             0.08s  
+  ✓ recepcion student updates are limited to contact information                                                    0.09s  
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true                                                                                               0.07s  
+
+   PASS  Tests\Unit\FinancialOperationHardeningTest
+  ✓ detecta diferencias por metodo aunque el total se compense                                                      0.13s  
+  ✓ los movimientos y cargos exponen sus claves de idempotencia                                                     0.11s  
+  ✓ los cargos conservan el origen masivo y el saldo aplicado                                                       0.07s  
+
+   PASS  Tests\Unit\HistoricalIntegrityTest
+  ✓ destructive controllers preserve historical records                                                             0.01s  
+  ✓ payments only accept partialities from locked active agreements
+  ✓ finalized academic calendars are read only history
+  ✓ critical financial and academic foreign keys are restrictive
+  ✓ compatibility migration does not restore destructive cascades
+  ✓ destructive routes require recent password where applicable
+
+   PASS  Tests\Unit\OperationalStatusCatalogTest
+  ✓ calendario academico uses the operational status catalog                                                        0.01s  
+  ✓ docente status catalog includes inactive
+  ✓ inactive docente is not reactivated by automatic recalculation
+  ✓ pago controller contains the academic payment notification handler                                              0.01s  
+
+   PASS  Tests\Unit\PrivateFileSecurityTest
+  ✓ student documents are filtered by business function                                                             0.10s  
+  ✓ sensitive controllers do not download from the public disk                                                      0.06s  
+  ✓ replacements are committed before old private files are removed                                                 0.06s  
+  ✓ local disk is private and raises storage failures                                                               0.06s  
+  ✓ compatibility migration adds integrity metadata for all sensitive files                                         0.07s  
+  ✓ routes and commands keep sensitive files behind controllers                                                     0.06s  
+  ✓ demo seeder creates real private files instead of broken references                                             0.07s  
+
+   PASS  Tests\Unit\Services\TeacherPaymentCalculatorTest
+  ✓ calculates payment by sessions                                                                                  0.01s  
+  ✓ calculates payment by hours with commercial rounding
+  ✓ fixed payment uses only manual total
+  ✓ rejects hourly scheme without reported hours
+
+   PASS  Tests\Feature\Auth\AuthenticationTest
+  ✓ login screen can be rendered                                                                                   37.71s  
+  ✓ usuarios can authenticate using the login screen                                                                0.21s  
+  ✓ usuarios can not authenticate with invalid password                                                             0.31s  
+  ✓ usuarios can logout                                                                                             0.09s  
+
+   PASS  Tests\Feature\Auth\EmailVerificationTest
+  ✓ email verification screen is disabled                                                                           0.12s  
+
+   PASS  Tests\Feature\Auth\InternalAuthenticationSecurityTest
+  ✓ inactive user cannot authenticate and receives generic message                                                  0.31s  
+  ✓ unknown and inactive recovery requests return same public response                                              0.51s  
+  ✓ active user receives institutional reset notification                                                           0.29s  
+  ✓ reset notification contains internal route and email                                                            0.08s  
+  ✓ expired reset token is rejected                                                                                 0.51s  
+  ✓ recent password cannot be reused during recovery                                                                0.54s  
+  ✓ password reset increments authentication version                                                                0.35s  
+  ✓ token issued before authentication version change is rejected                                                   0.54s  
+  ✓ expired temporary password cannot start session                                                                 0.10s  
+  ✓ forced password user cannot skip profile                                                                        0.09s  
+  ✓ stale authentication version closes session                                                                     0.09s  
+  ✓ user can invalidate other sessions and keep current session                                                     0.12s  
+  ✓ profile email change revokes token for previous email                                                           0.33s  
+  ✓ profile email change requires recent password confirmation                                                      0.11s  
+
+   PASS  Tests\Feature\Auth\PasswordConfirmationTest
+  ✓ confirm password screen can be rendered                                                                         0.16s  
+  ✓ password can be confirmed                                                                                       0.10s  
+  ✓ password is not confirmed with invalid password                                                                 0.32s  
+
+   PASS  Tests\Feature\Auth\PasswordResetTest
+  ✓ reset password link screen can be rendered                                                                      0.13s  
+  ✓ reset password link can be requested                                                                            0.30s  
+  ✓ reset password screen can be rendered                                                                           0.45s  
+  ✓ password can be reset with valid token                                                                          0.35s  
+
+   PASS  Tests\Feature\Auth\PasswordUpdateTest
+  ✓ password can be updated                                                                                         0.13s  
+  ✓ correct password must be provided to update password                                                            0.10s  
+
+   PASS  Tests\Feature\Auth\RegistrationTest
+  ✓ public registration screen is disabled                                                                          0.10s  
+  ✓ public registration post is disabled                                                                            0.09s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ the application returns a successful response                                                                   0.07s  
+
+   PASS  Tests\Feature\Production\ProductionHardeningTest
+  ✓ backups are post only and reserved for admin                                                                    0.07s  
+  ✓ institutional configuration is admin only                                                                       0.08s  
+  ✓ authenticated internal responses disable browser cache                                                          0.11s  
+  ✓ production validation command is registered                                                                     0.15s  
+
+   PASS  Tests\Feature\ProfileTest
+  ✓ profile page is displayed                                                                                       0.23s  
+  ✓ profile information can be updated                                                                              0.20s  
+  ✓ user can not delete their own account from profile                                                              2.92s  
+
+   PASS  Tests\Feature\SolicitudesDocentes\TeacherPaymentWorkflowTest
+  ✓ academica registers classes and cadmin values programs and pays                                                 0.34s  
+  ✓ cadmin can reject without academica assigning amounts                                                           0.14s  
+  ✓ academica cannot value or assign payment data                                                                   0.13s  
+  ✓ cadmin recalculates one session at 450 even if browser sends four                                               0.12s  
+  ✓ hourly payment uses reported hours and rounds to cents                                                          0.21s  
+  ✓ fixed payment keeps manual total and clears unit rate                                                           0.11s  
+  ✓ cadmin can correct an authorized but unpaid valuation                                                           0.17s  
+
+   PASS  Tests\Feature\UX\IdempotentSubmissionTest
+  ✓ same operation key is processed only once                                                                       0.12s  
+  ✓ different operation key allows a new action                                                                     0.11s  
+  ✓ validation failure does not consume operation key                                                               0.09s  
+  ✓ duplicate json request returns conflict                                                                         0.08s  
+
+   PASS  Tests\Feature\UX\InternalMutationRoutesIdempotencyTest
+  ✓ all internal mutation routes use idempotency protection                                                         0.13s  
+  ✓ read only mass filter is explicitly exempt                                                                      0.08s  
+
+   PASS  Tests\Feature\UX\PostRedirectGetTest
+  ✓ critical success flows use explicit get destinations                                                            0.07s  
+  ✓ both internal layouts include form recovery script                                                              0.07s  
+
+  Tests:    86 passed (338 assertions)
+  Duration: 53.96s
+

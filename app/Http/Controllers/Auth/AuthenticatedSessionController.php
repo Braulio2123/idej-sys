@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\InternalSessionSecurityService;
 use App\Traits\RegistraBitacora;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,11 @@ use Illuminate\View\View;
 class AuthenticatedSessionController extends Controller
 {
     use RegistraBitacora;
+
+    public function __construct(
+        private readonly InternalSessionSecurityService $sessionSecurity
+    ) {
+    }
 
     /**
      * Display the login view.
@@ -31,14 +37,18 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        $request->user()?->forceFill([
-            'ultimo_acceso_at' => now(),
-            'ultimo_login_ip' => $request->ip(),
-            'ultimo_user_agent' => $request->userAgent(),
-        ])->save();
+        $usuario = $request->user();
 
-        if ($request->user()?->password_changed_at) {
-            $request->session()->put('auth.password_changed_at', $request->user()->password_changed_at->timestamp);
+        if ($usuario) {
+            $usuario->forceFill([
+                'ultimo_acceso_at' => now(),
+                'ultimo_login_ip' => $request->ip(),
+                'ultimo_user_agent' => $request->userAgent(),
+                'password_changed_at' => $usuario->password_changed_at ?? now(),
+                'auth_version' => $usuario->versionAutenticacion(),
+            ])->save();
+
+            $this->sessionSecurity->synchronizeCurrentSession($request, $usuario);
         }
 
         $this->bitacora(

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordUsuarioInterno;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -28,6 +29,7 @@ class Usuario extends Authenticatable
         'ultimo_login_ip',
         'ultimo_user_agent',
         'password_changed_at',
+        'auth_version',
         'must_change_password',
         'temporary_password_generated_at',
         'temporary_password_expires_at',
@@ -43,6 +45,7 @@ class Usuario extends Authenticatable
         'activo' => 'boolean',
         'ultimo_acceso_at' => 'datetime',
         'password_changed_at' => 'datetime',
+        'auth_version' => 'integer',
         'must_change_password' => 'boolean',
         'notificar_email' => 'boolean',
         'notificar_sms' => 'boolean',
@@ -56,8 +59,23 @@ class Usuario extends Authenticatable
 
     public function estaActivo(): bool
     {
-        // Compatibilidad durante despliegue: si la migración aún no ha corrido, no bloquear el login.
-        return ! array_key_exists('activo', $this->attributes) || (bool) $this->activo;
+        // La cuenta administrativa debe demostrar explícitamente que está activa.
+        // Ante una estructura incompleta o un atributo ausente, se bloquea el acceso.
+        return array_key_exists('activo', $this->attributes) && (bool) $this->activo;
+    }
+
+    public function versionAutenticacion(): int
+    {
+        return max(1, (int) ($this->auth_version ?? 1));
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        if (! $this->estaActivo()) {
+            return;
+        }
+
+        $this->notify(new ResetPasswordUsuarioInterno((string) $token));
     }
 
     public function rol()
@@ -206,7 +224,13 @@ class Usuario extends Authenticatable
             return true;
         }
 
-        $configuracion = config("idej_permisos.permisos.{$permiso}");
+        // Las claves funcionales contienen puntos (por ejemplo,
+        // "configuracion.editar"). No deben consultarse mediante una ruta
+        // punteada de config(), porque Laravel interpretaría cada punto como
+        // un nivel anidado. Se obtiene primero la matriz y después la clave
+        // literal completa.
+        $permisos = config('idej_permisos.permisos', []);
+        $configuracion = is_array($permisos) ? ($permisos[$permiso] ?? null) : null;
 
         if (! is_array($configuracion)) {
             return false;
@@ -238,5 +262,36 @@ class Usuario extends Authenticatable
     public function esSistemas(): bool
     {
         return $this->rolClave() === Rol::SISTEMAS;
+    }
+
+    /**
+     * Las credenciales permiten asumir la identidad operativa de otra cuenta.
+     * Por separación de funciones, únicamente Admin puede generarlas.
+     */
+    public function puedeGestionarCredencialesDe(Usuario $objetivo): bool
+    {
+        return $this->esAdmin();
+    }
+
+    /**
+     * Admin y CAdmin pueden supervisar cajas de cualquier usuario.
+     */
+    public function puedeSupervisarCajas(): bool
+    {
+        return $this->tieneRol(Rol::ADMIN, Rol::CADMIN);
+    }
+
+    /**
+     * Recepción únicamente puede operar su propia caja. Los roles supervisores
+     * pueden consultar y operar cualquier caja conforme a la ruta autorizada.
+     */
+    public function puedeOperarCaja(CorteCaja $corteCaja): bool
+    {
+        if ($this->puedeSupervisarCajas()) {
+            return true;
+        }
+
+        return $this->rolClave() === Rol::RECEPCION
+            && (int) $corteCaja->usuario_id === (int) $this->id;
     }
 }

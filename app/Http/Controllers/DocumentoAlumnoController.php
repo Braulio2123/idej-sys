@@ -5,29 +5,37 @@ namespace App\Http\Controllers;
 use App\Models\Alumno;
 use App\Models\DocumentoAlumno;
 use App\Models\RequisitoDocumental;
+use App\Models\Rol;
+use App\Services\PrivateFileService;
 use App\Traits\RegistraBitacora;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DocumentoAlumnoController extends Controller
 {
     use RegistraBitacora;
 
+    public function __construct(private readonly PrivateFileService $privateFiles)
+    {
+    }
+
     public function index(Request $request, Alumno $alumno)
     {
+        $usuario = $request->user();
         $alumno->load('grupo.programa');
 
         $mostrarArchivados = $request->boolean('archivados');
 
         $documentosQuery = $alumno->documentos()
+            ->visiblesPara($usuario)
             ->with(['usuarioSubio', 'usuarioReviso', 'requisitoDocumental.programa']);
 
         if ($mostrarArchivados) {
-            $documentosQuery->withTrashed()->whereNotNull('deleted_at');
+            $documentosQuery->onlyTrashed();
         }
 
         $documentos = $documentosQuery
@@ -40,18 +48,24 @@ class DocumentoAlumnoController extends Controller
             ->with('programa')
             ->orderBy('orden')
             ->orderBy('tipo_documento')
-            ->get();
+            ->get()
+            ->filter(fn (RequisitoDocumental $requisito) => DocumentoAlumno::usuarioPuedeGestionarTipo($usuario, $requisito->tipo_documento))
+            ->values();
 
-        $tiposDocumento = DocumentoAlumno::tiposDisponibles();
-        $estatusDocumento = DocumentoAlumno::estatusDisponibles();
+        $tiposDocumento = array_values(array_filter(
+            DocumentoAlumno::tiposDisponibles(),
+            fn (string $tipo) => DocumentoAlumno::usuarioPuedeGestionarTipo($usuario, $tipo)
+        ));
+
+        $queryVisible = fn () => $alumno->documentos()->visiblesPara($usuario);
 
         $resumen = [
-            'total' => $alumno->documentos()->count(),
-            'pendientes' => $alumno->documentos()->pendientes()->count(),
-            'aceptados' => $alumno->documentos()->aceptados()->count(),
-            'revision' => $alumno->documentos()->where('estatus', DocumentoAlumno::ESTATUS_EN_REVISION)->count(),
-            'rechazados' => $alumno->documentos()->where('estatus', DocumentoAlumno::ESTATUS_RECHAZADO)->count(),
-            'archivados' => $alumno->documentos()->onlyTrashed()->count(),
+            'total' => $queryVisible()->count(),
+            'pendientes' => $queryVisible()->pendientes()->count(),
+            'aceptados' => $queryVisible()->aceptados()->count(),
+            'revision' => $queryVisible()->where('estatus', DocumentoAlumno::ESTATUS_EN_REVISION)->count(),
+            'rechazados' => $queryVisible()->where('estatus', DocumentoAlumno::ESTATUS_RECHAZADO)->count(),
+            'archivados' => $queryVisible()->onlyTrashed()->count(),
             'requisitos' => $requisitosDisponibles->count(),
         ];
 
@@ -59,21 +73,24 @@ class DocumentoAlumnoController extends Controller
             'alumno',
             'documentos',
             'tiposDocumento',
-            'estatusDocumento',
             'requisitosDisponibles',
             'resumen',
             'mostrarArchivados'
         ));
     }
 
-    public function generarChecklist(Alumno $alumno)
+    public function generarChecklist(Request $request, Alumno $alumno)
     {
+        abort_unless($request->user()?->tienePermiso('documentos.gestionar'), 403);
+
         $alumno->load('grupo.programa');
 
         $requisitos = RequisitoDocumental::paraAlumno($alumno)
             ->orderBy('orden')
             ->orderBy('tipo_documento')
-            ->get();
+            ->get()
+            ->filter(fn (RequisitoDocumental $requisito) => DocumentoAlumno::usuarioPuedeGestionarTipo($request->user(), $requisito->tipo_documento))
+            ->values();
 
         if ($requisitos->isEmpty()) {
             return redirect()
@@ -81,11 +98,13 @@ class DocumentoAlumnoController extends Controller
                 ->with('error', 'No hay requisitos documentales activos para este alumno. Revisa el catálogo de requisitos.');
         }
 
-        $creados = 0;
+        $creados = DB::transaction(function () use ($alumno, $requisitos) {
+            Alumno::whereKey($alumno->id)->lockForUpdate()->firstOrFail();
+            $creados = 0;
 
-        DB::transaction(function () use ($alumno, $requisitos, &$creados) {
             foreach ($requisitos as $requisito) {
-                $yaExiste = $alumno->documentos()
+                $yaExiste = DocumentoAlumno::withTrashed()
+                    ->where('alumno_id', $alumno->id)
                     ->where(function ($query) use ($requisito) {
                         $query->where('requisito_documental_id', $requisito->id)
                             ->orWhere('tipo_documento', $requisito->tipo_documento);
@@ -107,7 +126,9 @@ class DocumentoAlumnoController extends Controller
 
                 $creados++;
             }
-        });
+
+            return $creados;
+        }, 3);
 
         $mensaje = $creados > 0
             ? "Checklist documental generado. Se crearon {$creados} documentos pendientes."
@@ -131,51 +152,72 @@ class DocumentoAlumnoController extends Controller
         $validated = $request->validate([
             'requisito_documental_id' => ['nullable', 'exists:requisitos_documentales,id'],
             'tipo_documento' => ['required_without:requisito_documental_id', 'nullable', 'string', 'max:120'],
-            'estatus' => ['required', Rule::in(DocumentoAlumno::estatusDisponibles())],
             'fecha_documento' => ['nullable', 'date'],
             'archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:5120'],
             'observaciones' => ['nullable', 'string', 'max:5000'],
-            'motivo_rechazo' => ['nullable', 'string', 'max:5000'],
         ], $this->mensajesValidacionDocumento(), $this->atributosDocumento());
 
         $requisito = $this->obtenerRequisitoValido($alumno, $validated['requisito_documental_id'] ?? null);
+        $tipoDocumento = trim((string) ($requisito?->tipo_documento ?? $validated['tipo_documento']));
 
-        if ($requisito && $alumno->documentos()->where('requisito_documental_id', $requisito->id)->exists()) {
-            return back()
-                ->withInput()
-                ->with('error', 'Este requisito documental ya existe en el expediente del alumno. Puedes editar el registro existente.');
+        $documentoAutorizacion = new DocumentoAlumno(['tipo_documento' => $tipoDocumento]);
+        abort_unless($documentoAutorizacion->puedeGestionar($request->user()), 403);
+
+        $archivoGuardado = null;
+
+        if ($request->hasFile('archivo')) {
+            $archivoGuardado = $this->privateFiles->store(
+                $request->file('archivo'),
+                "documentos/alumnos/{$alumno->id}",
+                PrivateFileService::DOCUMENT_MIMES,
+                'archivo'
+            );
         }
 
-        $archivo = $request->file('archivo');
+        try {
+            $documento = DB::transaction(function () use ($alumno, $requisito, $tipoDocumento, $validated, $archivoGuardado) {
+                Alumno::whereKey($alumno->id)->lockForUpdate()->firstOrFail();
 
-        $documento = new DocumentoAlumno();
-        $documento->alumno_id = $alumno->id;
-        $documento->requisito_documental_id = $requisito?->id;
-        $documento->usuario_subio_id = Auth::id();
-        $documento->tipo_documento = $requisito?->tipo_documento ?? $validated['tipo_documento'];
-        $documento->estatus = $validated['estatus'];
-        $documento->fecha_documento = $validated['fecha_documento'] ?? null;
-        $documento->observaciones = $validated['observaciones'] ?? $requisito?->descripcion;
-        $documento->motivo_rechazo = $validated['motivo_rechazo'] ?? null;
+                if ($requisito) {
+                    $duplicado = DocumentoAlumno::withTrashed()
+                        ->where('alumno_id', $alumno->id)
+                        ->where('requisito_documental_id', $requisito->id)
+                        ->exists();
 
-        if ($archivo) {
-            $this->asignarArchivo($documento, $archivo, $alumno);
+                    if ($duplicado) {
+                        throw ValidationException::withMessages([
+                            'requisito_documental_id' => 'Este requisito documental ya existe, incluso dentro del historial archivado. Revisa el registro existente antes de crear otro.',
+                        ]);
+                    }
+                }
 
-            if ($documento->estatus === DocumentoAlumno::ESTATUS_PENDIENTE) {
-                $documento->estatus = DocumentoAlumno::ESTATUS_ENTREGADO;
-            }
+                $documento = new DocumentoAlumno([
+                    'alumno_id' => $alumno->id,
+                    'requisito_documental_id' => $requisito?->id,
+                    'usuario_subio_id' => Auth::id(),
+                    'tipo_documento' => $tipoDocumento,
+                    'estatus' => $archivoGuardado ? DocumentoAlumno::ESTATUS_ENTREGADO : DocumentoAlumno::ESTATUS_PENDIENTE,
+                    'fecha_documento' => $validated['fecha_documento'] ?? null,
+                    'observaciones' => $validated['observaciones'] ?? $requisito?->descripcion,
+                    'motivo_rechazo' => null,
+                ]);
+
+                if ($archivoGuardado) {
+                    $this->aplicarMetadatosArchivo($documento, $archivoGuardado);
+                }
+
+                $documento->save();
+
+                return $documento;
+            }, 3);
+        } catch (\Throwable $e) {
+            $this->privateFiles->delete($archivoGuardado['path'] ?? null);
+            throw $e;
         }
-
-        if (in_array($documento->estatus, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
-            $documento->usuario_reviso_id = Auth::id();
-            $documento->fecha_revision = now();
-        }
-
-        $documento->save();
 
         $this->bitacora(
             'Registrar Documento Alumno',
-            "Se registró el documento {$documento->tipo_documento} del alumno {$alumno->nombre_completo}.",
+            "Se registró el documento {$documento->tipo_documento} del alumno {$alumno->nombre_completo} con clasificación {$documento->clasificacion()}.",
             'Documentos de Alumnos',
             $documento,
             $alumno->id
@@ -183,17 +225,22 @@ class DocumentoAlumnoController extends Controller
 
         return redirect()
             ->route('alumnos.documentos.index', $alumno)
-            ->with('success', 'Documento registrado correctamente.');
+            ->with('success', $archivoGuardado ? 'Documento cargado correctamente y enviado a revisión.' : 'Documento pendiente registrado correctamente.');
     }
 
     public function update(Request $request, Alumno $alumno, DocumentoAlumno $documento)
     {
         $this->validarDocumentoDelAlumno($alumno, $documento);
+        abort_unless($documento->puedeGestionar($request->user()) || $documento->puedeRevisar($request->user()), 403);
+
+        if (in_array($documento->estatus, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
+            return back()->with('error', 'Un documento aceptado o rechazado es evidencia inmutable. Archiva el registro y carga uno nuevo si necesitas sustituirlo.');
+        }
 
         $validated = $request->validate([
             'requisito_documental_id' => ['nullable', 'exists:requisitos_documentales,id'],
             'tipo_documento' => ['required_without:requisito_documental_id', 'nullable', 'string', 'max:120'],
-            'estatus' => ['required', Rule::in(DocumentoAlumno::estatusDisponibles())],
+            'estatus' => ['nullable', Rule::in(DocumentoAlumno::estatusDisponibles())],
             'fecha_documento' => ['nullable', 'date'],
             'archivo' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,application/x-pdf,image/jpeg,image/png', 'max:5120'],
             'observaciones' => ['nullable', 'string', 'max:5000'],
@@ -201,103 +248,193 @@ class DocumentoAlumnoController extends Controller
         ], $this->mensajesValidacionDocumento(), $this->atributosDocumento());
 
         $requisito = $this->obtenerRequisitoValido($alumno, $validated['requisito_documental_id'] ?? null);
+        $tipoDocumento = trim((string) ($requisito?->tipo_documento ?? $validated['tipo_documento']));
+        $documentoPropuesto = new DocumentoAlumno(['tipo_documento' => $tipoDocumento]);
 
-        if ($requisito) {
-            $duplicado = $alumno->documentos()
-                ->where('requisito_documental_id', $requisito->id)
-                ->where('id', '!=', $documento->id)
-                ->exists();
+        abort_unless($documentoPropuesto->puedeGestionar($request->user()) || $documentoPropuesto->puedeRevisar($request->user()), 403);
 
-            if ($duplicado) {
-                return back()
-                    ->withInput()
-                    ->with('error', 'Ese requisito ya está relacionado con otro documento del mismo alumno.');
-            }
+        if ($documento->archivo_path && $tipoDocumento !== $documento->tipo_documento) {
+            throw ValidationException::withMessages([
+                'tipo_documento' => 'No se puede reclasificar un registro que ya contiene un archivo. Archívalo y crea uno nuevo con el tipo correcto.',
+            ]);
         }
 
-        $estatusAnterior = $documento->estatus;
+        $estatusSolicitado = $validated['estatus'] ?? $documento->estatus;
+        $requiereRevision = in_array($estatusSolicitado, [
+            DocumentoAlumno::ESTATUS_EN_REVISION,
+            DocumentoAlumno::ESTATUS_ACEPTADO,
+            DocumentoAlumno::ESTATUS_RECHAZADO,
+        ], true);
 
-        if ($request->hasFile('archivo') && in_array($estatusAnterior, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
-            return back()
-                ->withInput()
-                ->with('error', 'No se puede reemplazar el archivo de un documento aceptado o rechazado porque debe conservarse como evidencia. Archiva este registro y carga un nuevo documento.');
+        if ($requiereRevision && ! $documentoPropuesto->puedeRevisar($request->user())) {
+            abort(403, 'No tienes permiso para revisar este tipo de documento.');
         }
 
-        $documento->requisito_documental_id = $requisito?->id;
-        $documento->tipo_documento = $requisito?->tipo_documento ?? $validated['tipo_documento'];
-        $documento->estatus = $validated['estatus'];
-        $documento->fecha_documento = $validated['fecha_documento'] ?? null;
-        $documento->observaciones = $validated['observaciones'] ?? null;
-        $documento->motivo_rechazo = $validated['motivo_rechazo'] ?? null;
+        if ($estatusSolicitado === DocumentoAlumno::ESTATUS_RECHAZADO && mb_strlen(trim((string) ($validated['motivo_rechazo'] ?? ''))) < 8) {
+            throw ValidationException::withMessages([
+                'motivo_rechazo' => 'Explica claramente por qué se rechaza el documento.',
+            ]);
+        }
+
+        $archivoGuardado = null;
 
         if ($request->hasFile('archivo')) {
-            if ($documento->archivo_path) {
-                $this->eliminarArchivoFisico($documento->archivo_path);
-            }
-
-            $this->asignarArchivo($documento, $request->file('archivo'), $alumno);
+            $archivoGuardado = $this->privateFiles->store(
+                $request->file('archivo'),
+                "documentos/alumnos/{$alumno->id}",
+                PrivateFileService::DOCUMENT_MIMES,
+                'archivo'
+            );
         }
 
-        if (
-            in_array($documento->estatus, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)
-            && $estatusAnterior !== $documento->estatus
-        ) {
-            $documento->usuario_reviso_id = Auth::id();
-            $documento->fecha_revision = now();
+        $pathAnterior = $documento->archivo_path;
+
+        try {
+            $documentoActualizado = DB::transaction(function () use (
+                $documento,
+                $alumno,
+                $requisito,
+                $tipoDocumento,
+                $validated,
+                $estatusSolicitado,
+                $archivoGuardado,
+                $request
+            ) {
+                $actual = DocumentoAlumno::whereKey($documento->id)->lockForUpdate()->firstOrFail();
+                $this->validarDocumentoDelAlumno($alumno, $actual);
+
+                if (in_array($actual->estatus, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
+                    throw ValidationException::withMessages([
+                        'estatus' => 'El documento fue revisado por otro usuario y ya no puede modificarse.',
+                    ]);
+                }
+
+                if ($requisito) {
+                    $duplicado = DocumentoAlumno::withTrashed()
+                        ->where('alumno_id', $alumno->id)
+                        ->where('requisito_documental_id', $requisito->id)
+                        ->where('id', '!=', $actual->id)
+                        ->exists();
+
+                    if ($duplicado) {
+                        throw ValidationException::withMessages([
+                            'requisito_documental_id' => 'Ese requisito ya está relacionado con otro documento del alumno.',
+                        ]);
+                    }
+                }
+
+                $actual->requisito_documental_id = $requisito?->id;
+                $actual->tipo_documento = $tipoDocumento;
+                $actual->fecha_documento = $validated['fecha_documento'] ?? null;
+                $actual->observaciones = $validated['observaciones'] ?? null;
+
+                if ($archivoGuardado) {
+                    $this->aplicarMetadatosArchivo($actual, $archivoGuardado);
+                    $actual->estatus = DocumentoAlumno::ESTATUS_ENTREGADO;
+                    $actual->usuario_reviso_id = null;
+                    $actual->fecha_revision = null;
+                    $actual->motivo_rechazo = null;
+                } else {
+                    $archivoDisponible = filled($actual->archivo_path);
+
+                    if (in_array($estatusSolicitado, [DocumentoAlumno::ESTATUS_EN_REVISION, DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true) && ! $archivoDisponible) {
+                        throw ValidationException::withMessages([
+                            'estatus' => 'No se puede revisar, aceptar o rechazar un registro que todavía no tiene archivo.',
+                        ]);
+                    }
+
+                    $actual->estatus = $estatusSolicitado;
+                    $actual->motivo_rechazo = $estatusSolicitado === DocumentoAlumno::ESTATUS_RECHAZADO
+                        ? trim((string) ($validated['motivo_rechazo'] ?? ''))
+                        : null;
+
+                    if (in_array($estatusSolicitado, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
+                        $actual->usuario_reviso_id = $request->user()->id;
+                        $actual->fecha_revision = now();
+                    } elseif ($estatusSolicitado !== DocumentoAlumno::ESTATUS_EN_REVISION) {
+                        $actual->usuario_reviso_id = null;
+                        $actual->fecha_revision = null;
+                    }
+                }
+
+                $actual->save();
+
+                return $actual;
+            }, 3);
+        } catch (\Throwable $e) {
+            $this->privateFiles->delete($archivoGuardado['path'] ?? null);
+            throw $e;
         }
 
-        if (! in_array($documento->estatus, [DocumentoAlumno::ESTATUS_ACEPTADO, DocumentoAlumno::ESTATUS_RECHAZADO], true)) {
-            $documento->usuario_reviso_id = null;
-            $documento->fecha_revision = null;
+        if ($archivoGuardado && $pathAnterior && $pathAnterior !== $documentoActualizado->archivo_path) {
+            $this->privateFiles->delete($pathAnterior);
         }
-
-        $documento->save();
 
         $this->bitacora(
             'Actualizar Documento Alumno',
-            "Se actualizó el documento {$documento->tipo_documento} del alumno {$alumno->nombre_completo}.",
+            "Se actualizó el documento {$documentoActualizado->tipo_documento} del alumno {$alumno->nombre_completo}. Estatus: {$documentoActualizado->estatus}.",
             'Documentos de Alumnos',
-            $documento,
+            $documentoActualizado,
             $alumno->id
         );
 
         return redirect()
             ->route('alumnos.documentos.index', $alumno)
-            ->with('success', 'Documento actualizado correctamente.');
+            ->with('success', $archivoGuardado ? 'El nuevo archivo se guardó y el anterior se retiró después de confirmar la actualización.' : 'Documento actualizado correctamente.');
     }
 
-    public function download(Alumno $alumno, DocumentoAlumno $documento)
+    public function download(Request $request, Alumno $alumno, DocumentoAlumno $documento)
     {
         $this->validarDocumentoDelAlumno($alumno, $documento);
+        abort_unless($documento->puedeDescargar($request->user()), 403);
 
-        $disk = $this->resolverDiscoArchivo($documento->archivo_path);
+        $path = $this->privateFiles->ensurePrivate($documento->archivo_path);
 
-        if (! $documento->archivo_path || ! $disk) {
-            return back()->with('error', 'El archivo no existe o todavía no ha sido cargado.');
+        if (! $path) {
+            $this->registrarIncidenteArchivo($documento, $alumno, 'El archivo referenciado no existe en almacenamiento privado ni en el almacenamiento público heredado.');
+
+            return back()->with('error', 'El archivo no está disponible. El incidente quedó registrado para revisión del área de Sistemas.');
         }
 
-        $nombreDescarga = $documento->nombre_original ?: Str::slug($documento->tipo_documento, '_').'.'.($documento->extension ?: 'pdf');
+        $sha256 = $this->privateFiles->sha256($path);
+
+        if ($documento->archivo_sha256 && (! $sha256 || ! hash_equals($documento->archivo_sha256, $sha256))) {
+            $this->registrarIncidenteArchivo($documento, $alumno, 'La huella SHA-256 del archivo no coincide con la registrada.');
+
+            return back()->with('error', 'El archivo no superó la validación de integridad y no puede descargarse. Contacta al área de Sistemas.');
+        }
+
+        if (! $documento->archivo_sha256 && $sha256) {
+            $documento->forceFill([
+                'archivo_sha256' => $sha256,
+                'archivo_verificado_at' => now(),
+            ])->saveQuietly();
+        } else {
+            $documento->forceFill(['archivo_verificado_at' => now()])->saveQuietly();
+        }
+
+        $nombreDescarga = $documento->nombre_original
+            ?: Str::slug($documento->tipo_documento, '_').'.'.($documento->extension ?: 'pdf');
 
         $this->bitacora(
             'Descargar Documento Alumno',
-            "Se descargó el documento {$documento->tipo_documento} del alumno {$alumno->nombre_completo}.",
+            "Se descargó el documento {$documento->tipo_documento} del alumno {$alumno->nombre_completo}. Clasificación: {$documento->clasificacion()}.",
             'Documentos de Alumnos',
             $documento,
             $alumno->id
         );
 
-        return Storage::disk($disk)->download($documento->archivo_path, $nombreDescarga);
+        return $this->privateFiles->download($path, $nombreDescarga);
     }
 
-    public function destroy(Alumno $alumno, DocumentoAlumno $documento)
+    public function destroy(Request $request, Alumno $alumno, DocumentoAlumno $documento)
     {
         $this->validarDocumentoDelAlumno($alumno, $documento);
+        abort_unless($request->user()?->tienePermiso('documentos.eliminar'), 403);
 
         $tipo = $documento->tipo_documento;
         $teniaArchivo = filled($documento->archivo_path);
 
-        // No se elimina el archivo físico. El registro usa SoftDeletes y el archivo
-        // permanece en disco privado para conservar evidencia institucional.
         $documento->delete();
 
         $this->bitacora(
@@ -313,59 +450,23 @@ class DocumentoAlumnoController extends Controller
             ->with('success', 'Documento archivado correctamente. El archivo privado se conserva como evidencia.');
     }
 
-    private function asignarArchivo(DocumentoAlumno $documento, $archivo, Alumno $alumno): void
+    private function aplicarMetadatosArchivo(DocumentoAlumno $documento, array $archivo): void
     {
-        // Los documentos de alumnos contienen información sensible.
-        // Se guardan en disco privado y se entregan únicamente por ruta autenticada.
-        $path = $archivo->store("documentos/alumnos/{$alumno->id}", 'local');
-
-        $documento->nombre_original = $archivo->getClientOriginalName();
-        $documento->archivo_path = $path;
-        $documento->mime_type = $archivo->getClientMimeType();
-        $documento->extension = $archivo->getClientOriginalExtension();
-        $documento->tamano_bytes = $archivo->getSize();
+        $documento->nombre_original = $archivo['original_name'];
+        $documento->archivo_path = $archivo['path'];
+        $documento->mime_type = $archivo['mime_type'];
+        $documento->extension = $archivo['extension'];
+        $documento->tamano_bytes = $archivo['size'];
+        $documento->archivo_sha256 = $archivo['sha256'];
+        $documento->archivo_verificado_at = now();
         $documento->fecha_entrega = now();
         $documento->usuario_subio_id = Auth::id();
-    }
-
-    private function resolverDiscoArchivo(?string $path): ?string
-    {
-        if (! $path) {
-            return null;
-        }
-
-        if (Storage::disk('local')->exists($path)) {
-            return 'local';
-        }
-
-        // Compatibilidad con archivos cargados antes de la Fase 24.
-        if (Storage::disk('public')->exists($path)) {
-            return 'public';
-        }
-
-        return null;
-    }
-
-    private function eliminarArchivoFisico(?string $path): void
-    {
-        if (! $path) {
-            return;
-        }
-
-        if (Storage::disk('local')->exists($path)) {
-            Storage::disk('local')->delete($path);
-        }
-
-        if (Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->delete($path);
-        }
     }
 
     private function mensajesValidacionDocumento(): array
     {
         return [
             'tipo_documento.required_without' => 'Selecciona un requisito del catálogo o indica el tipo de documento que estás registrando.',
-            'estatus.required' => 'Selecciona el estatus del documento.',
             'archivo.mimes' => 'El archivo debe ser PDF, JPG, JPEG o PNG.',
             'archivo.mimetypes' => 'El contenido del archivo no coincide con un formato permitido. Verifica que sea PDF o imagen válida.',
             'archivo.max' => 'El archivo no debe ser mayor a 5 MB.',
@@ -402,8 +503,23 @@ class DocumentoAlumnoController extends Controller
             ->whereKey($requisito->id)
             ->exists();
 
-        abort_unless($esValido, 422, 'El requisito documental seleccionado no aplica para este alumno.');
+        if (! $esValido) {
+            throw ValidationException::withMessages([
+                'requisito_documental_id' => 'El requisito documental seleccionado no aplica para este alumno.',
+            ]);
+        }
 
         return $requisito;
+    }
+
+    private function registrarIncidenteArchivo(DocumentoAlumno $documento, Alumno $alumno, string $detalle): void
+    {
+        $this->bitacora(
+            'Incidente Archivo Privado',
+            "Documento #{$documento->id} ({$documento->tipo_documento}) del alumno {$alumno->nombre_completo}: {$detalle}",
+            'Seguridad de Archivos',
+            $documento,
+            $alumno->id
+        );
     }
 }

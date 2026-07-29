@@ -47,7 +47,8 @@ class DiaNoLaboralController extends Controller
 
         $this->bitacora('Crear día no laboral', "Se registró {$dia->nombre} para {$dia->fecha->format('d/m/Y')}.", 'Área Académica', $dia);
 
-        return back()->with('success', 'Día no laboral registrado correctamente. Si había sesiones programadas en esa fecha, se notificó a las áreas involucradas.');
+        return redirect()->route('dias_no_laborales.index', ['anio' => $dia->fecha->year])
+            ->with('success', 'Día no laboral registrado correctamente. Si había sesiones programadas en esa fecha, se notificó a las áreas involucradas.');
     }
 
     public function cargarOficiales(Request $request)
@@ -70,7 +71,8 @@ class DiaNoLaboralController extends Controller
 
         $this->bitacora('Cargar días no laborales oficiales', 'Se cargaron días no laborales oficiales para '.$validated['anio'].'.', 'Área Académica');
 
-        return back()->with('success', 'Días no laborales oficiales cargados para '.$validated['anio'].'.');
+        return redirect()->route('dias_no_laborales.index', ['anio' => $validated['anio']])
+            ->with('success', 'Días no laborales oficiales cargados para '.$validated['anio'].'.');
     }
 
     public function update(Request $request, DiaNoLaboral $diaNoLaboral)
@@ -87,17 +89,20 @@ class DiaNoLaboralController extends Controller
 
         $this->bitacora('Actualizar día no laboral', "Se actualizó el día no laboral {$diaNoLaboral->fecha->format('d/m/Y')}.", 'Área Académica', $diaNoLaboral);
 
-        return back()->with('success', 'Día no laboral actualizado correctamente.');
+        return redirect()->route('dias_no_laborales.index', ['anio' => $diaNoLaboral->fecha->year])
+            ->with('success', 'Día no laboral actualizado correctamente.');
     }
 
     public function destroy(DiaNoLaboral $diaNoLaboral)
     {
+        $anio = $diaNoLaboral->fecha->year;
         $descripcion = "Se eliminó el día no laboral {$diaNoLaboral->nombre} ({$diaNoLaboral->fecha->format('d/m/Y')}).";
         $diaNoLaboral->delete();
 
         $this->bitacora('Eliminar día no laboral', $descripcion, 'Área Académica');
 
-        return back()->with('success', 'Día no laboral eliminado correctamente.');
+        return redirect()->route('dias_no_laborales.index', ['anio' => $anio])
+            ->with('success', 'Día no laboral eliminado correctamente.');
     }
 
     private function notificarSesionesAfectadas(DiaNoLaboral $dia): void

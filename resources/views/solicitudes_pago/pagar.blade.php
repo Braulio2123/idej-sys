@@ -10,7 +10,7 @@
                 <i class="bx bx-money text-green-600 text-3xl"></i>
                 Registrar pago docente
             </h1>
-            <p class="text-sm text-slate-500">Solicitud {{ $solicitud->folio ?? '#'.$solicitud->id }} autorizada por {{ $solicitud->autorizadoPor->nombre ?? 'Administración' }}.</p>
+            <p class="text-sm text-slate-500">Solicitud {{ $solicitud->folio ?? '#'.$solicitud->id }} autorizada por {{ $solicitud->valoradoPor->nombre ?? 'Coordinación Administrativa' }}.</p>
         </div>
 
         @if($errors->any())

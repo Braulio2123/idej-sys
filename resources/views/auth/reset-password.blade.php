@@ -1,7 +1,7 @@
 <x-guest-layout>
     <div class="mb-5">
         <h1 class="text-xl font-bold text-slate-900">Crear nueva contraseña</h1>
-        <p class="text-sm text-slate-600 mt-1">Usa el enlace de recuperación recibido en tu correo.</p>
+        <p class="text-sm text-slate-600 mt-1">Usa el enlace recibido en tu correo. La nueva contraseña debe tener al menos 12 caracteres, mayúsculas, minúsculas, números y símbolos.</p>
     </div>
 
     <form method="POST" action="{{ route('password.store') }}">

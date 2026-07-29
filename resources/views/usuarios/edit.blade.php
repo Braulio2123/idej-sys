@@ -6,6 +6,10 @@
 <div class="max-w-xl mx-auto bg-white shadow-md rounded-xl p-6 mt-6">
     <h2 class="text-2xl font-bold text-gray-800 mb-4">✏ Editar usuario</h2>
 
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        La creación, modificación de identidad, asignación de roles y activación de cuentas está reservada a Administración.
+    </div>
+
     @if ($errors->any())
         <div class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 p-3 text-sm">
             <ul class="list-disc pl-5">

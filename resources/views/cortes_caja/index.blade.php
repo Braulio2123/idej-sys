@@ -3,6 +3,10 @@
 @section('title', 'Cortes de Caja')
 
 @section('content')
+@php
+    $usuarioActual = Auth::user();
+    $puedeOperarCaja = $usuarioActual?->tienePermiso('caja.operar') ?? false;
+@endphp
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -10,14 +14,16 @@
             <p class="text-sm text-slate-500">Control diario de ingresos por usuario, método de pago y cierre operativo.</p>
         </div>
 
-        @if($cajaAbierta)
-            <a href="{{ route('cortes-caja.show', $cajaAbierta) }}" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">
-                Ver mi caja abierta #{{ $cajaAbierta->id }}
-            </a>
-        @else
-            <a href="{{ route('cortes-caja.create') }}" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700">
-                Abrir caja
-            </a>
+        @if($puedeOperarCaja)
+            @if($cajaAbierta)
+                <a href="{{ route('cortes-caja.show', $cajaAbierta) }}" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">
+                    Ver mi caja abierta #{{ $cajaAbierta->id }}
+                </a>
+            @else
+                <a href="{{ route('cortes-caja.create') }}" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700">
+                    Abrir caja
+                </a>
+            @endif
         @endif
     </div>
 
@@ -38,17 +44,19 @@
             </select>
         </div>
 
-        <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Usuario</label>
-            <select name="usuario_id" class="w-full rounded-lg border-slate-300 text-sm">
-                <option value="">Todos</option>
-                @foreach($usuarios as $usuario)
-                    <option value="{{ $usuario->id }}" @selected((string) request('usuario_id') === (string) $usuario->id)>
-                        {{ $usuario->nombre }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+        @if($puedeConsultarTodas)
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Usuario</label>
+                <select name="usuario_id" class="w-full rounded-lg border-slate-300 text-sm">
+                    <option value="">Todos</option>
+                    @foreach($usuarios as $usuario)
+                        <option value="{{ $usuario->id }}" @selected((string) request('usuario_id') === (string) $usuario->id)>
+                            {{ $usuario->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
 
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Desde</label>
@@ -102,7 +110,7 @@
                         </td>
                         <td class="p-3 text-right space-x-2">
                             <a href="{{ route('cortes-caja.show', $corte) }}" class="text-indigo-700 font-semibold hover:underline">Ver</a>
-                            @if($corte->estatus === 'Abierta')
+                            @if($corte->estatus === 'Abierta' && ($usuarioActual?->puedeOperarCaja($corte) ?? false))
                                 <a href="{{ route('cortes-caja.cierre', $corte) }}" class="text-red-700 font-semibold hover:underline">Cerrar</a>
                             @endif
                         </td>

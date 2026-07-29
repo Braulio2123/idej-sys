@@ -36,8 +36,25 @@
 @php
     $configuracion = configuracionInstitucional();
     $logoPath = $configuracion->logoPathPdf();
-    $efectivoEsperado = (float) $corteCaja->saldo_inicial + (float) $totalesActuales['efectivo_sistema'] + (float) $resumenMovimientos['neto_efectivo'];
-    $totalEsperado = (float) $corteCaja->saldo_inicial + (float) $totalesActuales['total_sistema'] + (float) $resumenMovimientos['neto_total'];
+    $esperados = [
+        'Efectivo' => round((float) $corteCaja->saldo_inicial + (float) $totalesActuales['efectivo_sistema'] + (float) $resumenMovimientos['neto_efectivo'], 2),
+        'Transferencia' => round((float) $totalesActuales['transferencia_sistema'] + (float) $resumenMovimientos['neto_transferencia'], 2),
+        'Tarjeta' => round((float) $totalesActuales['tarjeta_sistema'] + (float) $resumenMovimientos['neto_tarjeta'], 2),
+        'Otros métodos' => round((float) $resumenMovimientos['neto_otro'], 2),
+    ];
+    $reportados = [
+        'Efectivo' => (float) $corteCaja->efectivo_reportado,
+        'Transferencia' => (float) $corteCaja->transferencia_reportado,
+        'Tarjeta' => (float) $corteCaja->tarjeta_reportado,
+        'Otros métodos' => (float) $corteCaja->otro_reportado,
+    ];
+    $diferencias = [
+        'Efectivo' => (float) $corteCaja->diferencia_efectivo,
+        'Transferencia' => (float) $corteCaja->diferencia_transferencia,
+        'Tarjeta' => (float) $corteCaja->diferencia_tarjeta,
+        'Otros métodos' => (float) $corteCaja->diferencia_otro,
+    ];
+    $totalEsperado = round(array_sum($esperados), 2);
 @endphp
 
 <div class="header">
@@ -86,28 +103,36 @@
     </tr>
     <tr>
         <td>Saldo inicial</td><td class="right">${{ number_format($corteCaja->saldo_inicial, 2) }}</td>
+        <td>Pagos activos</td><td class="right">{{ $totalesActuales['cantidad_pagos'] }}</td>
+    </tr>
+    <tr>
         <td>Total cobrado por pagos</td><td class="right">${{ number_format($totalesActuales['total_sistema'], 2) }}</td>
-    </tr>
-    <tr>
-        <td>Efectivo cobrado</td><td class="right">${{ number_format($totalesActuales['efectivo_sistema'], 2) }}</td>
-        <td>Transferencias</td><td class="right">${{ number_format($totalesActuales['transferencia_sistema'], 2) }}</td>
-    </tr>
-    <tr>
-        <td>Tarjeta</td><td class="right">${{ number_format($totalesActuales['tarjeta_sistema'], 2) }}</td>
         <td>Neto entradas/salidas</td><td class="right {{ $resumenMovimientos['neto_total'] < 0 ? 'red' : 'green' }}">${{ number_format($resumenMovimientos['neto_total'], 2) }}</td>
     </tr>
     <tr>
-        <td>Efectivo esperado</td><td class="right">${{ number_format($efectivoEsperado, 2) }}</td>
         <td>Total esperado</td><td class="right">${{ number_format($totalEsperado, 2) }}</td>
-    </tr>
-    <tr>
-        <td>Efectivo reportado</td><td class="right">${{ number_format($corteCaja->efectivo_reportado, 2) }}</td>
         <td>Total reportado</td><td class="right">${{ number_format($corteCaja->total_reportado, 2) }}</td>
     </tr>
     <tr>
-        <td>Diferencia efectivo</td><td class="right {{ (float)$corteCaja->diferencia_efectivo === 0.0 ? 'green' : 'red' }}">${{ number_format($corteCaja->diferencia_efectivo, 2) }}</td>
-        <td>Diferencia total</td><td class="right {{ (float)$corteCaja->diferencia_total === 0.0 ? 'green' : 'red' }}">${{ number_format($corteCaja->diferencia_total, 2) }}</td>
+        <td>Diferencia total</td>
+        <td class="right {{ abs((float) $corteCaja->diferencia_total) < 0.01 ? 'green' : 'red' }}">${{ number_format($corteCaja->diferencia_total, 2) }}</td>
+        <td>Movimientos aplicados</td><td class="right">{{ $resumenMovimientos['cantidad'] }}</td>
     </tr>
+</table>
+
+<div class="section-title">Conciliación por método</div>
+<table>
+    <tr>
+        <th>Método</th><th class="right">Esperado</th><th class="right">Reportado</th><th class="right">Diferencia</th>
+    </tr>
+    @foreach($esperados as $metodo => $esperado)
+        <tr>
+            <td>{{ $metodo }}</td>
+            <td class="right">${{ number_format($esperado, 2) }}</td>
+            <td class="right">${{ number_format($reportados[$metodo], 2) }}</td>
+            <td class="right {{ abs((float) $diferencias[$metodo]) < 0.01 ? 'green' : 'red' }}">${{ number_format($diferencias[$metodo], 2) }}</td>
+        </tr>
+    @endforeach
 </table>
 
 @if($corteCaja->movimientos->isNotEmpty())

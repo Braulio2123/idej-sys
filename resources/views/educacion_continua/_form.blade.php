@@ -76,12 +76,12 @@
         <div>
             <label class="block text-sm font-semibold text-slate-700 mb-1">Costo</label>
             <input type="number" step="0.01" min="0" name="costo" value="{{ old('costo', $curso->costo) }}" class="w-full rounded-xl border-slate-300">
-            <p class="text-xs text-slate-500 mt-1">Dato comercial para áreas administrativas, recepción, RRPP o finanzas.</p>
+            <p class="text-xs text-slate-500 mt-1">Dato comercial para Coordinación Administrativa, Recepción o RRPP.</p>
         </div>
     @else
         <div class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
             <p class="text-sm font-semibold text-blue-950">Costo administrativo</p>
-            <p class="text-sm text-blue-800 mt-1">Coordinación Académica no captura el costo en este flujo. CAdmin, Recepción, RRPP o Finanzas lo definirán cuando corresponda.</p>
+            <p class="text-sm text-blue-800 mt-1">Coordinación Académica no captura el costo en este flujo. Coordinación Administrativa, Recepción o RRPP lo definirán cuando corresponda.</p>
         </div>
     @endif
 </div>

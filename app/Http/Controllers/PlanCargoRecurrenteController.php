@@ -106,7 +106,7 @@ class PlanCargoRecurrenteController extends Controller
         return [
             'conceptos' => ConceptoPago::orderBy('nombre')->get(),
             'programas' => Programa::orderBy('nombre')->get(),
-            'grupos' => Grupo::with('programa')->orderBy('nombre')->get(),
+            'grupos' => Grupo::activos()->with('programa')->orderBy('nombre')->get(),
         ];
     }
 
@@ -117,7 +117,7 @@ class PlanCargoRecurrenteController extends Controller
             'concepto_id' => ['required', 'exists:conceptos_pagos,id'],
             'alcance' => ['required', Rule::in(['todos', 'programa', 'grupo'])],
             'programa_id' => ['nullable', 'required_if:alcance,programa', 'exists:programas,id'],
-            'grupo_id' => ['nullable', 'required_if:alcance,grupo', 'exists:grupos,id'],
+            'grupo_id' => ['nullable', 'required_if:alcance,grupo', Rule::exists('grupos', 'id')->where('activo', true)],
             'monto' => ['nullable', 'numeric', 'min:0'],
             'dia_vencimiento' => ['required', 'integer', 'min:1', 'max:28'],
             'frecuencia_meses' => ['required', 'integer', 'min:1', 'max:12'],

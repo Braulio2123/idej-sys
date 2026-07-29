@@ -5,7 +5,7 @@
 @section('content')
 @php
     $requiereCambioPassword = (bool) ($user->must_change_password ?? false);
-    $puedeModificarCorreo = $puedeModificarCorreo ?? ($user->esAdmin() || $user->esSistemas());
+    $puedeModificarCorreo = $puedeModificarCorreo ?? $user->esAdmin();
 @endphp
 
 <div class="max-w-6xl mx-auto space-y-6">
@@ -20,6 +20,12 @@
             {{ $user->rol?->nombre ?? 'Sin rol asignado' }}
         </div>
     </div>
+
+    @if (session('success'))
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {{ session('success') }}
+        </div>
+    @endif
 
     @if (session('warning'))
         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -53,7 +59,7 @@
                     @if($requiereCambioPassword)
                         <p class="text-sm text-amber-700">Por seguridad, primero cambia la contraseña temporal. Después podrás actualizar los datos permitidos.</p>
                     @else
-                        <p class="text-sm text-slate-500">Puedes actualizar tu nombre. El correo institucional solo puede modificarse con rol Admin o Sistemas.</p>
+                        <p class="text-sm text-slate-500">Puedes actualizar tu nombre. El correo institucional solo puede modificarse con rol Admin.</p>
                     @endif
                 </div>
 
@@ -90,7 +96,7 @@
                             class="mt-1 w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 {{ (! $puedeModificarCorreo || $requiereCambioPassword) ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : '' }}"
                         >
                         @if(! $puedeModificarCorreo)
-                            <p class="mt-2 text-xs text-slate-500">El correo institucional solo puede cambiarlo Admin o Sistemas desde Gestión de Usuarios.</p>
+                            <p class="mt-2 text-xs text-slate-500">El correo institucional solo puede cambiarlo un Admin desde Gestión de Usuarios.</p>
                         @elseif($requiereCambioPassword)
                             <p class="mt-2 text-xs text-amber-700">Primero cambia la contraseña temporal para continuar.</p>
                         @endif
@@ -113,7 +119,7 @@
             <section class="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
                 <div class="mb-5">
                     <h3 class="text-lg font-semibold text-slate-800">Cambiar contraseña</h3>
-                    <p class="text-sm text-slate-500">Usa una contraseña fuerte. No compartas tu acceso porque toda acción queda ligada a tu usuario en bitácora. No puedes reutilizar contraseñas usadas en los últimos 6 meses.</p>
+                    <p class="text-sm text-slate-500">Usa al menos 12 caracteres e incluye mayúsculas, minúsculas, números y símbolos. No puedes reutilizar contraseñas de los últimos 6 meses. Al actualizarla se cerrarán tus demás sesiones.</p>
                 </div>
 
                 <form method="POST" action="{{ route('password.update') }}" class="space-y-5">
@@ -209,8 +215,20 @@
             </section>
 
             <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-                <h3 class="font-semibold">Pendiente para fase de seguridad avanzada</h3>
-                <p class="mt-2">Aquí se integrará doble factor, cierre de otras sesiones y revisión de dispositivos activos.</p>
+                <h3 class="font-semibold">Sesiones abiertas</h3>
+                <p class="mt-2 leading-relaxed">Utiliza esta opción si dejaste tu cuenta abierta en otra computadora. Esta sesión permanecerá activa y las demás quedarán invalidadas.</p>
+
+                @unless($requiereCambioPassword)
+                    <form method="POST" action="{{ route('profile.sessions.destroy-others') }}" class="mt-4" onsubmit="return confirm('¿Deseas cerrar las demás sesiones de tu usuario?');">
+                        @csrf
+                        @method('DELETE')
+                        <button class="w-full rounded-xl bg-amber-700 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-amber-800">
+                            Cerrar otras sesiones
+                        </button>
+                    </form>
+                @else
+                    <p class="mt-3 font-semibold">Primero cambia la contraseña temporal.</p>
+                @endunless
             </section>
         </aside>
     </div>

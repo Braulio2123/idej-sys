@@ -13,7 +13,12 @@ return new class extends Migration
 
             $table->foreignId('alumno_id')
                 ->constrained('alumnos')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
+
+            $table->foreignId('requisito_documental_id')
+                ->nullable()
+                ->constrained('requisitos_documentales')
+                ->nullOnDelete();
 
             $table->foreignId('usuario_subio_id')
                 ->nullable()
@@ -31,6 +36,8 @@ return new class extends Migration
             $table->string('mime_type', 120)->nullable();
             $table->string('extension', 20)->nullable();
             $table->unsignedBigInteger('tamano_bytes')->nullable();
+            $table->char('archivo_sha256', 64)->nullable();
+            $table->dateTime('archivo_verificado_at')->nullable();
 
             $table->string('estatus', 40)->default('Pendiente');
             $table->date('fecha_documento')->nullable();
@@ -40,8 +47,10 @@ return new class extends Migration
             $table->text('motivo_rechazo')->nullable();
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['alumno_id', 'estatus']);
+            $table->index(['requisito_documental_id', 'estatus'], 'documentos_requisito_estatus_idx');
             $table->index(['tipo_documento', 'estatus']);
         });
     }

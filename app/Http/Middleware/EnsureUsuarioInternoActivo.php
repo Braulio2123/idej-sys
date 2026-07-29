@@ -43,6 +43,18 @@ class EnsureUsuarioInternoActivo
             );
         }
 
+        $authVersion = $usuario->versionAutenticacion();
+        $sessionAuthVersion = $request->session()->get('auth.version');
+
+        if (! is_numeric($sessionAuthVersion) || (int) $sessionAuthVersion !== $authVersion) {
+            $this->cerrarSesionAdministrativa(
+                $request,
+                'Sesión cerrada por versión de acceso inválida',
+                'Se cerró una sesión administrativa porque sus credenciales o permisos de acceso cambiaron después de iniciarla.',
+                'Tu acceso cambió recientemente. Inicia sesión nuevamente.'
+            );
+        }
+
         $passwordChangedAt = optional($usuario->password_changed_at)->timestamp;
         $sessionPasswordChangedAt = $request->session()->get('auth.password_changed_at');
 
@@ -107,11 +119,7 @@ class EnsureUsuarioInternoActivo
 
         Auth::guard('web')->logout();
 
-        $request->session()->forget([
-            'auth.password_confirmed_at',
-            'auth.password_changed_at',
-        ]);
-
+        $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         throw new HttpResponseException(
