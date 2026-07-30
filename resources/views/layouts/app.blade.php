@@ -7,7 +7,7 @@
         this.sidebarOpen = ! this.sidebarOpen;
         localStorage.setItem('idej_sidebar_open', JSON.stringify(this.sidebarOpen));
     }
-}" class="bg-slate-100">
+}" class="bg-slate-50">
 <head>
     <link rel="icon" type="image/png" href="{{ logoInstitucionalUrl() }}">
     <meta charset="UTF-8">
@@ -17,21 +17,11 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
 
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 
-    <style>
-        body { font-family: 'Poppins', sans-serif; }
-        .sidebar-scroll::-webkit-scrollbar { width: 6px; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 999px; }
-        .idej-table-responsive { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .idej-table-responsive > table { min-width: 760px; }
-        @keyframes idejNotificationPulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220,38,38,.45); } 70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(220,38,38,0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220,38,38,0); } }
-        .idej-notification-pulse { animation: idejNotificationPulse .9s ease-out 1; }
-    </style>
 </head>
 
-<body class="min-h-screen flex bg-slate-100 overflow-x-hidden">
+<body class="idej-shell flex">
 @php
     use App\Models\Rol;
 
@@ -44,9 +34,9 @@
     $rolClave = $usuarioActual?->rolClave();
     $nombreUsuario = $usuarioActual?->nombre ?? 'Usuario';
 
-    $linkBase = 'group relative flex items-center gap-4 px-4 py-3 text-[14px] rounded-xl font-medium transition-all duration-200';
-    $active = 'bg-amber-400 text-slate-900 shadow-lg shadow-amber-500/30';
-    $inactive = 'text-slate-100/80 hover:bg-white/10 hover:text-white';
+    $linkBase = 'idej-nav-link';
+    $active = 'idej-nav-link-active';
+    $inactive = '';
 
     $puedeVerAlumnos = usuarioTienePermiso('alumnos.ver');
     $puedeProspectos = usuarioTienePermiso('prospectos.ver');
@@ -74,251 +64,251 @@
     $notificacionesInternasRecientes = notificacionesInternasRecientes($usuarioActual, 5);
 @endphp
 
-<aside class="fixed inset-y-0 left-0 z-40 h-screen bg-gradient-to-b from-[#1E3A8A] via-[#162860] to-[#0D133A] text-slate-50 border-r border-blue-900/60 transition-all duration-300 ease-in-out flex flex-col shadow-2xl md:sticky md:top-0 md:translate-x-0"
-       :class="sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 md:translate-x-0 md:w-24'">
+<aside class="idej-sidebar fixed inset-y-0 left-0 z-40 flex h-screen flex-col border-r border-white/5 text-slate-50 transition-all duration-300 ease-in-out md:sticky md:top-0 md:translate-x-0"
+       :class="sidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full w-[280px] md:translate-x-0 md:w-[88px]'">
 
-    <div class="h-24 flex items-center justify-between px-5 border-b border-white/10">
+    <div class="flex h-20 items-center justify-between border-b border-white/10 px-4">
         <div class="flex items-center gap-3 overflow-hidden">
-            <img src="{{ $logoSistema }}" class="h-12 w-auto flex-shrink-0">
-            <div x-show="sidebarOpen" x-transition class="flex flex-col">
-                <span class="text-base font-semibold tracking-wide uppercase">{{ $nombreCortoSistema }}</span>
-                <span class="text-[12px] text-amber-200/90 leading-tight">{{ \Illuminate\Support\Str::limit($configuracionSistema->nombre_institucion, 32) }}</span>
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/10"><img src="{{ $logoSistema }}" alt="Logo institucional" class="max-h-8 max-w-8 object-contain"></span>
+            <div x-cloak x-show="sidebarOpen" x-transition class="flex flex-col">
+                <span class="text-sm font-bold tracking-wide text-white">{{ $nombreCortoSistema }}-SYS</span>
+                <span class="mt-0.5 text-[10px] leading-tight text-slate-400">{{ \Illuminate\Support\Str::limit($configuracionSistema->nombre_institucion, 34) }}</span>
             </div>
         </div>
 
         <button @click="toggleSidebar()"
-                class="flex items-center justify-center h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white transition">
+                class="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white">
             <i class='bx text-2xl' :class="sidebarOpen ? 'bx-chevron-left' : 'bx-chevron-right'"></i>
         </button>
     </div>
 
-    <nav class="p-4 pt-5 flex-1 overflow-y-auto sidebar-scroll">
+    <nav class="idej-sidebar-scroll flex-1 overflow-y-auto p-3 pb-6 pt-4">
         <a href="{{ route('dashboard') }}" class="{{ $linkBase }} {{ request()->routeIs('dashboard') ? $active : $inactive }}">
-            <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10">
+            <span class="idej-nav-icon">
                 <i class='bx bx-home-alt-2 text-2xl'></i>
             </span>
-            <span x-show="sidebarOpen" x-transition>Dashboard</span>
+            <span x-cloak x-show="sidebarOpen" x-transition>Dashboard</span>
         </a>
 
 
         @if($puedeAgendaOperativa)
             <a href="{{ route('agenda-operativa.index') }}" class="{{ $linkBase }} {{ request()->routeIs('agenda-operativa.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-star text-2xl'></i></span>
-                <span x-show="sidebarOpen">Agenda Operativa</span>
+                <span class="idej-nav-icon"><i class='bx bx-calendar-star text-2xl'></i></span>
+                <span x-cloak x-show="sidebarOpen">Agenda Operativa</span>
             </a>
         @endif
 
         @if($puedeCentroControlOperativo)
             <a href="{{ route('centro-control.index') }}" class="{{ $linkBase }} {{ request()->routeIs('centro-control.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-radar text-2xl'></i></span>
-                <span x-show="sidebarOpen">Centro de Control</span>
+                <span class="idej-nav-icon"><i class='bx bx-radar text-2xl'></i></span>
+                <span x-cloak x-show="sidebarOpen">Centro de Control</span>
             </a>
         @endif
 
         @if($puedeAdministracion)
-            <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-amber-200/90">
-                Administración
+            <p x-cloak x-show="sidebarOpen" class="idej-nav-section">
+                Sistema
             </p>
 
             @if($puedeUsuarios)
                 <a href="{{ route('usuarios.index') }}" class="{{ $linkBase }} {{ request()->routeIs('usuarios.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user-circle text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Usuarios</span>
+                    <span class="idej-nav-icon"><i class='bx bx-user-circle text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Usuarios</span>
                 </a>
             @endif
 
             @if($puedeConfiguracion)
                 <a href="{{ route('configuracion.institucional.edit') }}" class="{{ $linkBase }} {{ request()->routeIs('configuracion.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-cog text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Configuración</span>
+                    <span class="idej-nav-icon"><i class='bx bx-cog text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Configuración</span>
                 </a>
             @endif
 
             @if($puedePanelPermisos)
                 <a href="{{ route('seguridad.permisos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('seguridad.permisos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-shield-quarter text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Permisos</span>
+                    <span class="idej-nav-icon"><i class='bx bx-shield-quarter text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Permisos</span>
                 </a>
             @endif
 
             @if($puedeMantenimiento)
                 <a href="{{ route('sistema.mantenimiento.index') }}" class="{{ $linkBase }} {{ request()->routeIs('sistema.mantenimiento.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-wrench text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Mantenimiento</span>
+                    <span class="idej-nav-icon"><i class='bx bx-wrench text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Mantenimiento</span>
                 </a>
             @endif
         @endif
 
         @if($puedeVerAlumnos || $puedeProspectos)
-            <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-blue-200/90">
+            <p x-cloak x-show="sidebarOpen" class="idej-nav-section">
                 Atención y seguimiento
             </p>
 
             @if($puedeVerAlumnos)
                 <a href="{{ route('alumnos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('alumnos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Alumnos</span>
+                    <span class="idej-nav-icon"><i class='bx bx-user text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Alumnos</span>
                 </a>
             @endif
 
             @if($puedeProspectos)
                 <a href="{{ route('prospectos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('prospectos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-user-voice text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Prospectos</span>
+                    <span class="idej-nav-icon"><i class='bx bx-user-voice text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Prospectos</span>
                 </a>
             @endif
         @endif
 
         @if($puedeOfertaAcademica || $puedeAcademica || $puedeCalendarios || $puedeHorarios || $puedeRequisitosDocumentales || $puedeEducacionContinua)
-            <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-green-200/90">
-                Área Académica
+            <p x-cloak x-show="sidebarOpen" class="idej-nav-section">
+                Gestión académica
             </p>
 
             @if($puedeOfertaAcademica)
                 <a href="{{ route('ciclos_escolares.index') }}" class="{{ $linkBase }} {{ request()->routeIs('ciclos_escolares.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Ciclos Escolares</span>
+                    <span class="idej-nav-icon"><i class='bx bx-calendar text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Ciclos Escolares</span>
                 </a>
                 <a href="{{ route('grupos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('grupos.*') || request()->routeIs('academica.grupos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-group text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Grupos</span>
+                    <span class="idej-nav-icon"><i class='bx bx-group text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Grupos</span>
                 </a>
                 <a href="{{ route('programas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('programas.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Programas</span>
+                    <span class="idej-nav-icon"><i class='bx bx-book text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Programas</span>
                 </a>
             @endif
 
             @if($puedeAcademica)
                 <a href="{{ route('materias.index') }}" class="{{ $linkBase }} {{ request()->routeIs('materias.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-book-content text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Materias</span>
+                    <span class="idej-nav-icon"><i class='bx bx-book-content text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Materias</span>
                 </a>
                 <a href="{{ route('dias_no_laborales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('dias_no_laborales.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-x text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Días no laborales</span>
+                    <span class="idej-nav-icon"><i class='bx bx-calendar-x text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Días no laborales</span>
                 </a>
                 <a href="{{ route('docentes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('docentes.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-chalkboard text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Docentes</span>
+                    <span class="idej-nav-icon"><i class='bx bx-chalkboard text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Docentes</span>
                 </a>
             @endif
 
             @if($puedeCalendarios)
                 <a href="{{ route('calendarios_academicos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('calendarios_academicos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-calendar-event text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Calendarios</span>
+                    <span class="idej-nav-icon"><i class='bx bx-calendar-event text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Calendarios</span>
                 </a>
             @endif
 
             @if($puedeHorarios)
                 <a href="{{ route('horarios_academicos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('horarios_academicos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-time-five text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Horarios</span>
+                    <span class="idej-nav-icon"><i class='bx bx-time-five text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Horarios</span>
                 </a>
             @endif
 
             @if($puedeRequisitosDocumentales)
                 <a href="{{ route('requisitos_documentales.index') }}" class="{{ $linkBase }} {{ request()->routeIs('requisitos_documentales.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-file text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Requisitos Documentales</span>
+                    <span class="idej-nav-icon"><i class='bx bx-file text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Requisitos Documentales</span>
                 </a>
             @endif
 
             @if($puedeEducacionContinua)
                 <a href="{{ route('educacion_continua.index') }}" class="{{ $linkBase }} {{ request()->routeIs('educacion_continua.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-extension text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Educación Continua</span>
+                    <span class="idej-nav-icon"><i class='bx bx-extension text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Educación Continua</span>
                 </a>
             @endif
         @endif
 
         @if($puedeSolicitudes)
             <a href="{{ route('solicitudes_pago.index') }}" class="{{ $linkBase }} {{ request()->routeIs('solicitudes_pago.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-money-withdraw text-2xl'></i></span>
-                <span x-show="sidebarOpen">Solicitudes de Pago</span>
+                <span class="idej-nav-icon"><i class='bx bx-money-withdraw text-2xl'></i></span>
+                <span x-cloak x-show="sidebarOpen">Solicitudes de Pago</span>
             </a>
         @endif
 
         @if($puedeAdministracionFinanciera || $puedeBecas || $puedeReportes || $puedeReporteEjecutivo || $puedeCaja)
-            <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-yellow-200/90">
-                Administración financiera
+            <p x-cloak x-show="sidebarOpen" class="idej-nav-section">
+                Administración y cobranza
             </p>
 
 
             @if($puedeCaja)
                 <a href="{{ route('cortes-caja.index') }}" class="{{ $linkBase }} {{ request()->routeIs('cortes-caja.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-wallet text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Cortes de Caja</span>
+                    <span class="idej-nav-icon"><i class='bx bx-wallet text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Cortes de Caja</span>
                 </a>
             @endif
 
             @if($puedeAdministracionFinanciera)
                 <a href="{{ route('conceptos.index') }}" class="{{ $linkBase }} {{ request()->routeIs('conceptos.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-coin-stack text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Conceptos</span>
+                    <span class="idej-nav-icon"><i class='bx bx-coin-stack text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Conceptos</span>
                 </a>
 
                 <a href="{{ route('cargos.masivo.index') }}" class="{{ $linkBase }} {{ request()->routeIs('cargos.masivo.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-layer-plus text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Cargos Masivos</span>
+                    <span class="idej-nav-icon"><i class='bx bx-layer-plus text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Cargos Masivos</span>
                 </a>
 
                 <a href="{{ route('cargos.recurrentes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('cargos.recurrentes.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-refresh text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Cargos recurrentes</span>
+                    <span class="idej-nav-icon"><i class='bx bx-refresh text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Cargos recurrentes</span>
                 </a>
 
             @endif
 
             @if($puedeBecas)
                 <a href="{{ route('becas.index') }}" class="{{ $linkBase }} {{ request()->routeIs('becas.*') || request()->routeIs('alumnos.becas.*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-purchase-tag-alt text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Becas</span>
+                    <span class="idej-nav-icon"><i class='bx bx-purchase-tag-alt text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Becas</span>
                 </a>
             @endif
 
             @if($puedeReportes)
                 <a href="{{ route('reportes.index') }}" class="{{ $linkBase }} {{ request()->routeIs('reportes.index') || request()->routeIs('reportes.export-*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-line-chart text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Reportes</span>
+                    <span class="idej-nav-icon"><i class='bx bx-line-chart text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Reportes</span>
                 </a>
             @endif
 
             @if($puedeReporteEjecutivo)
                 <a href="{{ route('reportes.ejecutivo') }}" class="{{ $linkBase }} {{ request()->routeIs('reportes.ejecutivo*') ? $active : $inactive }}">
-                    <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-bar-chart-alt-2 text-2xl'></i></span>
-                    <span x-show="sidebarOpen">Reporte Ejecutivo</span>
+                    <span class="idej-nav-icon"><i class='bx bx-bar-chart-alt-2 text-2xl'></i></span>
+                    <span x-cloak x-show="sidebarOpen">Reporte Ejecutivo</span>
                 </a>
             @endif
         @endif
 
         @if($puedeBitacora)
-            <p x-show="sidebarOpen" class="mt-8 mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-purple-200/90">
-                Auditoría
+            <p x-cloak x-show="sidebarOpen" class="idej-nav-section">
+                Control y auditoría
             </p>
 
             <a href="{{ route('bitacoras.index') }}" class="{{ $linkBase }} {{ request()->routeIs('bitacoras.*') ? $active : $inactive }}">
-                <span class="flex items-center justify-center h-10 w-10 rounded-lg bg-white/10"><i class='bx bx-list-check text-2xl'></i></span>
-                <span x-show="sidebarOpen">Bitácoras</span>
+                <span class="idej-nav-icon"><i class='bx bx-list-check text-2xl'></i></span>
+                <span x-cloak x-show="sidebarOpen">Bitácoras</span>
             </a>
         @endif
     </nav>
 
-    <div class="border-t border-white/10 px-5 py-4">
+    <div class="border-t border-white/10 p-3">
         <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center font-semibold">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-sm font-bold text-white shadow-lg shadow-blue-950/20">
                 {{ strtoupper(mb_substr($nombreUsuario, 0, 1)) }}
             </div>
 
-            <a href="{{ route('profile.edit') }}" x-show="sidebarOpen" x-transition class="flex-1 min-w-0 rounded-lg px-2 py-1 hover:bg-white/10 transition" title="Mi perfil">
+            <a href="{{ route('profile.edit') }}" x-cloak x-show="sidebarOpen" x-transition class="min-w-0 flex-1 rounded-xl px-2 py-1.5 transition hover:bg-white/5" title="Mi perfil">
                 <p class="text-xs font-semibold truncate">{{ $nombreUsuario }}</p>
                 <p class="text-[11px] text-slate-100/70 truncate">{{ $usuarioActual?->rol?->nombre ?? 'Sin rol' }}</p>
             </a>
 
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
-                <button class="h-10 w-10 bg-white/10 hover:bg-red-500 text-white rounded-xl flex items-center justify-center transition" title="Cerrar sesión">
+                <button class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-red-500 hover:text-white" title="Cerrar sesión">
                     <i class='bx bx-log-out text-xl'></i>
                 </button>
             </form>
@@ -326,31 +316,31 @@
     </div>
 </aside>
 
-<div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-30 bg-slate-900/50 md:hidden" @click="toggleSidebar()"></div>
+<div x-cloak x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-30 bg-slate-900/50 md:hidden" @click="toggleSidebar()"></div>
 
-<div class="flex-1 flex flex-col min-w-0">
-    <header class="h-16 bg-white/80 backdrop-blur border-b border-slate-200 flex items-center justify-between gap-3 px-3 sm:px-6 shadow-sm min-w-0">
+<div class="flex min-w-0 flex-1 flex-col">
+    <header class="idej-topbar">
         <div class="flex items-center gap-3 min-w-0">
-            <button @click="toggleSidebar()" class="md:hidden flex items-center justify-center h-9 w-9 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">
+            <button @click="toggleSidebar()" class="idej-icon-button md:hidden">
                 <i class='bx bx-menu text-2xl'></i>
             </button>
 
             <div class="min-w-0">
-                <h1 class="truncate text-lg md:text-2xl font-semibold text-slate-800">@yield('title', 'Panel de Control')</h1>
-                <p class="text-xs text-slate-500 hidden sm:block">{{ $nombreCortoSistema }}-SYS · {{ $lemaSistema }}</p>
+                <h1 class="truncate text-base font-semibold text-slate-950 sm:text-lg">@yield('title', 'Panel de control')</h1>
+                <p class="hidden text-xs text-slate-500 sm:block">{{ $lemaSistema }}</p>
             </div>
         </div>
 
         <div class="flex items-center gap-2 flex-shrink-0">
             <div class="relative" @click.away="notificacionesMenu = false">
-                <button @click="notificacionesMenu = !notificacionesMenu" class="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200" title="Notificaciones internas">
+                <button @click="notificacionesMenu = !notificacionesMenu" class="idej-icon-button relative" title="Notificaciones internas">
                     <i class='bx bx-bell text-xl'></i>
                     <span id="notificaciones-pendientes-badge" class="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white {{ ($resumenNotificacionesInternas['pendientes'] ?? 0) > 0 ? '' : 'hidden' }}">
                         {{ ($resumenNotificacionesInternas['pendientes'] ?? 0) > 99 ? '99+' : ($resumenNotificacionesInternas['pendientes'] ?? 0) }}
                     </span>
                 </button>
 
-                <div x-show="notificacionesMenu" x-transition class="absolute right-0 z-30 mt-2 w-[calc(100vw-2rem)] sm:w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-xl">
+                <div x-cloak x-show="notificacionesMenu" x-transition class="absolute right-0 z-30 mt-2 w-[calc(100vw-2rem)] sm:w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white text-sm shadow-xl">
                     <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                         <div>
                             <p class="font-semibold text-slate-800">Notificaciones</p>
@@ -392,12 +382,12 @@
             </div>
 
             <div class="relative hidden sm:block" @click.away="userMenu = false">
-                <button @click="userMenu = !userMenu" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm text-slate-700">
-                    <span class="hidden md:inline-block max-w-[180px] truncate">{{ $nombreUsuario }}</span>
+                <button @click="userMenu = !userMenu" class="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white">{{ strtoupper(mb_substr($nombreUsuario, 0, 1)) }}</span><span class="hidden max-w-[180px] truncate md:inline-block">{{ $nombreUsuario }}</span>
                     <i class='bx bx-chevron-down text-lg'></i>
                 </button>
 
-                <div x-show="userMenu" x-transition class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden text-sm">
+                <div x-cloak x-show="userMenu" x-transition class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden text-sm">
                     <div class="px-3 py-2 border-b border-slate-100">
                         <p class="font-medium truncate">{{ $nombreUsuario }}</p>
                         <p class="text-xs text-slate-500 truncate">{{ $usuarioActual?->rol?->nombre ?? 'Sin rol' }}</p>
@@ -418,7 +408,7 @@
         </div>
     </header>
 
-    <main class="min-w-0 overflow-x-hidden p-3 md:p-6">
+    <main class="min-w-0 flex-1 overflow-x-hidden"><div class="idej-page">
         @php
             $statusGlobal = session('info') ?? session('status');
             $statusTecnicosOcultos = ['profile-updated', 'password-updated', 'verification-link-sent'];
@@ -431,29 +421,34 @@
         @if(session('success') || session('error') || $statusGlobal)
             <div class="mb-4 space-y-2">
                 @if(session('success'))
-                    <div class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+                    <div class="idej-alert-success">
                         {{ session('success') }}
                     </div>
                 @endif
 
                 @if(session('error'))
-                    <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">
+                    <div class="idej-alert-danger">
                         {{ session('error') }}
                     </div>
                 @endif
 
                 @if($statusGlobal)
-                    <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+                    <div class="idej-alert-info">
                         {{ $statusGlobal }}
                     </div>
                 @endif
             </div>
         @endif
 
-        <div class="w-full max-w-full overflow-hidden bg-white rounded-2xl shadow-md border border-slate-100 p-3 md:p-6">
+        @php($contentShell = trim($__env->yieldContent('content_shell', 'surface')))
+        @if($contentShell === 'plain')
             @yield('content')
-        </div>
-    </main>
+        @else
+            <div class="idej-surface overflow-hidden p-4 sm:p-6">
+                @yield('content')
+            </div>
+        @endif
+    </div></main>
 </div>
 
 @include('partials.idempotent-forms')
@@ -495,7 +490,7 @@
             if (! item) return;
             const toast = document.createElement('a');
             toast.href = item.url || endpoint;
-            toast.className = 'fixed right-4 top-4 z-[100] w-[min(92vw,380px)] rounded-2xl border border-blue-200 bg-white p-4 shadow-2xl transition';
+            toast.className = 'fixed right-4 top-4 z-[100] w-[min(92vw,390px)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl transition';
             toast.innerHTML = `<div class="flex items-start gap-3">
                 <span class="mt-1 h-3 w-3 flex-shrink-0 rounded-full bg-blue-600"></span>
                 <div class="min-w-0"><p class="font-bold text-slate-800">${escapeHtml(item.titulo)}</p>

@@ -1,3 +1,371 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    :root {
+        color-scheme: light;
+        --idej-navy-950: #081426;
+        --idej-navy-900: #0f2138;
+        --idej-navy-800: #16304f;
+        --idej-blue-700: #1d4ed8;
+        --idej-blue-600: #2563eb;
+        --idej-blue-500: #3b82f6;
+        --idej-surface: #ffffff;
+        --idej-canvas: #f3f6fb;
+        --idej-line: #dce4ee;
+        --idej-text: #172033;
+        --idej-muted: #64748b;
+    }
+
+    html {
+        @apply scroll-smooth bg-slate-50;
+    }
+
+    body {
+        @apply min-h-screen bg-slate-50 font-sans text-slate-800 antialiased;
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    ::selection {
+        background: #bfdbfe;
+        color: #172033;
+    }
+
+    :focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.28);
+        outline-offset: 2px;
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        -webkit-tap-highlight-color: transparent;
+    }
+}
+
+@layer components {
+    .idej-shell {
+        @apply min-h-screen overflow-x-hidden bg-slate-50 text-slate-800;
+        background-image:
+            radial-gradient(circle at 92% 0%, rgba(59, 130, 246, 0.08), transparent 25rem),
+            linear-gradient(180deg, #f8fafc 0%, #f3f6fb 100%);
+    }
+
+    .idej-sidebar {
+        background:
+            radial-gradient(circle at 20% 0%, rgba(59, 130, 246, 0.22), transparent 18rem),
+            linear-gradient(180deg, var(--idej-navy-900) 0%, var(--idej-navy-950) 100%);
+        box-shadow: 18px 0 45px -28px rgba(15, 33, 56, 0.72);
+    }
+
+    .idej-sidebar-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+    }
+
+    .idej-sidebar-scroll::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .idej-sidebar-scroll::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.22);
+    }
+
+    .idej-nav-section {
+        @apply mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400;
+    }
+
+    .idej-nav-link {
+        @apply relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-300 transition duration-200;
+    }
+
+    .idej-nav-link:hover {
+        @apply bg-white/10 text-white;
+        transform: translateX(2px);
+    }
+
+    .idej-nav-link-active {
+        @apply bg-white text-slate-900 shadow-lg shadow-slate-950/20;
+    }
+
+    .idej-nav-link-active::before {
+        content: "";
+        @apply absolute inset-y-2 left-0 w-1 rounded-r-full bg-blue-600;
+    }
+
+    .idej-nav-icon {
+        @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[20px] text-slate-300 transition;
+    }
+
+    .idej-nav-link:hover .idej-nav-icon {
+        @apply bg-white/10 text-white;
+    }
+
+    .idej-nav-link-active .idej-nav-icon {
+        @apply bg-blue-50 text-blue-700;
+    }
+
+    .idej-topbar {
+        @apply sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl sm:px-6;
+        box-shadow: 0 8px 30px -24px rgba(15, 23, 42, 0.45);
+    }
+
+    .idej-page {
+        @apply mx-auto w-full max-w-[1680px] px-3 py-4 sm:px-5 sm:py-6 lg:px-8;
+    }
+
+    .idej-page-header {
+        @apply mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between;
+    }
+
+    .idej-eyebrow {
+        @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700;
+    }
+
+    .idej-page-title {
+        @apply mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl;
+    }
+
+    .idej-page-subtitle {
+        @apply mt-1 max-w-3xl text-sm leading-6 text-slate-600;
+    }
+
+    .idej-surface {
+        @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+    }
+
+    .idej-panel {
+        @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6;
+    }
+
+    .idej-panel-soft {
+        @apply rounded-2xl border border-blue-100 bg-blue-50/70 p-5 sm:p-6;
+    }
+
+    .idej-stat-card {
+        @apply relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition duration-200;
+    }
+
+    .idej-stat-card:hover {
+        @apply -translate-y-0.5 border-blue-200 shadow-md;
+    }
+
+    .idej-stat-card::after {
+        content: "";
+        @apply absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-50;
+    }
+
+    .idej-stat-label {
+        @apply relative z-10 text-xs font-semibold uppercase tracking-wide text-slate-500;
+    }
+
+    .idej-stat-value {
+        @apply relative z-10 mt-2 text-3xl font-bold tracking-tight text-slate-950;
+    }
+
+    .idej-stat-hint {
+        @apply relative z-10 mt-1 text-xs leading-5 text-slate-500;
+    }
+
+    .idej-section-heading {
+        @apply flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between;
+    }
+
+    .idej-section-title {
+        @apply text-lg font-semibold tracking-tight text-slate-900;
+    }
+
+    .idej-section-description {
+        @apply mt-1 text-sm text-slate-500;
+    }
+
+    .idej-btn {
+        @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition duration-200 focus:outline-none disabled:pointer-events-none disabled:opacity-50;
+    }
+
+    .idej-btn-primary {
+        @apply idej-btn bg-blue-600 text-white shadow-sm shadow-blue-600/20 hover:bg-blue-700;
+    }
+
+    .idej-btn-secondary {
+        @apply idej-btn border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50;
+    }
+
+    .idej-btn-dark {
+        @apply idej-btn bg-slate-900 text-white hover:bg-slate-800;
+    }
+
+    .idej-btn-success {
+        @apply idej-btn bg-emerald-700 text-white hover:bg-emerald-800;
+    }
+
+    .idej-btn-danger {
+        @apply idej-btn bg-red-600 text-white hover:bg-red-700;
+    }
+
+    .idej-icon-button {
+        @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900;
+    }
+
+    .idej-role-chip {
+        @apply inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800;
+    }
+
+    .idej-badge {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+    }
+
+    .idej-badge-info {
+        @apply idej-badge bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200;
+    }
+
+    .idej-badge-success {
+        @apply idej-badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200;
+    }
+
+    .idej-badge-warning {
+        @apply idej-badge bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200;
+    }
+
+    .idej-badge-danger {
+        @apply idej-badge bg-red-50 text-red-700 ring-1 ring-inset ring-red-200;
+    }
+
+    .idej-alert {
+        @apply flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-sm;
+    }
+
+    .idej-alert-success {
+        @apply idej-alert border-emerald-200 bg-emerald-50 text-emerald-900;
+    }
+
+    .idej-alert-danger {
+        @apply idej-alert border-red-200 bg-red-50 text-red-900;
+    }
+
+    .idej-alert-info {
+        @apply idej-alert border-blue-200 bg-blue-50 text-blue-900;
+    }
+
+    .idej-empty-state {
+        @apply flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-6 py-10 text-center;
+    }
+
+    .idej-table-responsive {
+        @apply w-full max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .idej-table-responsive > table {
+        min-width: 760px;
+    }
+
+    .idej-table-responsive table {
+        @apply w-full border-collapse text-left text-sm;
+    }
+
+    .idej-table-responsive thead {
+        @apply bg-slate-50;
+    }
+
+    .idej-table-responsive th {
+        @apply border-b border-slate-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+    }
+
+    .idej-table-responsive td {
+        @apply border-b border-slate-100 px-4 py-3.5 align-middle text-slate-700;
+    }
+
+    .idej-table-responsive tbody tr {
+        @apply transition;
+    }
+
+    .idej-table-responsive tbody tr:hover {
+        @apply bg-blue-50/40;
+    }
+
+    .idej-table-responsive tbody tr:last-child td {
+        @apply border-b-0;
+    }
+
+    .idej-form-card {
+        @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6;
+    }
+
+    .idej-form-section {
+        @apply rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5;
+    }
+
+    .idej-field-label {
+        @apply mb-1.5 block text-sm font-semibold text-slate-700;
+    }
+
+    .idej-field-help {
+        @apply mt-1.5 text-xs leading-5 text-slate-500;
+    }
+
+    .idej-input {
+        @apply block min-h-11 w-full rounded-xl border-slate-300 bg-white text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:ring-blue-500;
+    }
+
+    .idej-notification-pulse {
+        animation: idejNotificationPulse 0.9s ease-out 1;
+    }
+}
+
+@layer utilities {
+    .idej-grid-auto {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    }
+}
+
+@keyframes idejNotificationPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45);
+    }
+    70% {
+        transform: scale(1.08);
+        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+}
+
+/* Modernización progresiva de controles Blade existentes. */
+main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+main select,
+main textarea {
+    min-height: 2.75rem;
+    border-radius: 0.75rem;
+    border-color: #cbd5e1;
+    background-color: #ffffff;
+    color: #172033;
+    font-size: 0.875rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):focus,
+main select:focus,
+main textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+main label {
+    color: #334155;
+}
+
+main hr {
+    border-color: #e2e8f0;
+}
